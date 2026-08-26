@@ -31,6 +31,7 @@ export function useCreateDocument(): {
   const router = useRouter();
   const [isCreating, setIsCreating] = useState(false);
   const createNode = useWorkspaceStore((state) => state.createDocument);
+  const requestTitleFocus = useWorkspaceStore((state) => state.requestTitleFocus);
   const pushFeedback = useWorkspaceStore((state) => state.pushFeedback);
 
   const createDocument = useCallback(
@@ -40,6 +41,10 @@ export function useCreateDocument(): {
       try {
         const node = createNode(parentId, name, ICONS[kind], kind);
         if (!node) return;
+
+        // Creating is the first half of writing: the page opens with the
+        // caret already in its title, not with a Rename waiting to be found.
+        requestTitleFocus(node.id);
 
         // Config and secret documents are seeded by their own service.
         if (kind !== "page") {
@@ -64,7 +69,7 @@ export function useCreateDocument(): {
         setIsCreating(false);
       }
     },
-    [createNode, pushFeedback, router],
+    [createNode, requestTitleFocus, pushFeedback, router],
   );
 
   return { createDocument, isCreating };

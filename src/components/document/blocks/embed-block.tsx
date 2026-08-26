@@ -197,6 +197,8 @@ export function EmbedBlock({ block, onChange, isEditable }: EmbedBlockProps) {
                             primaryColumnId={embed.board?.primaryColumnId ?? ""}
                             folderId={null}
                             people={[]}
+                            columns={embed.columns}
+                            context={embed.context}
                             onCommit={(value) => {
                               void embed.editCell(rowId, column.id, value);
                               setEditing(null);

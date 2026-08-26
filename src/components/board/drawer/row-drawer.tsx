@@ -1,11 +1,13 @@
 "use client";
 
-import { Archive, ArchiveRestore, Copy, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Copy, CornerLeftUp, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ActivityTimeline } from "@/components/board/drawer/activity-timeline";
 import { DrawerTabs, type DrawerTabId } from "@/components/board/drawer/drawer-tabs";
 import { WatchButton } from "@/components/collab/watch-button";
+import { AttachmentPanel } from "@/components/board/drawer/attachment-panel";
 import { BacklinksPanel } from "@/components/board/drawer/backlinks-panel";
+import { SubtaskPanel } from "@/components/board/drawer/subtask-panel";
 import { CommentPanel } from "@/components/comments/comment-panel";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ESCAPE_OWNER_ATTRIBUTE } from "@/components/comments/mention-textarea";
@@ -60,6 +62,14 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
     const value = row.cells[board.primaryColumnId];
     return value && value.kind === "text" ? value.value : "";
   }, [row, board]);
+
+  /** The record this one sits under, when it is a subtask. */
+  const parent = useBoardStore(selectRow(row?.parentRowId ?? ""));
+  const parentTitle = useMemo(() => {
+    if (!parent || !board) return "";
+    const value = parent.cells[board.primaryColumnId];
+    return value && value.kind === "text" ? value.value : "";
+  }, [parent, board]);
 
   const isOpen = Boolean(rowId && row && board);
   const isArchived = row ? isRowArchived(row) : false;
@@ -118,6 +128,18 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
                 <WatchButton target={target} isCompact />
               </div>
 
+              {parent && (
+                <button
+                  type="button"
+                  onClick={() => useGridStore.getState().openDrawer(parent.id)}
+                  className="mt-2 flex max-w-full items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                >
+                  <CornerLeftUp className="size-3 shrink-0" />
+                  <span className="metric shrink-0">{parent.displayId}</span>
+                  <span className="truncate">{parentTitle || "Untitled"}</span>
+                </button>
+              )}
+
               <DrawerTitle className="mt-2 truncate text-lg font-semibold tracking-tight text-foreground">
                 {title || "Untitled record"}
               </DrawerTitle>
@@ -147,6 +169,7 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
                       primaryColumnId={board.primaryColumnId}
                       folderId={folderId}
                       people={people}
+                      columns={columns}
                       onCommit={(value) => commit(column.id, value)}
                       onCreateOption={(label) => createOption(column.id, label)}
                     />
@@ -154,6 +177,31 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
                 </div>
 
                 <Separator />
+
+                {/* Subtasks are records, so they sit beside the fields rather
+                    than inside one — and commenting/attaching on a subtask
+                    happens in that subtask's own drawer. */}
+                <SubtaskPanel
+                  parentRowId={row.id}
+                  parentDisplayId={row.displayId}
+                  columns={columns}
+                  primaryColumnId={board.primaryColumnId}
+                  context={context}
+                  people={people}
+                  canEdit={isEditable}
+                />
+
+                <Separator />
+                <AttachmentPanel
+                  rowId={row.id}
+                  columns={columns}
+                  folderId={folderId}
+                  canEdit={isEditable}
+                />
+
+                <Separator />
+                {/* Relations are dependencies, not containment — kept apart
+                    from Subtasks on purpose. */}
                 <BacklinksPanel rowId={row.id} />
               </section>
 

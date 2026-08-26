@@ -1,12 +1,13 @@
 "use client";
 
-import { Archive, Maximize2 } from "lucide-react";
+import { Archive, ChevronRight, Maximize2 } from "lucide-react";
 import { memo, type MouseEvent } from "react";
 import { GridCell } from "@/components/board/table/grid-cell";
 import { GUTTER_WIDTH, type GridShared } from "@/components/board/table/grid-shared";
 import { RowActionsMenu } from "@/components/board/table/row-actions-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { isRowArchived } from "@/lib/archive";
+import { isSubtask } from "@/lib/board-hierarchy";
 import { selectRow, useBoardStore } from "@/store/board-store";
 import { selectIsRowSelected, useGridStore } from "@/store/grid-store";
 import { cn } from "@/lib/utils";
@@ -15,7 +16,16 @@ interface GridRowProps {
   readonly rowId: string;
   readonly rowIndex: number;
   readonly shared: GridShared;
+  /** Hierarchy depth — 0 for a top-level record, 1 for a subtask, and so on. */
+  readonly depth?: number;
+  readonly hasChildren?: boolean;
+  readonly childCount?: number;
+  readonly isCollapsed?: boolean;
+  readonly onToggleChildren?: () => void;
 }
+
+/** Indent per level. Applied to the primary cell only, so widths stay honest. */
+const INDENT_PER_LEVEL = 18;
 
 /**
  * One record.
@@ -25,7 +35,16 @@ interface GridRowProps {
  * leaves the other 4.999 untouched. That is the whole reason the store is
  * normalised and the bulk selection is a map rather than an array.
  */
-export const GridRow = memo(function GridRow({ rowId, rowIndex, shared }: GridRowProps) {
+export const GridRow = memo(function GridRow({
+  rowId,
+  rowIndex,
+  shared,
+  depth = 0,
+  hasChildren = false,
+  childCount = 0,
+  isCollapsed = false,
+  onToggleChildren,
+}: GridRowProps) {
   const row = useBoardStore(selectRow(rowId));
   const isOpen = useGridStore((state) => state.drawerRowId === rowId);
   const isSelected = useGridStore(selectIsRowSelected(rowId));
@@ -34,6 +53,7 @@ export const GridRow = memo(function GridRow({ rowId, rowIndex, shared }: GridRo
 
   const isArchived = isRowArchived(row);
   const isWarned = shared.warnedRowIds.has(rowId);
+  const isChild = isSubtask(row);
 
   function handleTick(event: MouseEvent<HTMLInputElement>) {
     // Shift-click ticks the run between the last click and this one, in the
@@ -100,7 +120,12 @@ export const GridRow = memo(function GridRow({ rowId, rowIndex, shared }: GridRo
             <Archive className="size-3" />
           </span>
         ) : (
-          <RowActionsMenu rowId={rowId} displayId={row.displayId} can={shared.can} />
+          <RowActionsMenu
+            rowId={rowId}
+            displayId={row.displayId}
+            can={shared.can}
+            isSubtask={isChild}
+          />
         )}
       </div>
 
@@ -114,6 +139,35 @@ export const GridRow = memo(function GridRow({ rowId, rowIndex, shared }: GridRo
             columnIndex={columnIndex}
             shared={shared}
             isReadOnly={shared.isReadOnly || isArchived}
+            {...(column.isPrimary
+              ? {
+                  indent: depth * INDENT_PER_LEVEL,
+                  ...(hasChildren && onToggleChildren
+                    ? {
+                        disclosure: (
+                          <button
+                            type="button"
+                            aria-expanded={!isCollapsed}
+                            aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${childCount} subtask${childCount === 1 ? "" : "s"} of ${row.displayId}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onToggleChildren();
+                            }}
+                            onMouseDown={(event) => event.stopPropagation()}
+                            className="flex size-4 shrink-0 items-center justify-center rounded text-faint-foreground hover:bg-hover hover:text-foreground"
+                          >
+                            <ChevronRight
+                              className={cn(
+                                "size-3 transition-transform",
+                                !isCollapsed && "rotate-90",
+                              )}
+                            />
+                          </button>
+                        ),
+                      }
+                    : {}),
+                }
+              : {})}
           />
         ))}
       </div>

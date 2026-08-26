@@ -15,11 +15,86 @@ export type ColumnType =
 
 export type SelectColor = "gray" | "blue" | "green" | "amber" | "red" | "violet" | "cyan" | "pink";
 
+/* --------------------------------------------------------------- conditions */
+
+/**
+ * Operators a rule can test a cell with. Deliberately a superset of
+ * `FilterOperator`: the same vocabulary drives view filters, conditional
+ * select options and anything rule-based that lands later.
+ */
+export type ConditionOperator =
+  | "is"
+  | "isNot"
+  | "contains"
+  | "notContains"
+  | "isAnyOf"
+  | "isNoneOf"
+  | "before"
+  | "after"
+  | "on"
+  | "isEmpty"
+  | "isNotEmpty";
+
+/**
+ * One test against one column of the record being evaluated.
+ *
+ * `value` is read the way the column reads it: an option id for select, a user
+ * id for user, `YYYY-MM-DD` for date, free text otherwise. `values` carries the
+ * list for the set operators; single-value operators ignore it.
+ */
+export interface Condition {
+  readonly id: string;
+  readonly columnId: string;
+  readonly operator: ConditionOperator;
+  readonly value: string;
+  readonly values?: readonly string[];
+}
+
+export type ConditionConjunction = "and" | "or";
+
+/**
+ * Conditions plus nested groups, combined by one conjunction. Nesting is what
+ * makes `A and (B or C)` expressible without a second data shape.
+ */
+export interface ConditionGroup {
+  readonly id: string;
+  readonly conjunction: ConditionConjunction;
+  readonly conditions: readonly Condition[];
+  readonly groups: readonly ConditionGroup[];
+}
+
+/* ------------------------------------------------------------------ select */
+
 export interface SelectOption {
   readonly id: string;
   readonly label: string;
   readonly color: SelectColor;
+  /** Switched off in column settings — never selectable, whatever a record holds. */
+  readonly isDisabled?: boolean;
+  /**
+   * Extra gate: the option is only offered while this evaluates true against
+   * the record being edited. Null or absent means "always offered".
+   */
+  readonly availability?: ConditionGroup | null;
 }
+
+/**
+ * What a Kanban drag (or a status edit) is allowed to do.
+ *
+ * The rules are data, keyed by option id, and authored by the user — nothing
+ * in the codebase knows that "debug" may not reach "done". `transitions` maps
+ * a source option id to the option ids it may move to; `EMPTY_OPTION_KEY`
+ * stands for the empty bucket on both sides.
+ */
+export interface TransitionRules {
+  readonly enabled: boolean;
+  /** Only declared transitions pass. Left open for a future deny-list. */
+  readonly mode: "allow-list";
+  readonly transitions: Readonly<Record<string, readonly string[]>>;
+}
+
+/** What the dropdown does with an option whose conditions do not hold. */
+export type UnavailableOptionBehavior = "disabled" | "hidden";
 
 export interface TextConfig {
   readonly placeholder?: string;
@@ -33,6 +108,14 @@ export interface LongTextConfig {
 export interface SelectConfig {
   readonly options: readonly SelectOption[];
   readonly isMulti: boolean;
+  /** Hide or merely disable options the record does not qualify for. */
+  readonly unavailableBehavior?: UnavailableOptionBehavior;
+  /**
+   * Options that mean "finished". Subtask progress counts against these, so
+   * completion is configured rather than inferred from a label.
+   */
+  readonly completedOptionIds?: readonly string[];
+  readonly transitionRules?: TransitionRules;
 }
 
 export interface DateConfig {
@@ -86,6 +169,16 @@ export type BoardColumn = { [T in ColumnType]: BoardColumnOf<T> }[ColumnType];
 
 /* ------------------------------------------------------------------ values */
 
+/**
+ * A file attached to a record.
+ *
+ * The board holds a *reference*, never the bytes: `url` points at the stored
+ * asset (a signed URL in production), so a record with twenty screenshots
+ * costs twenty small objects in memory rather than twenty base64 blobs.
+ *
+ * Attachments belong to the record, not to the Drive tree — uploading one into
+ * a task does not create a file node beside the board.
+ */
 export interface CellAttachment {
   readonly id: string;
   readonly name: string;
@@ -94,6 +187,9 @@ export interface CellAttachment {
   /** Session URL for the real bytes; null once the session that made it ends. */
   readonly url: string | null;
   readonly thumbnailUrl: string | null;
+  /** Directory id of whoever uploaded it. */
+  readonly uploadedBy?: string;
+  readonly createdAt?: string;
 }
 
 /**
@@ -137,6 +233,15 @@ export interface BoardRow {
    * every view by default and are read-only until they are restored.
    */
   readonly archivedAt?: string | null;
+  /**
+   * Parent record in the task hierarchy, or null/absent at the top level.
+   *
+   * A subtask is a full board record — its own display id, status, assignee,
+   * attachments, comments and history — so the parent stores a pointer, never
+   * a nested copy. Nothing here caps the depth: a subtask may itself be a
+   * parent, and the hierarchy helpers walk as far as the data goes.
+   */
+  readonly parentRowId?: string | null;
   /** True while the row exists only optimistically. */
   readonly isPending?: boolean;
 }
@@ -204,7 +309,19 @@ export interface SavedView {
   /** Calendar and timeline anchor on these date columns. */
   readonly dateColumnId: string | null;
   readonly endDateColumnId: string | null;
+  /**
+   * How this view treats the parent/child hierarchy. Per view, so one saved
+   * view can nest subtasks while another lists every record flat.
+   */
+  readonly subtaskDisplay?: SubtaskDisplay;
 }
+
+/**
+ * `nested` — children indent under their parent, collapsible.
+ * `flat`   — every record is a top-level row (the pre-hierarchy behaviour).
+ * `hidden` — subtasks are dropped from the view entirely.
+ */
+export type SubtaskDisplay = "nested" | "flat" | "hidden";
 
 /* --------------------------------------------------------------- templates */
 

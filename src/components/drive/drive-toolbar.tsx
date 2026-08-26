@@ -24,15 +24,11 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCapabilities } from "@/hooks/use-permissions";
 import { useCreateDocument } from "@/hooks/use-create-document";
-import { useCreateFile } from "@/hooks/use-create-file";
-import { FILE_TEMPLATES } from "@/lib/file-templates";
-import { fileKindVisual } from "@/lib/node-visuals";
 import { findNodeById } from "@/lib/tree";
 import { cn } from "@/lib/utils";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
@@ -57,7 +53,6 @@ interface DriveToolbarProps {
 export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveToolbarProps) {
   const [isUploaderOpen, setUploaderOpen] = useState(false);
   const { createDocument, isCreating } = useCreateDocument();
-  const { createFile, isCreating: isCreatingFile } = useCreateFile();
 
   const tree = useWorkspaceStore(selectTree);
   const targetNode = useMemo(
@@ -164,14 +159,14 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
                 <Button
                   size="icon"
                   variant="outline"
-                  aria-label="New page or file"
-                  disabled={isCreating || isCreatingFile}
+                  aria-label="New page"
+                  disabled={isCreating}
                 >
                   <FilePlus2 />
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent>New page or file here</TooltipContent>
+            <TooltipContent>New page here</TooltipContent>
           </Tooltip>
 
           <DropdownMenuContent align="end" className="w-60">
@@ -180,23 +175,6 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
               <FileText />
               Page
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>Blank file</DropdownMenuLabel>
-            {FILE_TEMPLATES.map((template) => {
-              const visual = fileKindVisual(template.kind);
-
-              return (
-                <DropdownMenuItem
-                  key={template.id}
-                  disabled={isCreatingFile}
-                  onSelect={() => void createFile(targetId, template)}
-                >
-                  <visual.Icon className={visual.colorClass} />
-                  <span className="flex-1">{template.label}</span>
-                  <DropdownMenuShortcut>.{template.extension}</DropdownMenuShortcut>
-                </DropdownMenuItem>
-              );
-            })}
           </DropdownMenuContent>
         </DropdownMenu>
 

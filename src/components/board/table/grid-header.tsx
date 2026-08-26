@@ -84,6 +84,7 @@ export const GridHeader = memo(function GridHeader({
         <HeaderCell
           key={column.id}
           column={column}
+          columns={columns}
           index={index}
           can={can}
           isDragOver={dragOverId === column.id}
@@ -129,6 +130,8 @@ export const GridHeader = memo(function GridHeader({
 
 interface HeaderCellProps {
   readonly column: BoardColumn;
+  /** The whole schema — a select option rule can test any of it. */
+  readonly columns: readonly BoardColumn[];
   readonly index: number;
   readonly can: PermissionResolver;
   readonly isDragOver: boolean;
@@ -141,6 +144,7 @@ interface HeaderCellProps {
 
 function HeaderCell({
   column,
+  columns,
   index,
   can,
   isDragOver,
@@ -241,6 +245,7 @@ function HeaderCell({
 
       <ColumnMenu
         column={column}
+        columns={columns}
         can={can}
         onRename={() => setDraftName(column.name)}
         onConvert={(type) => onConvert(column, type)}

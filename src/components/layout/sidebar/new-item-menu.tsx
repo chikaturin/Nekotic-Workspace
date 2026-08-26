@@ -1,6 +1,6 @@
 "use client";
 
-import { FilePlus2, FileType2, FolderPlus, KeyRound, Plus, SlidersHorizontal, SquareKanban, Upload } from "lucide-react";
+import { FilePlus2, FolderPlus, KeyRound, Plus, SlidersHorizontal, SquareKanban, Upload } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { UploadDialog } from "@/components/files/upload-dialog";
@@ -19,10 +19,7 @@ import {
 import { useCapabilities } from "@/hooks/use-permissions";
 import { useCreateBoard } from "@/hooks/use-create-board";
 import { useCreateDocument } from "@/hooks/use-create-document";
-import { useCreateFile } from "@/hooks/use-create-file";
 import { BOARD_TEMPLATES } from "@/lib/board-templates";
-import { FILE_TEMPLATES } from "@/lib/file-templates";
-import { fileKindVisual } from "@/lib/node-visuals";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/workspace-store";
 
@@ -33,12 +30,23 @@ interface NewItemMenuProps {
   readonly targetName: string;
 }
 
-/** Primary create action: folder, board or upload into the current location. */
+/**
+ * Primary create action.
+ *
+ * Four content types, and no more: Folder, Page, Board, and the two documents
+ * that genuinely need their own editor — Config and Secret. There is no "new
+ * .txt", "new .md", "new .csv" or "new .xlsx", because a Page already holds
+ * headings, checklists, code, tables, images, attachments and embedded boards.
+ * Creating a second, weaker way to write a paragraph was never the point.
+ *
+ * Uploading files is untouched, and so are attachments: a file that arrives by
+ * upload is still a file, and a file attached to a record is still an
+ * attachment. What is gone is inventing a standalone file just to type in it.
+ */
 export function NewItemMenu({ isCollapsed, targetId, targetName }: NewItemMenuProps) {
   const [isUploaderOpen, setUploaderOpen] = useState(false);
   const createFolder = useWorkspaceStore((state) => state.createFolder);
   const { createDocument, isCreating } = useCreateDocument();
-  const { createFile, isCreating: isCreatingFile } = useCreateFile();
   const { createBoard, isCreating: isCreatingBoard } = useCreateBoard();
   const capabilities = useCapabilities();
 
@@ -107,31 +115,6 @@ export function NewItemMenu({ isCollapsed, targetId, targetName }: NewItemMenuPr
                   </div>
                 </DropdownMenuItem>
               ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger disabled={isCreatingFile}>
-              <FileType2 />
-              File
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-60">
-              <DropdownMenuLabel>Blank file</DropdownMenuLabel>
-              {FILE_TEMPLATES.map((template) => {
-                const visual = fileKindVisual(template.kind);
-
-                return (
-                  <DropdownMenuItem
-                    key={template.id}
-                    disabled={isCreatingFile}
-                    onSelect={() => void createFile(targetId, template)}
-                  >
-                    <visual.Icon className={visual.colorClass} />
-                    <span className="flex-1">{template.label}</span>
-                    <DropdownMenuShortcut>.{template.extension}</DropdownMenuShortcut>
-                  </DropdownMenuItem>
-                );
-              })}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
 

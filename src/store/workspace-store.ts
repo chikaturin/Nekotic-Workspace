@@ -106,6 +106,18 @@ interface WorkspaceState {
    * loads — the grid store is reset per board and cannot carry the intent.
    */
   readonly rowRequest: RowRequest | null;
+  /**
+   * A node whose name the user should be editing right now — set the moment a
+   * folder or a board is created, so "create" lands the caret in the name
+   * rather than leaving an "Untitled folder" for someone to rename later.
+   */
+  readonly renameRequestId: string | null;
+  /**
+   * A page whose title should take the caret as soon as it opens. Set when a
+   * page is created, so the first thing on screen is an editable title rather
+   * than the word "Untitled" waiting to be found.
+   */
+  readonly titleFocusNodeId: string | null;
   readonly isSidebarCollapsed: boolean;
   readonly isSearchOpen: boolean;
   readonly feedback: Feedback | null;
@@ -165,6 +177,13 @@ interface WorkspaceActions {
   requestRow: (nodeId: string, rowId: string) => void;
   clearRowRequest: () => void;
 
+  /** Open the rename surface on a node — how "create" hands over to editing. */
+  requestRename: (nodeId: string) => void;
+  clearRenameRequest: () => void;
+
+  requestTitleFocus: (nodeId: string) => void;
+  clearTitleFocus: () => void;
+
   toggleSidebar: () => void;
   /** Set directly — the responsive rail drives this, not a click. */
   setSidebarCollapsed: (isCollapsed: boolean) => void;
@@ -193,6 +212,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
   previewNodeId: null,
   rowRequest: null,
+  renameRequestId: null,
+  titleFocusNodeId: null,
   isSidebarCollapsed: false,
   isSearchOpen: false,
   feedback: null,
@@ -308,9 +329,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         children: [],
       };
 
+      // A new folder opens straight into its name — creating one and having
+      // to hunt for "Rename" afterwards is two steps where one will do.
       return {
         ...writeTree(state, insertNode(tree, parentId, folder)),
         seed: nextSeed,
+        renameRequestId: folder.id,
         feedback: makeFeedback(state, `Created folder “${folder.name}”`, "success"),
       };
     }),
@@ -654,6 +678,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     })),
 
   clearRowRequest: () => set({ rowRequest: null }),
+
+  requestRename: (nodeId) => set({ renameRequestId: nodeId }),
+  clearRenameRequest: () => set({ renameRequestId: null }),
+
+  requestTitleFocus: (nodeId) => set({ titleFocusNodeId: nodeId }),
+  clearTitleFocus: () => set({ titleFocusNodeId: null }),
 
   toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
 

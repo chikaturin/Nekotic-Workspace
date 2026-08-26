@@ -150,7 +150,33 @@ export function removeRow(index: RowIndex, rowId: string): RowIndex {
   const rowsById = { ...index.rowsById };
   delete rowsById[rowId];
 
-  return { rowsById, rowOrder: removeRowId(index.rowOrder, rowId) };
+  return {
+    rowsById: detachChildren(rowsById, [rowId]),
+    rowOrder: removeRowId(index.rowOrder, rowId),
+  };
+}
+
+/**
+ * Lift the children of removed records back to the top level.
+ *
+ * Deleting a parent must not take its subtasks with it — each one is a record
+ * in its own right, with its own id, history and comments. Detaching keeps
+ * them addressable instead of leaving them pointing at a parent that is gone.
+ */
+export function detachChildren(rows: RowMap, removedIds: readonly string[]): RowMap {
+  const removed = new Set(removedIds);
+  if (removed.size === 0) return rows;
+
+  const next: Record<string, BoardRow> = { ...rows };
+  let changed = false;
+
+  for (const [rowId, row] of Object.entries(rows)) {
+    if (!row.parentRowId || !removed.has(row.parentRowId)) continue;
+    next[rowId] = { ...row, parentRowId: null };
+    changed = true;
+  }
+
+  return changed ? next : rows;
 }
 
 /** Drop many records in one pass — what a bulk delete or move leaves behind. */
@@ -161,7 +187,10 @@ export function removeRows(index: RowIndex, rowIds: readonly string[]): RowIndex
   const rowsById = { ...index.rowsById };
   for (const rowId of removed) delete rowsById[rowId];
 
-  return { rowsById, rowOrder: index.rowOrder.filter((rowId) => !removed.has(rowId)) };
+  return {
+    rowsById: detachChildren(rowsById, [...removed]),
+    rowOrder: index.rowOrder.filter((rowId) => !removed.has(rowId)),
+  };
 }
 
 /** Append server-created records to the end of the order — what an import does. */

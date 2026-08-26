@@ -1,13 +1,20 @@
 "use client";
 
+import { ListTree } from "lucide-react";
 import { memo } from "react";
 import { CellRenderer } from "@/components/board/cells/cell-renderer";
+import {
+  childIdsOf,
+  isSubtask,
+  subtaskProgress,
+  type HierarchyIndex,
+} from "@/lib/board-hierarchy";
 import type { CellContext } from "@/lib/cell-values";
 import { cellOf, isCellEmpty } from "@/lib/cell-values";
 import { selectRow, useBoardStore } from "@/store/board-store";
 import { useGridStore } from "@/store/grid-store";
 import { cn } from "@/lib/utils";
-import type { BoardColumn } from "@/types";
+import type { BoardColumn, BoardColumnOf } from "@/types";
 
 interface RecordCardProps {
   readonly rowId: string;
@@ -17,6 +24,9 @@ interface RecordCardProps {
   readonly context: CellContext;
   readonly canDrag: boolean;
   readonly density?: "card" | "compact";
+  /** Hierarchy index, when the surface wants the subtask badge. */
+  readonly hierarchy?: HierarchyIndex;
+  readonly completionColumn?: BoardColumnOf<"select"> | null;
   readonly onDragStart?: (rowId: string) => void;
   readonly onDragEnd?: () => void;
 }
@@ -34,10 +44,13 @@ export const RecordCard = memo(function RecordCard({
   context,
   canDrag,
   density = "card",
+  hierarchy,
+  completionColumn = null,
   onDragStart,
   onDragEnd,
 }: RecordCardProps) {
   const row = useBoardStore(selectRow(rowId));
+  const rowsById = useBoardStore((state) => state.rowsById);
   const isOpen = useGridStore((state) => state.drawerRowId === rowId);
 
   if (!row) return null;
@@ -45,6 +58,14 @@ export const RecordCard = memo(function RecordCard({
   const title = row.cells[primaryColumnId];
   const label = title && title.kind === "text" ? title.value : "";
   const visible = fields.filter((column) => !isCellEmpty(cellOf(row, column))).slice(0, 3);
+
+  /**
+   * A subtask is an ordinary card — it appears in whatever column its own
+   * status puts it in. The badges only say where it sits in the hierarchy.
+   */
+  const childIds = hierarchy ? childIdsOf(hierarchy, rowId) : [];
+  const progress = hierarchy ? subtaskProgress(childIds, rowsById, completionColumn) : null;
+  const isChild = isSubtask(row);
 
   return (
     <article
@@ -85,6 +106,28 @@ export const RecordCard = memo(function RecordCard({
           {label || "Untitled"}
         </span>
       </div>
+
+      {density === "card" && (childIds.length > 0 || isChild) && (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          {childIds.length > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-1.5 py-px text-[10px] text-muted-foreground">
+              <ListTree className="size-2.5" />
+              {childIds.length} subtask{childIds.length === 1 ? "" : "s"}
+              {progress?.isMeasurable && (
+                <span className="metric text-faint-foreground">
+                  {progress.completed}/{progress.total} done
+                </span>
+              )}
+            </span>
+          )}
+
+          {isChild && (
+            <span className="rounded-full border border-hairline px-1.5 py-px text-[10px] text-faint-foreground">
+              subtask
+            </span>
+          )}
+        </div>
+      )}
 
       {density === "card" && visible.length > 0 && (
         <div className="mt-1.5 flex flex-wrap items-center gap-1">

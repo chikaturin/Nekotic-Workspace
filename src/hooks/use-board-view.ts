@@ -4,10 +4,17 @@ import { useMemo } from "react";
 import { isRowArchived } from "@/lib/archive";
 import type { CellContext } from "@/lib/cell-values";
 import { buildGroups, type RowGroup } from "@/lib/board-grouping";
+import {
+  buildHierarchy,
+  completionColumnOf,
+  isSubtask,
+  subtaskDisplayOf,
+  type HierarchyIndex,
+} from "@/lib/board-hierarchy";
 import { queryRowIds, resolveColumns, visibleColumns } from "@/lib/board-view";
 import { useRelationIndex } from "@/hooks/use-relation-index";
 import { selectActiveView, useBoardStore } from "@/store/board-store";
-import type { Board, BoardColumn, SavedView } from "@/types";
+import type { Board, BoardColumn, BoardColumnOf, SavedView, SubtaskDisplay } from "@/types";
 
 export interface BoardViewModel {
   readonly board: Board | null;
@@ -29,6 +36,16 @@ export interface BoardViewModel {
   /** Anchors for the calendar and the timeline. */
   readonly dateColumn: BoardColumn | null;
   readonly endDateColumn: BoardColumn | null;
+  /**
+   * Parent/child index over the whole board — built from `rowOrder`, not from
+   * `rowIds`, so a parent filtered out of this view is still known to be the
+   * parent of the children that survived it.
+   */
+  readonly hierarchy: HierarchyIndex;
+  /** How this view reads that hierarchy. */
+  readonly subtaskDisplay: SubtaskDisplay;
+  /** Select column whose configured options mean "finished", if any. */
+  readonly completionColumn: BoardColumnOf<"select"> | null;
 }
 
 /**
@@ -80,7 +97,7 @@ export function useBoardView(): BoardViewModel {
     [peopleById, relationLabels, relations.isResolved],
   );
 
-  const rowIds = useMemo(
+  const queried = useMemo(
     () =>
       queryRowIds({
         view,
@@ -93,6 +110,29 @@ export function useBoardView(): BoardViewModel {
       }),
     [view, rowsById, rowOrder, columnsShown, context, search, isShowingArchived],
   );
+
+  /**
+   * The hierarchy is indexed over the board, not over the query: a child whose
+   * parent a filter removed still needs to know it has one.
+   */
+  const hierarchy = useMemo(() => buildHierarchy(rowOrder, rowsById), [rowOrder, rowsById]);
+
+  const subtaskDisplay = subtaskDisplayOf(view?.subtaskDisplay);
+
+  /**
+   * "Hide subtasks" is a property of the view, so it is applied here — before
+   * grouping, before Kanban columns, before the calendar. Every surface then
+   * reads one list of ids and none of them has to know about the hierarchy.
+   */
+  const rowIds = useMemo(
+    () =>
+      subtaskDisplay === "hidden"
+        ? queried.filter((rowId) => !isSubtask(rowsById[rowId]))
+        : queried,
+    [queried, subtaskDisplay, rowsById],
+  );
+
+  const completionColumn = useMemo(() => completionColumnOf(columns), [columns]);
 
   const archivedRows = useMemo(
     () => rowOrder.filter((rowId) => {
@@ -135,5 +175,8 @@ export function useBoardView(): BoardViewModel {
     groups,
     dateColumn,
     endDateColumn,
+    hierarchy,
+    subtaskDisplay,
+    completionColumn,
   };
 }

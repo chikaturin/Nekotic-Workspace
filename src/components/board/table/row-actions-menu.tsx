@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Copy, MoreHorizontal, Trash2 } from "lucide-react";
+import { Archive, Copy, CornerDownRight, ListTree, MoreHorizontal, Trash2, Unlink } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useBoardStore } from "@/store/board-store";
+import { useGridStore } from "@/store/grid-store";
 import type { PermissionResolver } from "@/types";
 
 interface RowActionsMenuProps {
@@ -22,13 +23,18 @@ interface RowActionsMenuProps {
    * are not — three different keys behind three items that used to share one.
    */
   readonly can: PermissionResolver;
+  /** True when the record already sits under a parent. */
+  readonly isSubtask: boolean;
 }
 
 /** Row-level operations: duplicate, archive and delete, all optimistic. */
-export function RowActionsMenu({ rowId, displayId, can }: RowActionsMenuProps) {
+export function RowActionsMenu({ rowId, displayId, can, isSubtask }: RowActionsMenuProps) {
   const duplicateRow = useBoardStore((state) => state.duplicateRow);
   const deleteRow = useBoardStore((state) => state.deleteRow);
   const bulkArchive = useBoardStore((state) => state.bulkArchive);
+  const createSubtask = useBoardStore((state) => state.createSubtask);
+  const setRowParent = useBoardStore((state) => state.setRowParent);
+  const openDrawer = useGridStore((state) => state.openDrawer);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   return (
@@ -50,6 +56,36 @@ export function RowActionsMenu({ rowId, displayId, can }: RowActionsMenuProps) {
             <Copy />
             Duplicate record
           </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={!can("row.create")}
+            onSelect={() => {
+              // The child is a record of its own, so its drawer is where the
+              // rest of it gets filled in.
+              void createSubtask(rowId).then((id) => {
+                if (id) openDrawer(id);
+              });
+            }}
+          >
+            <CornerDownRight />
+            Add subtask
+          </DropdownMenuItem>
+
+          {isSubtask && (
+            <DropdownMenuItem
+              disabled={!can("row.move")}
+              onSelect={() => void setRowParent(rowId, null)}
+            >
+              <Unlink />
+              Move to the top level
+            </DropdownMenuItem>
+          )}
+
+          <DropdownMenuItem disabled={!can("row.update")} onSelect={() => openDrawer(rowId)}>
+            <ListTree />
+            Open subtasks
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             disabled={!can("row.archive")}
             onSelect={() => void bulkArchive([rowId], true)}

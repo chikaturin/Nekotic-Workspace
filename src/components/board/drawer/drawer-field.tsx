@@ -17,6 +17,8 @@ interface DrawerFieldProps {
   readonly primaryColumnId: string;
   readonly folderId: string | null;
   readonly people: readonly DirectoryUser[];
+  /** The whole schema — an option rule can test any column of this record. */
+  readonly columns: readonly BoardColumn[];
   readonly onCommit: (value: CellValue) => void;
   readonly onCreateOption: (label: string) => Promise<SelectOption | null>;
 }
@@ -35,6 +37,7 @@ export function DrawerField({
   primaryColumnId,
   folderId,
   people,
+  columns,
   onCommit,
   onCreateOption,
 }: DrawerFieldProps) {
@@ -58,6 +61,8 @@ export function DrawerField({
             primaryColumnId={primaryColumnId}
             folderId={folderId}
             people={people}
+            columns={columns}
+            context={context}
             onCommit={(next) => {
               onCommit(next);
               setIsEditing(false);

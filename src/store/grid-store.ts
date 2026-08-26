@@ -37,6 +37,12 @@ interface GridState {
   /** Collapsed group keys, kept per view so switching views restores them. */
   readonly collapsedByView: Readonly<Record<string, readonly string[]>>;
   /**
+   * Parent records whose subtasks are folded away, per view. Kept beside the
+   * group state for the same reason: collapsing is presentation, and it must
+   * survive switching to another view and back.
+   */
+  readonly collapsedParentsByView: Readonly<Record<string, readonly string[]>>;
+  /**
    * Records ticked for a bulk action (SY-BLK-34). A map, not an array, so a
    * row's checkbox subscribes to one boolean instead of the whole selection.
    */
@@ -58,6 +64,8 @@ interface GridActions {
   closeDrawer: () => void;
   toggleGroup: (viewId: string, groupKey: string) => void;
   setCollapsedGroups: (viewId: string, keys: readonly string[]) => void;
+  toggleParent: (viewId: string, rowId: string) => void;
+  setCollapsedParents: (viewId: string, rowIds: readonly string[]) => void;
 
   toggleRowSelection: (rowId: string) => void;
   /** Shift-click: tick everything between the anchor and `rowId` in view order. */
@@ -76,6 +84,7 @@ const INITIAL: GridState = {
   drawerRowId: null,
   isDragSelecting: false,
   collapsedByView: {},
+  collapsedParentsByView: {},
   selectedRowIds: {},
   lastSelectedRowId: null,
 };
@@ -127,6 +136,21 @@ export const useGridStore = create<GridStore>()((set, get) => ({
 
   setCollapsedGroups: (viewId, keys) =>
     set((state) => ({ collapsedByView: { ...state.collapsedByView, [viewId]: keys } })),
+
+  toggleParent: (viewId, rowId) =>
+    set((state) => {
+      const current = state.collapsedParentsByView[viewId] ?? [];
+      const next = current.includes(rowId)
+        ? current.filter((id) => id !== rowId)
+        : [...current, rowId];
+
+      return { collapsedParentsByView: { ...state.collapsedParentsByView, [viewId]: next } };
+    }),
+
+  setCollapsedParents: (viewId, rowIds) =>
+    set((state) => ({
+      collapsedParentsByView: { ...state.collapsedParentsByView, [viewId]: rowIds },
+    })),
 
   toggleRowSelection: (rowId) =>
     set((state) => {
@@ -199,6 +223,11 @@ const NO_COLLAPSED: readonly string[] = [];
 export function selectCollapsedGroups(viewId: string | null) {
   return (state: GridStore): readonly string[] =>
     (viewId ? state.collapsedByView[viewId] : undefined) ?? NO_COLLAPSED;
+}
+
+export function selectCollapsedParents(viewId: string | null) {
+  return (state: GridStore): readonly string[] =>
+    (viewId ? state.collapsedParentsByView[viewId] : undefined) ?? NO_COLLAPSED;
 }
 
 export function selectIsEditing(rowId: string, columnId: string) {

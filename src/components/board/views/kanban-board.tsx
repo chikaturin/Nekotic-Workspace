@@ -1,7 +1,7 @@
 "use client";
 
 import { Lock, Plus } from "lucide-react";
-import { useCallback, useState, type DragEvent } from "react";
+import { useCallback, useMemo, useState, type DragEvent } from "react";
 import { RecordCard } from "@/components/board/views/record-card";
 import { StatePanel } from "@/components/shared/state-panels";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import type { BoardViewModel } from "@/hooks/use-board-view";
 import { SELECT_COLOR_CLASSES } from "@/lib/board-schema";
 import { groupValueFor, UNGROUPED_KEY, type RowGroup } from "@/lib/board-grouping";
+import { evaluateTransition, transitionKeyOf } from "@/lib/transition-rules";
+import { groupKeyOf } from "@/lib/board-grouping";
 import { formatCount } from "@/lib/format";
 import { useBoardStore } from "@/store/board-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
@@ -41,15 +43,36 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
     (column) => !column.isPrimary && column.id !== groupColumn?.id,
   );
 
+  const rowsById = useBoardStore((state) => state.rowsById);
+
+  /**
+   * A drop asks two separate questions, in order:
+   *
+   *   1. Permission — "may this user change Status at all?"
+   *   2. Transition rule — "may Status go from where it is to here?"
+   *
+   * They are deliberately not merged: the first is about the person, the
+   * second about the record, and a refusal from each says something different.
+   * Either refusal returns before the optimistic write, so the card snaps back
+   * to its column and no request is made.
+   */
   const drop = useCallback(
     (group: RowGroup, rowId: string) => {
       if (!groupColumn) return;
 
-      // Permission is checked before the optimistic write, so a card the user
-      // may not move never leaves its column.
       if (!canEdit) {
         pushFeedback(`You do not have permission to change ${groupColumn.name}`, "error");
         return;
+      }
+
+      if (groupColumn.type === "select") {
+        const from = transitionKeyOf(groupKeyOf(rowId, rowsById, groupColumn));
+        const verdict = evaluateTransition(groupColumn, from, transitionKeyOf(group.key));
+
+        if (!verdict.isAllowed) {
+          pushFeedback(verdict.reason ?? "That status change is not allowed", "error");
+          return;
+        }
       }
 
       const value = groupValueFor(groupColumn, group.key);
@@ -57,8 +80,23 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
 
       void editCells([{ rowId, columnId: groupColumn.id, value }]);
     },
-    [groupColumn, canEdit, editCells, pushFeedback],
+    [groupColumn, canEdit, editCells, pushFeedback, rowsById],
   );
+
+  /**
+   * Which columns the card being dragged may actually land in. Shown while a
+   * drag is in flight so a refused drop is visible before it is attempted,
+   * rather than only as a toast afterwards.
+   */
+  const reachable = useMemo<ReadonlySet<string> | null>(() => {
+    if (!draggingId || !groupColumn || groupColumn.type !== "select") return null;
+
+    const rules = groupColumn.config.transitionRules;
+    if (!rules?.enabled) return null;
+
+    const from = transitionKeyOf(groupKeyOf(draggingId, rowsById, groupColumn));
+    return new Set([from, ...(rules.transitions[from] ?? [])]);
+  }, [draggingId, groupColumn, rowsById]);
 
   if (!groupColumn || !groups) {
     return (
@@ -70,6 +108,11 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
         />
       </div>
     );
+  }
+
+  /** True when a transition rule permits the dragged card to land here. */
+  function isDroppable(groupKey: string): boolean {
+    return reachable === null || reachable.has(transitionKeyOf(groupKey));
   }
 
   function handleDrop(event: DragEvent<HTMLElement>, group: RowGroup) {
@@ -90,18 +133,22 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
             aria-label={group.label}
             onDragOver={(event) => {
               event.preventDefault();
-              event.dataTransfer.dropEffect = canEdit ? "move" : "none";
+              event.dataTransfer.dropEffect =
+                canEdit && isDroppable(group.key) ? "move" : "none";
               setOverKey(group.key);
             }}
             onDragLeave={() => setOverKey((key) => (key === group.key ? null : key))}
             onDrop={(event) => handleDrop(event, group)}
             className={cn(
-              "flex w-72 shrink-0 flex-col rounded-xl border bg-background/60",
+              "flex w-72 shrink-0 flex-col rounded-xl border bg-background/60 transition-colors",
               overKey === group.key && draggingId
-                ? canEdit
+                ? canEdit && isDroppable(group.key)
                   ? "border-accent bg-accent-soft"
                   : "border-danger/40 bg-danger/5"
                 : "border-border",
+              // A rule that forbids this column says so while the card is in
+              // the air, not after it has been dropped and bounced back.
+              draggingId && !isDroppable(group.key) && overKey !== group.key && "opacity-45",
             )}
           >
             <header className="flex shrink-0 items-center gap-2 border-b border-hairline px-3 py-2.5">
@@ -139,6 +186,8 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
                   fields={cardFields}
                   context={context}
                   canDrag={canEdit}
+                  hierarchy={model.hierarchy}
+                  completionColumn={model.completionColumn}
                   onDragStart={setDraggingId}
                   onDragEnd={() => setDraggingId(null)}
                 />

@@ -91,6 +91,7 @@ export function DocumentPage({ node }: DocumentPageProps) {
           return (
             <>
               <DocumentHeader
+                nodeId={node.id}
                 document={document}
                 draft={draft}
                 saveState={controller.saveState}

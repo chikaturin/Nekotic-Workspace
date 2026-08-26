@@ -261,16 +261,27 @@ export interface CreateRowInput {
   /** Insert after this row; appended when omitted. */
   readonly afterRowId?: string | null;
   readonly cells?: Readonly<Record<string, import("@/types").CellValue>>;
+  /**
+   * Parent record, for a subtask. The child is a normal record in every other
+   * respect — its own display id from the same counter, its own cells, its own
+   * history — so nothing downstream has to special-case it.
+   */
+  readonly parentRowId?: string | null;
 }
 
 /**
  * The backend owns the counter. It only ever increases, so deleting `TASK-005`
  * does not hand `005` to the next record.
  */
-async function createRow({ boardId, afterRowId, cells }: CreateRowInput, signal?: AbortSignal): Promise<BoardRow> {
+async function createRow(
+  { boardId, afterRowId, cells, parentRowId = null }: CreateRowInput,
+  signal?: AbortSignal,
+): Promise<BoardRow> {
   await writeDelay(signal);
   const record = recordByBoardId(boardId);
   assertWritable(record, "the record");
+
+  if (parentRowId && !record.rows.has(parentRowId)) throw notFound("That parent record");
 
   record.sequence += 1;
   const now = nowIso();
@@ -285,21 +296,136 @@ async function createRow({ boardId, afterRowId, cells }: CreateRowInput, signal?
     updatedAt: now,
     createdBy: CURRENT_USER.id,
     revision: 1,
+    ...(parentRowId ? { parentRowId } : {}),
   };
 
-  const at = afterRowId ? record.order.indexOf(afterRowId) + 1 : record.order.length;
+  // A subtask files itself directly after its parent's last descendant, so the
+  // board's own order already reads as the tree even before a view nests it.
+  const anchor = parentRowId ? lastDescendantOf(record, parentRowId) : afterRowId;
+  const at = anchor ? record.order.indexOf(anchor) + 1 : record.order.length;
   record.order.splice(at <= 0 ? record.order.length : at, 0, row.id);
   record.rows.set(row.id, row);
-  logActivity(record, row.id, `created ${row.displayId}`, "created");
+
+  const parent = parentRowId ? record.rows.get(parentRowId) : null;
+  logActivity(
+    record,
+    row.id,
+    parent ? `created ${row.displayId} under ${parent.displayId}` : `created ${row.displayId}`,
+    "created",
+  );
+  if (parent) {
+    logActivity(record, parent.id, `added subtask ${row.displayId}`, "updated");
+  }
 
   return row;
 }
 
+/** Last row of a parent's whole subtree in board order — where a new child goes. */
+function lastDescendantOf(record: BoardRecord, parentRowId: string): string {
+  let last = parentRowId;
+
+  for (const rowId of record.order) {
+    const row = record.rows.get(rowId);
+    if (!row) continue;
+    if (isDescendant(record, row, parentRowId)) last = rowId;
+  }
+
+  return last;
+}
+
+function isDescendant(record: BoardRecord, row: BoardRow, ancestorId: string): boolean {
+  const seen = new Set<string>([row.id]);
+  let current = row.parentRowId ?? null;
+
+  while (current && !seen.has(current)) {
+    if (current === ancestorId) return true;
+    seen.add(current);
+    current = record.rows.get(current)?.parentRowId ?? null;
+  }
+
+  return false;
+}
+
+/**
+ * Re-parent a record, or lift it back to the top level.
+ *
+ * The cycle guard lives here as well as in the client: a hierarchy that loops
+ * would hang every reader, and the backend is the last place that can refuse.
+ */
+async function setRowParent(
+  boardId: string,
+  rowId: string,
+  parentRowId: string | null,
+  signal?: AbortSignal,
+): Promise<BoardRow> {
+  await writeDelay(signal);
+  const record = recordByBoardId(boardId);
+  assertWritable(record, "the subtask");
+
+  const row = rowOrThrow(record, rowId);
+  if (parentRowId === rowId) throw conflict("A record cannot be its own parent");
+
+  if (parentRowId) {
+    const parent = record.rows.get(parentRowId);
+    if (!parent) throw notFound("That parent record");
+    if (isDescendant(record, parent, rowId)) {
+      throw conflict(`${parent.displayId} is already under ${row.displayId}`);
+    }
+  }
+
+  const next: BoardRow = {
+    ...row,
+    parentRowId,
+    updatedAt: nowIso(),
+    revision: row.revision + 1,
+  };
+
+  record.rows.set(rowId, next);
+
+  const parent = parentRowId ? record.rows.get(parentRowId) : null;
+  logActivity(
+    record,
+    rowId,
+    parent ? `moved under ${parent.displayId}` : "moved to the top level",
+    "moved",
+  );
+
+  return next;
+}
+
+/**
+ * A parent's direct children, in board order. The client already holds the
+ * whole record set, so this exists for the surfaces that do not — and it is
+ * the seam the real `GET /boards/:id/rows/:rowId/subtasks` replaces.
+ */
+async function listSubtasks(
+  boardId: string,
+  rowId: string,
+  signal?: AbortSignal,
+): Promise<readonly BoardRow[]> {
+  await readDelay(signal);
+  const record = recordByBoardId(boardId);
+
+  return record.order.flatMap((id) => {
+    const row = record.rows.get(id);
+    return row && row.parentRowId === rowId ? [row] : [];
+  });
+}
+
+/** A copy is a sibling: it keeps the source's parent, not the source itself. */
 async function duplicateRow(boardId: string, rowId: string, signal?: AbortSignal): Promise<BoardRow> {
   const record = recordByBoardId(boardId);
   const source = rowOrThrow(record, rowId);
 
-  return createRow({ boardId, afterRowId: rowId, cells: { ...source.cells } }, signal);
+  return createRow(
+    {
+      boardId,
+      afterRowId: rowId,
+      cells: { ...source.cells },
+      parentRowId: source.parentRowId ?? null,
+    },
+    signal,
+  );
 }
 
 async function deleteRow(boardId: string, rowId: string, signal?: AbortSignal): Promise<void> {
@@ -310,6 +436,19 @@ async function deleteRow(boardId: string, rowId: string, signal?: AbortSignal): 
   rowOrThrow(record, rowId);
   record.rows.delete(rowId);
   record.order = record.order.filter((id) => id !== rowId);
+  detachOrphans(record, new Set([rowId]));
+}
+
+/**
+ * Children of a deleted parent are lifted to the top level rather than removed
+ * with it. Deleting a container must not silently delete work nobody asked
+ * about — the subtasks stay, addressable, as records of their own.
+ */
+function detachOrphans(record: BoardRecord, removed: ReadonlySet<string>): void {
+  for (const [rowId, row] of record.rows) {
+    if (!row.parentRowId || !removed.has(row.parentRowId)) continue;
+    record.rows.set(rowId, { ...row, parentRowId: null, revision: row.revision + 1 });
+  }
 }
 
 export interface UpdateCellsInput {
@@ -783,6 +922,7 @@ async function bulkDelete(
   for (const id of removed) record.rows.delete(id);
   record.order = record.order.filter((id) => !removed.has(id));
   record.activity = record.activity.filter((entry) => !removed.has(entry.rowId));
+  detachOrphans(record, removed);
 
   return { requested: rowIds.length, rows: [], applied: [...removed], skipped };
 }
@@ -1103,6 +1243,8 @@ export const boardService = {
   createRow,
   duplicateRow,
   deleteRow,
+  setRowParent,
+  listSubtasks,
   updateCells,
   bulkUpdate,
   bulkArchive,

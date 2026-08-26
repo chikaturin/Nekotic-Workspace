@@ -34,8 +34,8 @@ import {
   DAY_WIDTH,
   offsetToIso,
   orderRange,
-  pixelsToDays,
   timelineScale,
+  TIMELINE_ZOOMS,
 } from "@/lib/board-timeline";
 import { queryRowIds, pruneView } from "@/lib/board-view";
 import type { BoardColumn, BoardColumnOf, BoardRow, DirectoryUser, SavedView } from "@/types";
@@ -320,16 +320,24 @@ describe("timeline", () => {
   });
 
   test("an empty board still produces a usable window", () => {
-    const scale = timelineScale([], {}, start, due, "month", "2026-08-12T00:00:00.000Z");
+    const scale = timelineScale([], {}, start, due, "week", "2026-08-12T00:00:00.000Z");
 
     expect(scale.dayCount).toBeGreaterThan(0);
     expect(scale.ticks.length).toBeGreaterThan(0);
   });
 
   test("zoom changes pixels per day, never the day maths", () => {
-    expect(pixelsToDays(DAY_WIDTH.day * 3, "day")).toBe(3);
-    expect(pixelsToDays(DAY_WIDTH.week * 3, "week")).toBe(3);
-    expect(pixelsToDays(DAY_WIDTH.month * -2, "month")).toBe(-2);
+    const dayScale = timelineScale(rowIds, index.rowsById, start, due, "day", "2026-08-12T00:00:00.000Z");
+    const weekScale = timelineScale(rowIds, index.rowsById, start, due, "week", "2026-08-12T00:00:00.000Z");
+
+    expect(dayScale.dayCount).toBe(weekScale.dayCount);
+    expect(dayScale.dayWidth).toBe(DAY_WIDTH.day);
+    expect(weekScale.dayWidth).toBe(DAY_WIDTH.week);
+  });
+
+  test("the roadmap offers day and week only", () => {
+    expect(TIMELINE_ZOOMS).toEqual(["day", "week"]);
+    expect(Object.keys(DAY_WIDTH)).toEqual(["day", "week"]);
   });
 });
 

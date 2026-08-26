@@ -235,6 +235,25 @@ function cellFor(column: BoardColumn, context: RowContext): CellValue {
   }
 }
 
+/**
+ * Which fixture rows are subtasks, and of what.
+ *
+ * A repeating shape — one parent followed by three children, every seventh
+ * record — so the dataset always contains a hierarchy to look at, identically
+ * on every reload. Only work boards get one: an endpoint catalogue has no
+ * notion of a subtask.
+ */
+const HIERARCHY_TEMPLATES = new Set<BoardTemplate["id"]>(["task", "bug"]);
+const HIERARCHY_PERIOD = 7;
+
+function parentIndexFor(template: BoardTemplate, index: number): number | null {
+  if (!HIERARCHY_TEMPLATES.has(template.id)) return null;
+
+  const slot = index % HIERARCHY_PERIOD;
+  // Slot 1 is a parent; slots 2–4 are its children.
+  return slot >= 2 && slot <= 4 ? index - (slot - 1) : null;
+}
+
 export function buildRows(
   boardId: string,
   template: BoardTemplate,
@@ -255,6 +274,8 @@ export function buildRows(
       cells[column.id] = cellFor(column, { template, seed, cellSeed, index, base });
     }
 
+    const parentIndex = parentIndexFor(template, index);
+
     rows.push({
       id: `${boardId}_row_${sequence}`,
       boardId,
@@ -265,6 +286,10 @@ export function buildRows(
       updatedAt: new Date(base - (seed % 20) * DAY_MS).toISOString(),
       createdBy: person.id,
       revision: 1,
+      // The child points at the parent; the parent stores nothing about it.
+      ...(parentIndex !== null && parentIndex < index
+        ? { parentRowId: `${boardId}_row_${parentIndex + 1}` }
+        : {}),
     });
   }
 

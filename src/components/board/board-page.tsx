@@ -186,7 +186,8 @@ export function BoardPage({ node }: { node: BoardNode }) {
 
       {model.view?.type === "kanban" && <KanbanBoard model={model} canEdit={canEdit} />}
       {model.view?.type === "calendar" && <CalendarBoard model={model} canEdit={canEdit} />}
-      {model.view?.type === "timeline" && <TimelineBoard model={model} canEdit={canEdit} />}
+      {/* The roadmap is read-only: dates change on the record, not by dragging. */}
+      {model.view?.type === "timeline" && <TimelineBoard model={model} />}
       {(model.view?.type === "table" || !model.view) && (
         <TableGrid
           model={model}

@@ -42,7 +42,7 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
   const router = useRouter();
   const toggleFavorite = useWorkspaceStore((state) => state.toggleFavorite);
   const trashNode = useWorkspaceStore((state) => state.trashNode);
-  const renameNode = useWorkspaceStore((state) => state.renameNode);
+  const requestRename = useWorkspaceStore((state) => state.requestRename);
   const openPreview = useWorkspaceStore((state) => state.openPreview);
   const setNodeArchived = useWorkspaceStore((state) => state.setNodeArchived);
   const can = usePermissions(node);
@@ -65,11 +65,6 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
     } catch {
       pushFeedback("Could not reach the clipboard — copy the address bar instead", "error");
     }
-  }
-
-  function handleRename() {
-    const next = window.prompt("Rename item", node.name);
-    if (next !== null) renameNode(node.id, next);
   }
 
   return (
@@ -97,7 +92,10 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
           {node.isFavorite ? <StarOff /> : <Star />}
           {node.isFavorite ? "Remove from favorites" : "Add to favorites"}
         </DropdownMenuItem>
-        <DropdownMenuItem disabled={!can("node.rename")} onSelect={handleRename}>
+        <DropdownMenuItem
+          disabled={!can("node.rename")}
+          onSelect={() => requestRename(node.id)}
+        >
           <PenLine />
           Rename
         </DropdownMenuItem>

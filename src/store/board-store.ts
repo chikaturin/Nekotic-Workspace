@@ -16,7 +16,10 @@ import {
 } from "@/lib/board-records";
 import { bulkTone, describeBulkResult } from "@/lib/bulk";
 import { emptyCellFor } from "@/lib/cell-values";
+import { wouldCreateCycle } from "@/lib/board-hierarchy";
+import { guardCellEdits } from "@/lib/board-write-rules";
 import { pruneView } from "@/lib/board-view";
+import type { CellContext } from "@/lib/cell-values";
 import { boardService } from "@/services/board-service";
 import { isCancellation, toAppError } from "@/services/errors";
 import { CURRENT_USER } from "@/mock/users";
@@ -39,6 +42,7 @@ import type {
   RowHeight,
   SavedView,
   SelectOption,
+  SubtaskDisplay,
   ViewFilter,
   ViewSort,
 } from "@/types";
@@ -91,6 +95,16 @@ interface BoardActions {
   duplicateRow: (rowId: string) => Promise<string | null>;
   deleteRow: (rowId: string) => Promise<void>;
 
+  /**
+   * Subtasks. A child is a full board record — same store, same order, same
+   * views — so these two actions only ever move a pointer.
+   */
+  createSubtask: (
+    parentRowId: string,
+    values?: Readonly<Record<string, CellValue>>,
+  ) => Promise<string | null>;
+  setRowParent: (rowId: string, parentRowId: string | null) => Promise<boolean>;
+
   addColumn: (type: ColumnType, name: string) => Promise<void>;
   renameColumn: (columnId: string, name: string) => Promise<void>;
   updateColumnConfig: (columnId: string, patch: ColumnPatch) => Promise<void>;
@@ -110,6 +124,8 @@ interface BoardActions {
   setEndDateColumn: (columnId: string | null) => Promise<void>;
   setViewType: (type: BoardViewType) => Promise<void>;
   setRowHeight: (rowHeight: RowHeight) => Promise<void>;
+  /** How this view reads the parent/child hierarchy. Presentation, not data. */
+  setSubtaskDisplay: (display: SubtaskDisplay) => Promise<void>;
 
   /* Saved views. Switching between them never copies a record. */
   createView: (name: string, type: BoardViewType) => Promise<string | null>;
@@ -169,6 +185,26 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
 
   function currentBoard(): Board | null {
     return get().board;
+  }
+
+  /**
+   * Lookups the rule guard needs to read a cell the way a column displays it.
+   * Relation labels stay local — a rule that spans boards is not a thing the
+   * builder can author, so there is nothing to resolve across one.
+   */
+  function writeContext(): CellContext {
+    const { people, rowsById, rowOrder } = get();
+    const relationLabels = new Map<string, string>();
+    for (const rowId of rowOrder) {
+      const row = rowsById[rowId];
+      if (row) relationLabels.set(rowId, row.displayId);
+    }
+
+    return {
+      people: new Map(people.map((person) => [person.id, person])),
+      relationLabels,
+      relationResolved: false,
+    };
   }
 
   function patchView(viewId: string, patch: Partial<SavedView>): void {
@@ -248,9 +284,24 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
 
     /* ------------------------------------------------------------- records */
 
-    editCells: async (edits) => {
+    editCells: async (rawEdits) => {
       const board = currentBoard();
-      if (!board || edits.length === 0) return;
+      if (!board || rawEdits.length === 0) return;
+
+      /**
+       * Record rules first: an edit a transition rule or a conditional option
+       * refuses never becomes an optimistic write, so nothing has to be rolled
+       * back and no request leaves the client.
+       */
+      const { allowed: edits, rejected } = guardCellEdits({
+        edits: rawEdits,
+        board,
+        rowsById: get().rowsById,
+        context: writeContext(),
+      });
+
+      for (const rejection of rejected) feedback(rejection.message);
+      if (edits.length === 0) return;
 
       const before = get().rowsById;
       const reverts = captureCells(before, edits);
@@ -373,14 +424,142 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
       );
     },
 
+    /* ----------------------------------------------------------- subtasks */
+
+    /**
+     * Create a child of `parentRowId`, optionally pre-filled.
+     *
+     * The optimistic row already carries its parent, so the drawer's subtask
+     * list and the table's nested rows both show it on the next frame — and
+     * the server's real `TASK-00n` replaces the placeholder when it answers.
+     */
+    createSubtask: async (parentRowId, values) => {
+      const board = currentBoard();
+      const parent = get().rowsById[parentRowId];
+      if (!board || !parent) return null;
+
+      const tempId = `tmp_${Date.now().toString(36)}`;
+      const now = new Date().toISOString();
+
+      const optimistic: BoardRow = {
+        id: tempId,
+        boardId: board.id,
+        displayId: `${board.rowIdPrefix}-…`,
+        sequence: 0,
+        cells: {
+          ...Object.fromEntries(
+            board.columns.map((column) => [column.id, emptyCellFor(column.type)]),
+          ),
+          ...values,
+        },
+        createdAt: now,
+        updatedAt: now,
+        createdBy: CURRENT_USER.id,
+        revision: 0,
+        parentRowId,
+        isPending: true,
+      };
+
+      const index = get().rowOrder.indexOf(parentRowId) + 1;
+      set((state) => ({
+        rowsById: { ...state.rowsById, [tempId]: optimistic },
+        rowOrder: [
+          ...state.rowOrder.slice(0, index),
+          tempId,
+          ...state.rowOrder.slice(index),
+        ],
+      }));
+
+      const created = await write(
+        () =>
+          boardService.createRow({
+            boardId: board.id,
+            parentRowId,
+            ...(values ? { cells: optimistic.cells } : {}),
+          }),
+        () => set((state) => removeRow(state, tempId)),
+      );
+
+      if (!created) return null;
+
+      set((state) => replaceRow(state, tempId, created));
+      return created.id;
+    },
+
+    /**
+     * Move a record under a new parent, or back to the top level.
+     *
+     * The cycle guard runs before the optimistic write: a loop would hang every
+     * reader of the hierarchy, so it must never reach the store at all.
+     */
+    setRowParent: async (rowId, parentRowId) => {
+      const board = currentBoard();
+      const row = get().rowsById[rowId];
+      if (!board || !row) return false;
+      if ((row.parentRowId ?? null) === parentRowId) return true;
+
+      if (wouldCreateCycle(get().rowsById, rowId, parentRowId)) {
+        feedback("That would put a record inside itself");
+        return false;
+      }
+
+      const previous = row.parentRowId ?? null;
+      set((state) => ({
+        rowsById: { ...state.rowsById, [rowId]: { ...row, parentRowId } },
+      }));
+
+      const updated = await write(
+        () => boardService.setRowParent(board.id, rowId, parentRowId),
+        () =>
+          set((state) => {
+            const current = state.rowsById[rowId];
+            return current
+              ? { rowsById: { ...state.rowsById, [rowId]: { ...current, parentRowId: previous } } }
+              : state;
+          }),
+      );
+
+      if (!updated) return false;
+
+      set((state) => ({ rowsById: reconcileRows(state.rowsById, [updated]) }));
+      return true;
+    },
+
     /* --------------------------------------------------------------- bulk */
 
+    /**
+     * The same record rules apply to a hundred records as to one: a bulk
+     * status change is still a status change, so the selection is split into
+     * the records the rules permit and the ones they do not before anything is
+     * written. Refusing the whole batch because one record cannot make the
+     * move would be worse than telling the user which ones could not.
+     */
     bulkUpdate: async (rowIds, values, verb = "Updated") => {
       const board = currentBoard();
       if (!board || rowIds.length === 0) return null;
 
+      const { rejected } = guardCellEdits({
+        edits: rowIds.flatMap((rowId) =>
+          Object.entries(values).map(([columnId, value]) => ({ rowId, columnId, value })),
+        ),
+        board,
+        rowsById: get().rowsById,
+        context: writeContext(),
+      });
+
+      const blocked = new Set(rejected.map((rejection) => rejection.edit.rowId));
+      const targets = rowIds.filter((rowId) => !blocked.has(rowId));
+
+      if (blocked.size > 0) {
+        feedback(
+          `${blocked.size} record${blocked.size === 1 ? "" : "s"} could not make that change — ${rejected[0]?.message ?? ""}`,
+        );
+      }
+
+      if (targets.length === 0) return null;
+
       const result = await write(
-        () => boardService.bulkUpdate({ boardId: board.id, rowIds, values }),
+        () => boardService.bulkUpdate({ boardId: board.id, rowIds: targets, values }),
         () => {},
       );
       if (!result) return null;
@@ -650,6 +829,12 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
 
     setRowHeight: async (rowHeight) => {
       await patchActiveView({ rowHeight }, (view) => ({ rowHeight: view.rowHeight }));
+    },
+
+    setSubtaskDisplay: async (subtaskDisplay) => {
+      await patchActiveView({ subtaskDisplay }, (view) => ({
+        subtaskDisplay: view.subtaskDisplay,
+      }));
     },
 
     createView: async (name, type) => {

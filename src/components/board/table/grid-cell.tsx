@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, type MouseEvent } from "react";
+import { memo, useCallback, type MouseEvent, type ReactNode } from "react";
 import { CellEditor } from "@/components/board/cells/cell-editor";
 import { CellRenderer } from "@/components/board/cells/cell-renderer";
 import { widthStyle, type GridShared } from "@/components/board/table/grid-shared";
@@ -22,6 +22,13 @@ interface GridCellProps {
   readonly shared: GridShared;
   /** Frozen: an archived record, an archived board, or a viewer who may read. */
   readonly isReadOnly: boolean;
+  /**
+   * Hierarchy indent in pixels, applied to the primary cell only so a nested
+   * row still lines up with every other column.
+   */
+  readonly indent?: number;
+  /** Expand/collapse control for a record that owns subtasks. */
+  readonly disclosure?: ReactNode;
 }
 
 /**
@@ -38,6 +45,8 @@ export const GridCell = memo(function GridCell({
   columnIndex,
   shared,
   isReadOnly,
+  indent = 0,
+  disclosure,
 }: GridCellProps) {
   const isFocused = useGridStore(selectIsFocused(rowIndex, columnIndex));
   const isSelected = useGridStore(selectIsSelected(rowIndex, columnIndex));
@@ -103,6 +112,15 @@ export const GridCell = memo(function GridCell({
         isFocused && "z-30 ring-2 ring-inset ring-accent",
       )}
     >
+      {(indent > 0 || disclosure) && !isEditing && (
+        <div
+          style={{ width: indent + (disclosure ? 18 : 0) }}
+          className="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center justify-end pr-0.5"
+        >
+          <span className="pointer-events-auto">{disclosure}</span>
+        </div>
+      )}
+
       {isEditing && !isReadOnly ? (
         <CellEditor
           value={value}
@@ -112,13 +130,20 @@ export const GridCell = memo(function GridCell({
           primaryColumnId={shared.primaryColumnId}
           folderId={shared.folderId}
           people={shared.people}
+          columns={shared.columns}
+          context={shared.context}
           initialText={initialText}
           onCommit={commit}
           onCancel={() => useGridStore.getState().endEdit()}
           onCreateOption={(label) => shared.onCreateOption(column.id, label)}
         />
       ) : (
-        <CellRenderer value={value} column={column} context={shared.context} />
+        <div
+          style={indent > 0 || disclosure ? { paddingLeft: indent + (disclosure ? 18 : 0) } : undefined}
+          className="h-full"
+        >
+          <CellRenderer value={value} column={column} context={shared.context} />
+        </div>
       )}
     </div>
   );

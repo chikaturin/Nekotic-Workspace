@@ -7,7 +7,7 @@ import { RelationCellEditor } from "@/components/board/cells/relation-cell";
 import { SelectCellEditor } from "@/components/board/cells/select-cell";
 import { TextCellEditor } from "@/components/board/cells/text-cell";
 import { UserCellEditor } from "@/components/board/cells/user-cell";
-import { emptyCellFor } from "@/lib/cell-values";
+import { emptyCellFor, type CellContext } from "@/lib/cell-values";
 import type { BoardColumn, CellValue, DirectoryUser, SelectOption } from "@/types";
 
 export interface CellEditorProps {
@@ -19,6 +19,9 @@ export interface CellEditorProps {
   /** Folder that attachment uploads are filed into. */
   readonly folderId: string | null;
   readonly people: readonly DirectoryUser[];
+  /** The board's schema and lookups — what an option rule is evaluated against. */
+  readonly columns: readonly BoardColumn[];
+  readonly context: CellContext;
   readonly initialText?: string;
   readonly onCommit: (value: CellValue, move?: "down" | "none") => void;
   readonly onCancel: () => void;
@@ -60,6 +63,9 @@ export function CellEditor(props: CellEditorProps) {
         <SelectCellEditor
           value={safe}
           column={column}
+          rowId={props.rowId}
+          columns={props.columns}
+          context={props.context}
           onCommit={onCommit}
           onCancel={onCancel}
           onCreateOption={props.onCreateOption}
@@ -83,16 +89,16 @@ export function CellEditor(props: CellEditorProps) {
       ) : null;
 
     case "attachment":
-      return safe.kind === "attachment" ? (
+      // The attachment editor writes through the board record itself, so it
+      // takes no value and returns none — see `use-attachment-field`.
+      return (
         <AttachmentCellEditor
-          value={safe}
           column={column}
           rowId={props.rowId}
           folderId={props.folderId}
-          onCommit={onCommit}
           onCancel={onCancel}
         />
-      ) : null;
+      );
 
     case "relation":
       return safe.kind === "relation" ? (

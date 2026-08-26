@@ -1,30 +1,47 @@
 "use client";
 
-import { X } from "lucide-react";
+import { ListTree, Workflow, X } from "lucide-react";
+import { useState } from "react";
 import { DateMenu } from "@/components/board/config/date-menu";
 import { FilterMenu } from "@/components/board/config/filter-menu";
 import { GroupMenu } from "@/components/board/config/group-menu";
+import { SelectColumnDialog } from "@/components/board/config/select-column-dialog";
 import { SortMenu } from "@/components/board/config/sort-menu";
 import { Button } from "@/components/ui/button";
 import { SelectField } from "@/components/ui/select-field";
 import type { BoardViewModel } from "@/hooks/use-board-view";
 import { describeFilter } from "@/lib/board-filters";
+import { SUBTASK_DISPLAY_LABELS } from "@/lib/board-hierarchy";
 import { useBoardStore } from "@/store/board-store";
-import type { RowHeight } from "@/types";
+import type { RowHeight, SubtaskDisplay } from "@/types";
 
 const ROW_HEIGHTS: readonly RowHeight[] = ["short", "medium", "tall"];
+const SUBTASK_DISPLAYS: readonly SubtaskDisplay[] = ["nested", "flat", "hidden"];
 
 /**
  * One configuration bar for every view type. Filter, sort and group are shared
  * by all four; the date anchors only appear where they mean something.
  */
 export function ViewConfigBar({ model }: { model: BoardViewModel }) {
-  const { view, columns } = model;
+  const { view, columns, groupColumn, subtaskDisplay } = model;
   const setFilters = useBoardStore((state) => state.setFilters);
   const setRowHeight = useBoardStore((state) => state.setRowHeight);
+  const setSubtaskDisplay = useBoardStore((state) => state.setSubtaskDisplay);
+  const updateColumnConfig = useBoardStore((state) => state.updateColumnConfig);
+  const people = useBoardStore((state) => state.people);
+
+  const [isEditingRules, setIsEditingRules] = useState(false);
 
   const needsDates = view?.type === "calendar" || view?.type === "timeline";
   const filters = view?.filters ?? [];
+
+  /**
+   * Kanban writes the group column on every drop, so its transition rules are
+   * worth reaching from the board itself — the same dialog the column header
+   * opens, and the same stored config.
+   */
+  const kanbanStatusColumn =
+    view?.type === "kanban" && groupColumn?.type === "select" ? groupColumn : null;
 
   return (
     <div className="flex flex-wrap items-center gap-1 border-t border-hairline px-3 py-1.5">
@@ -32,6 +49,37 @@ export function ViewConfigBar({ model }: { model: BoardViewModel }) {
       <SortMenu model={model} />
       {!needsDates && <GroupMenu model={model} />}
       {needsDates && <DateMenu model={model} />}
+
+      {kanbanStatusColumn && (
+        <Button
+          size="sm"
+          variant={kanbanStatusColumn.config.transitionRules?.enabled ? "subtle" : "ghost"}
+          className="gap-1.5"
+          onClick={() => setIsEditingRules(true)}
+        >
+          <Workflow />
+          Transition rules
+        </Button>
+      )}
+
+      {/* Hierarchy is presentation, so it lives on the view like row height —
+          one saved view can nest subtasks while another lists them flat. */}
+      <label className="ml-1 flex items-center gap-1">
+        <ListTree className="size-3.5 shrink-0 text-faint-foreground" />
+        <span className="sr-only">Subtasks</span>
+        <SelectField
+          aria-label="Subtasks"
+          value={subtaskDisplay}
+          onChange={(event) => void setSubtaskDisplay(event.target.value as SubtaskDisplay)}
+          className="h-7"
+        >
+          {SUBTASK_DISPLAYS.map((display) => (
+            <option key={display} value={display}>
+              {SUBTASK_DISPLAY_LABELS[display]}
+            </option>
+          ))}
+        </SelectField>
+      </label>
 
       {view?.type === "table" && (
         <SelectField
@@ -73,6 +121,16 @@ export function ViewConfigBar({ model }: { model: BoardViewModel }) {
           </Button>
         </div>
       )}
+
+      <SelectColumnDialog
+        column={isEditingRules ? kanbanStatusColumn : null}
+        columns={columns}
+        people={people}
+        onClose={() => setIsEditingRules(false)}
+        onSave={(config) => {
+          if (kanbanStatusColumn) void updateColumnConfig(kanbanStatusColumn.id, { config });
+        }}
+      />
     </div>
   );
 }

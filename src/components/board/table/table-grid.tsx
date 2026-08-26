@@ -13,10 +13,16 @@ import { useGridClipboard } from "@/hooks/use-grid-clipboard";
 import { useGridKeyboard } from "@/hooks/use-grid-keyboard";
 import { useVirtualRows } from "@/hooks/use-virtual-rows";
 import type { BoardViewModel } from "@/hooks/use-board-view";
-import { flattenGroups, flattenUngrouped } from "@/lib/board-grouping";
+import { flattenGroups, flattenUngrouped, type RowExpander } from "@/lib/board-grouping";
+import { layoutHierarchy } from "@/lib/board-hierarchy";
 import { ROW_HEIGHTS } from "@/lib/grid-geometry";
 import { useBoardStore } from "@/store/board-store";
-import { selectCollapsedGroups, selectSelectedRowIds, useGridStore } from "@/store/grid-store";
+import {
+  selectCollapsedGroups,
+  selectCollapsedParents,
+  selectSelectedRowIds,
+  useGridStore,
+} from "@/store/grid-store";
 import type { BoardColumn, CellValue, ColumnType, PermissionResolver } from "@/types";
 
 interface TableGridProps {
@@ -47,7 +53,8 @@ export function TableGrid({
   can,
   onExportSelection,
 }: TableGridProps) {
-  const { board, view, columnsShown, context, groups, groupColumn } = model;
+  const { board, view, columnsShown, context, groups, groupColumn, hierarchy, subtaskDisplay } =
+    model;
 
   const rowHeight = ROW_HEIGHTS[view?.rowHeight ?? "medium"];
   const editCells = useBoardStore((state) => state.editCells);
@@ -70,7 +77,9 @@ export function TableGrid({
   const orderedRef = useRef<readonly string[]>([]);
 
   const collapsed = useGridStore(selectCollapsedGroups(view?.id ?? null));
+  const collapsedParents = useGridStore(selectCollapsedParents(view?.id ?? null));
   const toggleGroup = useGridStore((state) => state.toggleGroup);
+  const toggleParent = useGridStore((state) => state.toggleParent);
   const selectedMap = useGridStore(selectSelectedRowIds);
 
   const bulk = useBulkActions(model);
@@ -80,10 +89,27 @@ export function TableGrid({
    * Grouped and ungrouped take the same path: one flat, uniform-height list of
    * group headers and records, which is what the window maths needs.
    */
+  /**
+   * How a list of row ids becomes rows on screen. Under "nested" a parent
+   * brings its visible children with it, indented; the other two modes are
+   * plain filters the view model already applied, so they lay out flat.
+   */
+  const expand = useMemo<RowExpander>(
+    () => (ids) =>
+      layoutHierarchy({
+        rowIds: ids,
+        rowsById,
+        index: hierarchy,
+        display: subtaskDisplay,
+        collapsed: new Set(collapsedParents),
+      }),
+    [rowsById, hierarchy, subtaskDisplay, collapsedParents],
+  );
+
   const flattened = useMemo(() => {
-    if (!groups) return flattenUngrouped(model.rowIds);
-    return flattenGroups(groups, new Set(collapsed));
-  }, [groups, model.rowIds, collapsed]);
+    if (!groups) return flattenUngrouped(model.rowIds, expand);
+    return flattenGroups(groups, new Set(collapsed), expand);
+  }, [groups, model.rowIds, collapsed, expand]);
 
   const rowIds = flattened.rowIds;
 
@@ -294,6 +320,11 @@ export function TableGrid({
                 key={entry.rowId}
                 rowId={entry.rowId}
                 rowIndex={entry.recordIndex}
+                depth={entry.depth}
+                hasChildren={entry.hasChildren}
+                childCount={entry.childCount}
+                isCollapsed={entry.isCollapsed}
+                onToggleChildren={() => toggleParent(view?.id ?? "", entry.rowId)}
                 shared={shared}
               />
             ),

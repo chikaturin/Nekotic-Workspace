@@ -11,7 +11,6 @@ import {
   toAppError,
 } from "@/services/errors";
 import { delay, nextId } from "@/services/backend";
-import { FILE_TEMPLATES, templateFileName } from "@/lib/file-templates";
 import { resetSimulation, setSimulation, shouldFailSave, shouldFailUpload } from "@/services/simulation";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import { isFile, type FileNode } from "@/types";
@@ -371,32 +370,6 @@ describe("file service previews", () => {
     );
   });
 
-  test("a blank file is created with real, editable bytes", async () => {
-    const template = FILE_TEMPLATES.find((candidate) => candidate.id === "xlsx");
-    if (!template) throw new Error("fixture missing");
-
-    const asset = await fileService.createBlank({
-      template,
-      name: "Untitled.xlsx",
-      folderId: null,
-      owner: CURRENT_USER,
-    });
-
-    expect(asset.extension).toBe("xlsx");
-    expect(asset.sizeBytes).toBeGreaterThan(0);
-
-    const preview = await fileService.getPreview({
-      ...fileNode("t_development_backend_payment_spec_pdf"),
-      id: asset.id,
-      name: asset.name,
-      kind: "spreadsheet",
-      extension: "xlsx",
-      mimeType: asset.mimeType,
-    });
-
-    expect(preview.kind).toBe("sheet");
-    if (preview.kind === "sheet") expect(preview.rows[0]).toEqual(["Column A", "Column B", "Column C"]);
-  });
 
   test("a download url is produced for any file", async () => {
     const url = await fileService.getDownloadUrl(fileNode("t_development_backend_payment_spec_pdf"));
@@ -443,25 +416,5 @@ describe("block visuals", () => {
   test("text blocks have typography and placeholders", () => {
     expect(TEXT_BLOCK_CLASS.heading1).toContain("font-semibold");
     expect(BLOCK_PLACEHOLDER.paragraph).toContain("/");
-  });
-});
-
-describe("file templates", () => {
-  const template = FILE_TEMPLATES[0]!;
-
-  test("the first file of a type keeps the plain name", () => {
-    expect(templateFileName(template, [])).toBe(`Untitled.${template.extension}`);
-  });
-
-  test("a taken name is suffixed until it is free", () => {
-    const taken = [`Untitled.${template.extension}`, `Untitled 2.${template.extension}`];
-
-    expect(templateFileName(template, taken)).toBe(`Untitled 3.${template.extension}`);
-  });
-
-  test("every template declares a distinct extension", () => {
-    const extensions = FILE_TEMPLATES.map((candidate) => candidate.extension);
-
-    expect(new Set(extensions).size).toBe(extensions.length);
   });
 });

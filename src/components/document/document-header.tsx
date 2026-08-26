@@ -1,6 +1,7 @@
 "use client";
 
 import { Archive, Lock, Maximize2, Minimize2, Pin } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { WatchButton } from "@/components/collab/watch-button";
 import { DocumentActionsMenu } from "@/components/document/document-actions-menu";
 import { SaveIndicator } from "@/components/document/save-indicator";
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { DocumentActions } from "@/hooks/use-document-actions";
 import { countWords } from "@/lib/blocks";
+import { useWorkspaceStore } from "@/store/workspace-store";
 import { formatCount } from "@/lib/format";
 import type {
   CapabilitySet,
@@ -46,6 +48,8 @@ interface DocumentHeaderProps {
   readonly onToggleFullScreen: () => void;
   /** The page itself, for the follow button. */
   readonly watchTarget: EntityRef;
+  /** Drive node id, so a freshly created page can claim its own title focus. */
+  readonly nodeId: string;
 }
 
 export function DocumentHeader({
@@ -64,8 +68,25 @@ export function DocumentHeader({
   isFullScreen,
   onToggleFullScreen,
   watchTarget,
+  nodeId,
 }: DocumentHeaderProps) {
   const isEditable = capabilities.edit;
+  const titleRef = useRef<HTMLInputElement>(null);
+  const titleFocusNodeId = useWorkspaceStore((state) => state.titleFocusNodeId);
+  const clearTitleFocus = useWorkspaceStore((state) => state.clearTitleFocus);
+
+  /**
+   * A page that was just created opens with its title selected, so typing a
+   * name is the first thing that happens rather than a separate edit step.
+   * The request is consumed once — coming back later must not steal focus.
+   */
+  useEffect(() => {
+    if (titleFocusNodeId !== nodeId || !isEditable) return;
+
+    const frame = requestAnimationFrame(() => titleRef.current?.select());
+    clearTitleFocus();
+    return () => cancelAnimationFrame(frame);
+  }, [titleFocusNodeId, nodeId, isEditable, clearTitleFocus]);
 
   return (
     <header className="border-b border-border bg-background/80 px-4 py-3 backdrop-blur">
@@ -99,6 +120,7 @@ export function DocumentHeader({
         </DropdownMenu>
 
         <input
+          ref={titleRef}
           value={draft.title}
           readOnly={!isEditable}
           onChange={(event) => onTitleChange(event.target.value)}

@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   Pencil,
   Shuffle,
+  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
 import {
@@ -22,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useState } from "react";
+import { SelectColumnDialog } from "@/components/board/config/select-column-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useBoardList } from "@/hooks/use-board-list";
 import { COLUMN_TYPE_LABELS } from "@/lib/board-schema";
@@ -30,6 +32,8 @@ import type { BoardColumn, ColumnType, PermissionResolver } from "@/types";
 
 interface ColumnMenuProps {
   readonly column: BoardColumn;
+  /** Every column on the board — what an option rule can be written against. */
+  readonly columns: readonly BoardColumn[];
   /**
    * Reshaping a column is a manager's job; sorting and hiding one is how
    * anybody reads a board. The menu holds both, so it asks per item rather
@@ -43,13 +47,15 @@ interface ColumnMenuProps {
 const TYPES = Object.keys(COLUMN_TYPE_LABELS) as readonly ColumnType[];
 
 /** Everything a column can do, at the header where the user is looking. */
-export function ColumnMenu({ column, can, onRename, onConvert }: ColumnMenuProps) {
+export function ColumnMenu({ column, columns, can, onRename, onConvert }: ColumnMenuProps) {
   const setSort = useBoardStore((state) => state.setSort);
+  const people = useBoardStore((state) => state.people);
   const setColumnHidden = useBoardStore((state) => state.setColumnHidden);
   const deleteColumn = useBoardStore((state) => state.deleteColumn);
   const updateColumnConfig = useBoardStore((state) => state.updateColumnConfig);
   const boards = useBoardList();
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isConfiguringSelect, setIsConfiguringSelect] = useState(false);
 
   const canEditSchema = can("board.column.update");
 
@@ -94,6 +100,16 @@ export function ColumnMenu({ column, can, onRename, onConvert }: ColumnMenuProps
             ))}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+
+        {column.type === "select" && (
+          <DropdownMenuItem
+            disabled={!canEditSchema}
+            onSelect={() => setIsConfiguringSelect(true)}
+          >
+            <SlidersHorizontal />
+            Options &amp; rules…
+          </DropdownMenuItem>
+        )}
 
         {column.type === "relation" && (
           <DropdownMenuSub>
@@ -153,6 +169,16 @@ export function ColumnMenu({ column, can, onRename, onConvert }: ColumnMenuProps
 
       {/* Deleting a column takes its value out of every record on the board.
           Nothing else in the app destroys that much from a single menu item. */}
+      {/* Options, their conditions and the transition table are one write:
+          the dialog commits a whole config so a half-written rule never lands. */}
+      <SelectColumnDialog
+        column={isConfiguringSelect && column.type === "select" ? column : null}
+        columns={columns}
+        people={people}
+        onClose={() => setIsConfiguringSelect(false)}
+        onSave={(config) => void updateColumnConfig(column.id, { config })}
+      />
+
       <ConfirmDialog
         isOpen={isConfirmingDelete}
         title={`Delete the “${column.name}” column?`}

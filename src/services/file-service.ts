@@ -4,7 +4,6 @@ import { extensionOf, kindFromFileName } from "@/lib/node-visuals";
 import { buildPdf, pdfToBytes } from "@/lib/pdf";
 import { buildXlsx, parseXlsx } from "@/lib/xlsx";
 import { validateUpload } from "@/lib/file-validation";
-import { SHEET_SEED, TEXT_SEEDS, type FileTemplate } from "@/lib/file-templates";
 import { previewStrategyFor } from "@/lib/preview-strategy";
 import { svgPreview } from "@/mock/preview";
 import { mockSheet } from "@/mock/sheet";
@@ -88,59 +87,6 @@ async function upload({ file, folderId, owner, onProgress, signal }: UploadInput
     updatedAt: nowIso(),
     folderId,
   };
-}
-
-export interface CreateBlankInput {
-  readonly template: FileTemplate;
-  readonly name: string;
-  readonly folderId: string | null;
-  readonly owner: UserSummary;
-  readonly signal?: AbortSignal;
-}
-
-/**
- * Create an empty file of a chosen type. The seed bytes are real, so the new
- * file previews, edits and downloads exactly like an uploaded one.
- */
-async function createBlank({
-  template,
-  name,
-  folderId,
-  owner,
-  signal,
-}: CreateBlankInput): Promise<FileAsset> {
-  await writeDelay(signal);
-  if (signal?.aborted) throw cancelled(`Creating “${name}”`);
-
-  const id = nextId("asset");
-  blobs.set(id, seedBlob(template));
-
-  return {
-    id,
-    name,
-    extension: template.extension,
-    mimeType: template.mimeType,
-    sizeBytes: blobs.get(id)?.size ?? 0,
-    kind: template.kind,
-    owner,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-    folderId,
-  };
-}
-
-function seedBlob(template: FileTemplate): Blob {
-  if (template.extension === "xlsx") {
-    return new Blob([buildXlsx(SHEET_SEED, "Sheet1")], { type: template.mimeType });
-  }
-
-  if (template.extension === "csv" || template.extension === "tsv") {
-    return new Blob([toDelimited(SHEET_SEED, delimiterFor(template.extension))], {
-      type: template.mimeType,
-    });
-  }
-
-  return new Blob([TEXT_SEEDS[template.id] ?? ""], { type: template.mimeType });
 }
 
 export interface ListFilesInput {
@@ -395,7 +341,6 @@ function unsupportedReason(node: FileNode): string {
 
 export const fileService = {
   upload,
-  createBlank,
   listFiles,
   getPreview,
   saveText,

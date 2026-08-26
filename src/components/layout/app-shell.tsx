@@ -6,6 +6,7 @@ import { GlobalSearchDialog } from "@/components/search/global-search-dialog";
 import { AppSidebar } from "@/components/layout/sidebar/app-sidebar";
 import { RolePreviewBanner } from "@/components/permissions/role-preview-banner";
 import { FeedbackToast } from "@/components/shared/feedback-toast";
+import { RenameDialog } from "@/components/shared/rename-dialog";
 import { DrivePreviewDialog } from "@/components/drive/drive-preview-dialog";
 import { UploadQueuePanel } from "@/components/files/upload-queue-panel";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -40,6 +41,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <GlobalSearchDialog />
       <DrivePreviewDialog />
       <UploadQueuePanel />
+      <RenameDialog />
       <FeedbackToast />
     </TooltipProvider>
   );

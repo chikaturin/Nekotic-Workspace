@@ -3,8 +3,10 @@ import type {
   BoardColumn,
   BoardTemplate,
   BoardTemplateId,
+  ConditionGroup,
   SelectOption,
   ColumnType,
+  TransitionRules,
 } from "@/types";
 
 /**
@@ -57,6 +59,13 @@ interface ColumnSpec {
   readonly options?: readonly SelectOption[];
   readonly isMulti?: boolean;
   readonly includesTime?: boolean;
+  /**
+   * Which options mean "finished". Subtask progress is measured against these,
+   * so completion is a setting on the board rather than a label match in code.
+   */
+  readonly completedOptionIds?: readonly string[];
+  /** Seed rules the user can then edit, disable or replace entirely. */
+  readonly transitionRules?: TransitionRules;
 }
 
 function column(spec: ColumnSpec, position: number): BoardColumn {
@@ -66,7 +75,17 @@ function column(spec: ColumnSpec, position: number): BoardColumn {
   });
 
   if (spec.type === "select") {
-    return { ...base, type: "select", config: { options: spec.options ?? [], isMulti: false } };
+    return {
+      ...base,
+      type: "select",
+      config: {
+        options: spec.options ?? [],
+        isMulti: false,
+        unavailableBehavior: "disabled",
+        ...(spec.completedOptionIds ? { completedOptionIds: spec.completedOptionIds } : {}),
+        ...(spec.transitionRules ? { transitionRules: spec.transitionRules } : {}),
+      },
+    };
   }
   if (spec.type === "user") {
     return { ...base, type: "user", config: { isMulti: spec.isMulti ?? false } };
@@ -80,6 +99,30 @@ function column(spec: ColumnSpec, position: number): BoardColumn {
 
 function schema(specs: readonly ColumnSpec[]): readonly BoardColumn[] {
   return specs.map(column);
+}
+
+/**
+ * A transition table, written as "from → allowed targets".
+ *
+ * Templates ship a sensible starting graph; it is ordinary configuration from
+ * the moment the board exists, and the user can rewrite or switch it off. No
+ * code path anywhere depends on the pairs declared here.
+ */
+function transitions(
+  table: Readonly<Record<string, readonly string[]>>,
+  enabled = false,
+): TransitionRules {
+  return { enabled, mode: "allow-list", transitions: table };
+}
+
+/** `Field is empty` — the one condition the seeded rules need. */
+function whenEmpty(id: string, columnId: string): ConditionGroup {
+  return {
+    id,
+    conjunction: "and",
+    conditions: [{ id: `${id}_c0`, columnId, operator: "isEmpty", value: "" }],
+    groups: [],
+  };
 }
 
 /* ------------------------------------------------------------ templates */
@@ -97,6 +140,9 @@ const TASK: BoardTemplate = {
       name: "Status",
       type: "select",
       width: 150,
+      // "Done" is only offered while nothing is blocking the record. The rule
+      // is data on the option, editable under Options & rules — the Select
+      // component itself knows nothing about blocking.
       options: options(
         [
           ["To do", "gray"],
@@ -106,7 +152,22 @@ const TASK: BoardTemplate = {
           ["Done", "green"],
         ],
         "status",
+      ).map((option) =>
+        option.id === "status_4"
+          ? { ...option, availability: whenEmpty("status_4_rule", "col_blocks") }
+          : option,
       ),
+      completedOptionIds: ["status_4"],
+      // Off by default: a board should behave exactly as it always has until
+      // someone opts into the rules.
+      transitionRules: transitions({
+        status_0: ["status_1", "status_3"],
+        status_1: ["status_2", "status_3", "status_0"],
+        status_2: ["status_1", "status_4"],
+        status_3: ["status_0", "status_1"],
+        status_4: ["status_1"],
+        __empty__: ["status_0"],
+      }),
     },
     {
       id: "col_priority",
@@ -182,6 +243,18 @@ const BUG: BoardTemplate = {
         ],
         "status",
       ),
+      completedOptionIds: ["status_4", "status_5"],
+      // A defect walks the ladder: nothing jumps from New straight to
+      // Verified. Seeded, disabled, and entirely the user's to change.
+      transitionRules: transitions({
+        status_0: ["status_1", "status_5"],
+        status_1: ["status_2", "status_5"],
+        status_2: ["status_3", "status_1"],
+        status_3: ["status_4", "status_2"],
+        status_4: ["status_2"],
+        status_5: ["status_1"],
+        __empty__: ["status_0"],
+      }),
     },
     { id: "col_env", name: "Environment", type: "select", width: 150, options: ENVIRONMENT_OPTIONS },
     { id: "col_reporter", name: "Reporter", type: "user", width: 180 },
@@ -220,6 +293,7 @@ const QA: BoardTemplate = {
         ],
         "result",
       ),
+      completedOptionIds: ["result_1"],
     },
     {
       id: "col_suite",
@@ -328,9 +402,32 @@ export function instantiateColumns(template: BoardTemplate): readonly BoardColum
     const copy = { ...source } as BoardColumn;
 
     if (copy.type === "select") {
+      const { transitionRules, completedOptionIds } = copy.config;
+
+      // Every nested structure is copied too: a board must be able to rewrite
+      // its own rules without the template it came from ever changing.
       return {
         ...copy,
-        config: { ...copy.config, options: copy.config.options.map((option) => ({ ...option })) },
+        config: {
+          ...copy.config,
+          options: copy.config.options.map((option) => ({
+            ...option,
+            ...(option.availability
+              ? { availability: cloneConditionGroup(option.availability) }
+              : {}),
+          })),
+          ...(completedOptionIds ? { completedOptionIds: [...completedOptionIds] } : {}),
+          ...(transitionRules
+            ? {
+                transitionRules: {
+                  ...transitionRules,
+                  transitions: Object.fromEntries(
+                    Object.entries(transitionRules.transitions).map(([from, to]) => [from, [...to]]),
+                  ),
+                },
+              }
+            : {}),
+        },
       };
     }
 
@@ -351,4 +448,15 @@ for (const template of BOARD_TEMPLATES) {
       for (const option of item.config.options) Object.freeze(option);
     }
   }
+}
+
+function cloneConditionGroup(group: ConditionGroup): ConditionGroup {
+  return {
+    ...group,
+    conditions: group.conditions.map((condition) => ({
+      ...condition,
+      ...(condition.values ? { values: [...condition.values] } : {}),
+    })),
+    groups: group.groups.map(cloneConditionGroup),
+  };
 }

@@ -1,3 +1,4 @@
+import type { HierarchyEntry } from "@/lib/board-hierarchy";
 import { cellOf, cellText, isCellEmpty, type CellContext } from "@/lib/cell-values";
 import type { RowMap } from "@/lib/board-records";
 import type { BoardColumn, CellValue, SelectColor } from "@/types";
@@ -146,7 +147,33 @@ export type FlatRow =
       readonly count: number;
       readonly isCollapsed: boolean;
     }
-  | { readonly kind: "record"; readonly rowId: string; readonly recordIndex: number };
+  | {
+      readonly kind: "record";
+      readonly rowId: string;
+      readonly recordIndex: number;
+      /** Hierarchy depth; 0 for a top-level record. */
+      readonly depth: number;
+      readonly hasChildren: boolean;
+      readonly childCount: number;
+      /** True when this parent's subtasks are folded away. */
+      readonly isCollapsed: boolean;
+    };
+
+/**
+ * Turns a group's ordered row ids into the entries to render. The table passes
+ * the hierarchy layout; anything that does not care about nesting passes
+ * nothing and gets one flat entry per id.
+ */
+export type RowExpander = (rowIds: readonly string[]) => readonly HierarchyEntry[];
+
+const FLAT_EXPANDER: RowExpander = (rowIds) =>
+  rowIds.map((rowId) => ({
+    rowId,
+    depth: 0,
+    childCount: 0,
+    hasChildren: false,
+    isCollapsed: false,
+  }));
 
 export interface FlattenedGroups {
   /** Group headers and records interleaved — what the virtualiser renders. */
@@ -164,6 +191,7 @@ export interface FlattenedGroups {
 export function flattenGroups(
   groups: readonly RowGroup[],
   collapsed: ReadonlySet<string>,
+  expand: RowExpander = FLAT_EXPANDER,
 ): FlattenedGroups {
   const flat: FlatRow[] = [];
   const rowIds: string[] = [];
@@ -183,10 +211,10 @@ export function flattenGroups(
 
     if (isCollapsed) continue;
 
-    for (const rowId of group.rowIds) {
+    for (const entry of expand(group.rowIds)) {
       flatIndexByRecord.push(flat.length);
-      flat.push({ kind: "record", rowId, recordIndex: rowIds.length });
-      rowIds.push(rowId);
+      flat.push({ kind: "record", recordIndex: rowIds.length, ...entry });
+      rowIds.push(entry.rowId);
     }
   }
 
@@ -194,10 +222,15 @@ export function flattenGroups(
 }
 
 /** The ungrouped shape, so the grid can take one code path either way. */
-export function flattenUngrouped(rowIds: readonly string[]): FlattenedGroups {
+export function flattenUngrouped(
+  rowIds: readonly string[],
+  expand: RowExpander = FLAT_EXPANDER,
+): FlattenedGroups {
+  const entries = expand(rowIds);
+
   return {
-    flat: rowIds.map((rowId, recordIndex) => ({ kind: "record" as const, rowId, recordIndex })),
-    rowIds,
-    flatIndexByRecord: rowIds.map((_, index) => index),
+    flat: entries.map((entry, recordIndex) => ({ kind: "record" as const, recordIndex, ...entry })),
+    rowIds: entries.map((entry) => entry.rowId),
+    flatIndexByRecord: entries.map((_, index) => index),
   };
 }

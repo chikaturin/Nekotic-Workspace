@@ -21,18 +21,25 @@ import type { BoardColumn } from "@/types";
  * which keeps every offset in whole days and the maths exact.
  */
 
-export type TimelineZoom = "day" | "week" | "month";
+/**
+ * Two scales, on purpose.
+ *
+ * A roadmap is read at the granularity people plan at — a day or a week. A
+ * month scale squeezed a day into five pixels, which made every bar look the
+ * same length and every label unreadable, so it is not offered.
+ */
+export type TimelineZoom = "day" | "week";
+
+export const TIMELINE_ZOOMS: readonly TimelineZoom[] = ["day", "week"];
 
 export const DAY_WIDTH: Readonly<Record<TimelineZoom, number>> = {
   day: 44,
   week: 16,
-  month: 5,
 };
 
 export const ZOOM_LABELS: Readonly<Record<TimelineZoom, string>> = {
   day: "Day",
   week: "Week",
-  month: "Month",
 };
 
 /** Days of blank space kept on each side of the data. */
@@ -172,7 +179,7 @@ export function timelineScale(
   };
 }
 
-/** Day labels when zoomed in, week starts at medium, month starts when far out. */
+/** Day labels when zoomed in, week starts when zoomed out. */
 function buildTicks(startIso: string, dayCount: number, zoom: TimelineZoom): readonly TimelineTick[] {
   const ticks: TimelineTick[] = [];
 
@@ -184,18 +191,12 @@ function buildTicks(startIso: string, dayCount: number, zoom: TimelineZoom): rea
       continue;
     }
 
-    if (zoom === "week") {
-      if (weekdayIndex(iso) !== 0) continue;
-      ticks.push({ iso, offset, label: shortDayLabel(iso), isMajor: isFirstOfMonth(iso) });
-      continue;
-    }
-
-    if (isFirstOfMonth(iso)) {
-      ticks.push({ iso, offset, label: monthLabel(iso), isMajor: true });
-    }
+    // Week zoom labels the Monday that starts each week.
+    if (weekdayIndex(iso) !== 0) continue;
+    ticks.push({ iso, offset, label: shortDayLabel(iso), isMajor: isFirstOfMonth(iso) });
   }
 
-  // A short window at month zoom can contain no first-of-month at all.
+  // A window shorter than a week can contain no Monday at all.
   if (ticks.length === 0) {
     ticks.push({ iso: startIso, offset: 0, label: monthLabel(startIso), isMajor: true });
   }
@@ -205,11 +206,6 @@ function buildTicks(startIso: string, dayCount: number, zoom: TimelineZoom): rea
 
 export function offsetToIso(scale: TimelineScale, offset: number): string {
   return addDays(scale.startIso, Math.round(offset));
-}
-
-/** Pixels dragged → whole days moved, at the current zoom. */
-export function pixelsToDays(pixels: number, zoom: TimelineZoom): number {
-  return Math.round(pixels / DAY_WIDTH[zoom]);
 }
 
 export { startOfWeek };
