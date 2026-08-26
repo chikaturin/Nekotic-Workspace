@@ -3,6 +3,7 @@ name: Deploy Next.js site to Pages
 on:
   push:
     branches: ["master"] # Chạy khi push lên master
+  workflow_dispatch: # Cho phép chạy tay từ tab Actions
 
 permissions:
   contents: read
@@ -20,23 +21,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Phải chạy TRƯỚC setup-node: cache "pnpm" cần binary pnpm để dò store path.
+      # Không cần khai version — action đọc "packageManager" trong package.json.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: pnpm # Hoặc 'yarn' / 'ppnpm' tùy bạn dùng package manager nào
+          node-version: "24"
+          cache: pnpm
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
-        with:
-          static_site_generator: next
 
       - name: Install dependencies
-        run: pnpm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build with Next.js
         run: pnpm run build
 
+      # next.config.ts đã đặt output: "export" nên build ghi thẳng ra ./out
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

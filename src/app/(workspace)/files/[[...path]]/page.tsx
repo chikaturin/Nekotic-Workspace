@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { FilesView } from "@/components/files/files-view";
+import { nodePathChains } from "@/lib/static-paths";
 
 interface FilesPageProps {
   readonly params: Promise<{ path?: string[] }>;
@@ -10,6 +11,11 @@ export async function generateMetadata({ params }: FilesPageProps): Promise<Meta
   const current = path[path.length - 1];
 
   return { title: current ? `Files · ${decodeURIComponent(current)}` : "Files" };
+}
+
+/** Static export needs every addressable path listed up front. */
+export function generateStaticParams() {
+  return nodePathChains().map((path) => ({ path: [...path] }));
 }
 
 export default async function FilesPage({ params }: FilesPageProps) {
