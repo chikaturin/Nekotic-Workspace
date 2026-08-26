@@ -182,7 +182,7 @@ export const useUploadStore = create<UploadStore>()((set, get) => {
 function canUploadTo(folderId: string | null): boolean {
   const state = useWorkspaceStore.getState();
   const workspace = selectActiveWorkspace(state);
-  const role = workspace.members.find((member) => member.id === CURRENT_USER.id)?.role ?? "guest";
+  const role = workspace.members.find((member) => member.id === CURRENT_USER.id)?.role ?? "viewer";
   const node = folderId ? findNodeById(getActiveTree(), folderId) : null;
 
   if (folderId && !node) return false;

@@ -2,18 +2,20 @@
 
 import { create } from "zustand";
 import {
+  appendRows,
   applyCellEdits,
   captureCells,
   copyCells,
   indexRows,
   reconcileRows,
   removeRow,
+  removeRows,
   replaceRow,
   revertCellEdits,
   type RowMap,
 } from "@/lib/board-records";
+import { bulkTone, describeBulkResult } from "@/lib/bulk";
 import { emptyCellFor } from "@/lib/cell-values";
-import { formatRowId } from "@/lib/row-id";
 import { pruneView } from "@/lib/board-view";
 import { boardService } from "@/services/board-service";
 import { isCancellation, toAppError } from "@/services/errors";
@@ -25,6 +27,8 @@ import type {
   BoardColumn,
   BoardRow,
   BoardViewType,
+  BulkMoveResult,
+  BulkResult,
   CellEdit,
   CellValue,
   ColumnPatch,
@@ -62,6 +66,8 @@ interface BoardState {
   /** Writes in flight — the toolbar shows a saving hint while it is above 0. */
   readonly pendingWrites: number;
   readonly conflicts: readonly ConflictNotice[];
+  /** Archived records are hidden until the board is asked to show them. */
+  readonly isShowingArchived: boolean;
 }
 
 interface BoardActions {
@@ -71,7 +77,16 @@ interface BoardActions {
   setSearch: (query: string) => void;
   dismissConflict: (id: string) => void;
 
+  setShowArchived: (show: boolean) => void;
+
   editCells: (edits: readonly CellEdit[]) => Promise<void>;
+
+  /* Bulk writes — one request for the whole selection, never a loop. */
+  bulkUpdate: (rowIds: readonly string[], values: Readonly<Record<string, CellValue>>, verb?: string) => Promise<BulkResult | null>;
+  bulkArchive: (rowIds: readonly string[], isArchived: boolean) => Promise<BulkResult | null>;
+  bulkDelete: (rowIds: readonly string[]) => Promise<BulkResult | null>;
+  bulkMove: (rowIds: readonly string[], targetNodeId: string, targetName: string) => Promise<BulkMoveResult | null>;
+  importRows: (rows: readonly Readonly<Record<string, CellValue>>[]) => Promise<readonly BoardRow[] | null>;
   addRow: (afterRowId?: string | null) => Promise<string | null>;
   duplicateRow: (rowId: string) => Promise<string | null>;
   deleteRow: (rowId: string) => Promise<void>;
@@ -123,6 +138,7 @@ const INITIAL: BoardState = {
   search: "",
   pendingWrites: 0,
   conflicts: [],
+  isShowingArchived: false,
 };
 
 let loadToken = 0;
@@ -130,6 +146,10 @@ let loadToken = 0;
 export const useBoardStore = create<BoardStore>()((set, get) => {
   const feedback = (message: string, tone: "info" | "success" | "error" = "error") =>
     useWorkspaceStore.getState().pushFeedback(message, tone);
+
+  /** Bulk results always report both halves: what was written and what was not. */
+  const report = (result: BulkResult, verb: string) =>
+    feedback(describeBulkResult(result, verb), bulkTone(result));
 
   /** Wrap a write: count it, surface failures, always settle the counter. */
   async function write<T>(request: () => Promise<T>, onError: () => void): Promise<T | null> {
@@ -222,6 +242,7 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
 
     setActiveView: (viewId) => set({ activeViewId: viewId }),
     setSearch: (query) => set({ search: query }),
+    setShowArchived: (show) => set({ isShowingArchived: show }),
     dismissConflict: (id) =>
       set((state) => ({ conflicts: state.conflicts.filter((conflict) => conflict.id !== id) })),
 
@@ -350,6 +371,96 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
             ],
           })),
       );
+    },
+
+    /* --------------------------------------------------------------- bulk */
+
+    bulkUpdate: async (rowIds, values, verb = "Updated") => {
+      const board = currentBoard();
+      if (!board || rowIds.length === 0) return null;
+
+      const result = await write(
+        () => boardService.bulkUpdate({ boardId: board.id, rowIds, values }),
+        () => {},
+      );
+      if (!result) return null;
+
+      set((state) => ({ rowsById: reconcileRows(state.rowsById, result.rows) }));
+      report(result, verb);
+      return result;
+    },
+
+    bulkArchive: async (rowIds, isArchived) => {
+      const board = currentBoard();
+      if (!board || rowIds.length === 0) return null;
+
+      const result = await write(
+        () => boardService.bulkArchive({ boardId: board.id, rowIds, isArchived }),
+        () => {},
+      );
+      if (!result) return null;
+
+      set((state) => ({ rowsById: reconcileRows(state.rowsById, result.rows) }));
+      report(result, isArchived ? "Archived" : "Restored");
+      return result;
+    },
+
+    bulkDelete: async (rowIds) => {
+      const board = currentBoard();
+      if (!board || rowIds.length === 0) return null;
+
+      const result = await write(
+        () => boardService.bulkDelete({ boardId: board.id, rowIds }),
+        () => {},
+      );
+      if (!result) return null;
+
+      set((state) => removeRows(state, result.applied));
+      report(result, "Deleted");
+      return result;
+    },
+
+    /**
+     * Records leave this board and arrive on another with new ids, so the two
+     * halves of the answer are applied to two different places: the source
+     * forgets `applied`, the destination already holds `rows`.
+     */
+    bulkMove: async (rowIds, targetNodeId, targetName) => {
+      const board = currentBoard();
+      if (!board || rowIds.length === 0) return null;
+
+      const result = await write(
+        () => boardService.bulkMove({ boardId: board.id, rowIds, targetNodeId }),
+        () => {},
+      );
+      if (!result) return null;
+
+      set((state) => removeRows(state, result.applied));
+
+      const dropped =
+        result.droppedColumns.length > 0
+          ? ` · ${result.droppedColumns.length} column${result.droppedColumns.length === 1 ? "" : "s"} had no match on ${targetName}`
+          : "";
+
+      feedback(
+        `${describeBulkResult(result, "Moved")} to ${targetName}${dropped}`,
+        bulkTone(result),
+      );
+      return result;
+    },
+
+    importRows: async (rows) => {
+      const board = currentBoard();
+      if (!board || rows.length === 0) return null;
+
+      const created = await write(
+        () => boardService.importRows({ boardId: board.id, rows }),
+        () => {},
+      );
+      if (!created) return null;
+
+      set((state) => appendRows(state, created));
+      return created;
     },
 
     /* ------------------------------------------------------------- schema */
@@ -681,20 +792,12 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
 
 /* -------------------------------------------------------------- selectors */
 
-export const selectBoard = (state: BoardStore) => state.board;
-export const selectRowOrder = (state: BoardStore) => state.rowOrder;
-
 /** One row, by id. Cells subscribe through their row, never through the map. */
 export const selectRow = (rowId: string) => (state: BoardStore) => state.rowsById[rowId];
 
 export function selectActiveView(state: BoardStore): SavedView | null {
   const { board, activeViewId } = state;
   return board?.views.find((view) => view.id === activeViewId) ?? board?.views[0] ?? null;
-}
-
-/** Display id for a row that the server has not answered for yet. */
-export function pendingDisplayId(prefix: string): string {
-  return formatRowId(prefix, 0).replace("000", "…");
 }
 
 export type { CellValue };

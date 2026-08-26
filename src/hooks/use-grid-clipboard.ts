@@ -14,7 +14,7 @@ import { useWorkspaceStore } from "@/store/workspace-store";
  * Clipboard API: no permission prompt, and the payload is TSV, so a range
  * round-trips through a real spreadsheet.
  */
-export function useGridClipboard(slice: GridSlice) {
+export function useGridClipboard(slice: GridSlice, isReadOnly = false) {
   const editCells = useBoardStore((state) => state.editCells);
   const pushFeedback = useWorkspaceStore((state) => state.pushFeedback);
 
@@ -32,20 +32,20 @@ export function useGridClipboard(slice: GridSlice) {
   const onCut = useCallback(
     (event: ClipboardEvent) => {
       const range = useGridStore.getState().range;
-      if (!range || useGridStore.getState().editing) return;
+      if (!range || useGridStore.getState().editing || isReadOnly) return;
 
       const box = rangeBox(range);
       event.preventDefault();
       event.clipboardData.setData("text/plain", copyRange(slice, box));
       void editCells(clearRange(slice, box));
     },
-    [slice, editCells],
+    [slice, editCells, isReadOnly],
   );
 
   const onPaste = useCallback(
     (event: ClipboardEvent) => {
       const range = useGridStore.getState().range;
-      if (!range || useGridStore.getState().editing) return;
+      if (!range || useGridStore.getState().editing || isReadOnly) return;
 
       const text = event.clipboardData.getData("text/plain");
       if (!text) return;
@@ -66,7 +66,7 @@ export function useGridClipboard(slice: GridSlice) {
         pushFeedback(`${result.skipped} pasted cells fell outside the grid`, "info");
       }
     },
-    [slice, editCells, pushFeedback],
+    [slice, editCells, pushFeedback, isReadOnly],
   );
 
   const clearSelection = useCallback(() => {

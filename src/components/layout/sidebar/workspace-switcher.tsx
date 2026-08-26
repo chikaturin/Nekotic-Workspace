@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronsUpDown, Plus, Settings } from "lucide-react";
+import { Check, ChevronsUpDown, Eye, Plus, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { DRIVE_ROOT_PATH } from "@/config/app";
 import {
@@ -9,12 +9,18 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useEffectiveRole } from "@/hooks/use-permissions";
+import { ROLE_LABELS } from "@/lib/permissions";
+import { selectPreviewRole, usePermissionStore } from "@/store/permission-store";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspace-store";
-import type { Workspace } from "@/types";
+import { WORKSPACE_ROLES, type Workspace } from "@/types";
 
 function WorkspaceTile({ workspace, className }: { workspace: Workspace; className?: string }) {
   return (
@@ -38,6 +44,9 @@ interface WorkspaceSwitcherProps {
 export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
   const router = useRouter();
   const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const role = useEffectiveRole();
+  const previewRole = usePermissionStore(selectPreviewRole);
+  const setPreviewRole = usePermissionStore((state) => state.setPreviewRole);
   const active = useWorkspaceStore(selectActiveWorkspace);
   const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
 
@@ -94,11 +103,42 @@ export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
         ))}
 
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+
+        {/* Reachable from every screen, because the whole point is to walk the
+            app as somebody else. Previewing can only ever take affordances
+            away — a member previewing as admin still sees a member's app. */}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Eye />
+            Preview as
+            <span className="ml-auto text-[11px] text-faint-foreground">
+              {ROLE_LABELS[previewRole ?? role]}
+            </span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="w-52">
+            <DropdownMenuItem onSelect={() => setPreviewRole(null)}>
+              My role ({ROLE_LABELS[role]})
+              {previewRole === null && <Check className="ml-auto size-4 text-accent" />}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {WORKSPACE_ROLES.map((candidate) => (
+              <DropdownMenuItem key={candidate} onSelect={() => setPreviewRole(candidate)}>
+                {ROLE_LABELS[candidate]}
+                {previewRole === candidate && <Check className="ml-auto size-4 text-accent" />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+
+        <DropdownMenuSeparator />
+
+        {/* Neither is part of this build. Disabled rather than silently inert:
+            a menu item that does nothing when pressed reads as a bug. */}
+        <DropdownMenuItem disabled title="Not part of this build">
           <Plus />
           Create workspace
         </DropdownMenuItem>
-        <DropdownMenuItem>
+        <DropdownMenuItem disabled title="Not part of this build">
           <Settings />
           Workspace settings
         </DropdownMenuItem>

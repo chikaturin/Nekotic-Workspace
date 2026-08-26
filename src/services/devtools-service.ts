@@ -1,9 +1,11 @@
+import { roleHas } from "@/lib/permissions/roles";
 import { formatFromName } from "@/lib/syntax";
 import { findNodeById } from "@/lib/tree";
 import { CURRENT_USER, DIRECTORY, memberAt } from "@/mock/users";
 import { CONFIG_SEEDS, SECRET_SEEDS } from "@/mock/devtools";
 import { nextId, nowIso, readDelay, writeDelay } from "@/services/backend";
 import { appError, notFound, permissionDenied, ServiceError } from "@/services/errors";
+import { auditService } from "@/services/audit-service";
 import { shouldFailSave } from "@/services/simulation";
 import { getActiveTree } from "@/store/workspace-store";
 import { isDocument } from "@/types";
@@ -210,8 +212,12 @@ async function getSecrets(nodeId: string, signal?: AbortSignal): Promise<SecretD
   return secretRecord(nodeId).document;
 }
 
-/** Roles allowed to see plaintext. Anything else is a 403, server-side. */
-const PRIVILEGED_ROLES: ReadonlySet<WorkspaceRole> = new Set(["owner", "admin"]);
+/**
+ * Whether the caller's role holds `secret.reveal`. Read from the same matrix
+ * the UI runs on, so the two can never disagree about who may see plaintext —
+ * and re-checked here rather than trusted from the client.
+ */
+const mayReveal = (role: WorkspaceRole): boolean => roleHas(role, "secret.reveal");
 
 export interface RevealInput {
   readonly nodeId: string;
@@ -233,11 +239,11 @@ async function revealSecret(
   const entry = record.document.entries.find((candidate) => candidate.id === secretId);
   if (!entry) throw notFound("That secret");
 
-  if (!PRIVILEGED_ROLES.has(role)) {
+  if (!mayReveal(role)) {
     // Recorded even when refused: a denied attempt is worth auditing.
     pushAudit(record, entry, action, false);
     throw permissionDenied(
-      `Revealing ${entry.key} needs an admin or owner role`,
+      `Revealing ${entry.key} needs the Admin role`,
       "Ask a workspace admin to share it with you.",
     );
   }
@@ -249,12 +255,20 @@ async function revealSecret(
   return value;
 }
 
+/**
+ * One write, two readers: the document's own trail and the workspace audit log
+ * (SY-AUD-41). A denied attempt is recorded exactly as carefully as an allowed
+ * one — a refusal nobody can see is not a control.
+ */
 function pushAudit(
   record: SecretRecord,
   entry: SecretEntry,
   action: SecretAction,
   allowed: boolean,
 ): void {
+  // The server is the only honest source of an address; this stands in for it.
+  const ip = "10.0.0.14";
+
   record.audit.unshift({
     id: nextId("aud"),
     action,
@@ -262,8 +276,20 @@ function pushAudit(
     key: entry.key,
     actor: CURRENT_USER,
     at: nowIso(),
-    // The server is the only honest source of an address; this stands in for it.
-    ip: allowed ? "10.0.0.14" : "10.0.0.14 (denied)",
+    ip: allowed ? ip : `${ip} (denied)`,
+  });
+
+  auditService.record({
+    module: "secret",
+    action: action === "reveal" ? "secret.reveal" : "secret.rotate",
+    actor: CURRENT_USER,
+    ip,
+    severity: allowed ? "warn" : "error",
+    target: entry.key,
+    outcome: allowed ? "allowed" : "denied",
+    detail: allowed
+      ? "Value returned once and cleared from the client on a timer."
+      : "Refused: the role does not hold Reveal secrets.",
   });
 }
 

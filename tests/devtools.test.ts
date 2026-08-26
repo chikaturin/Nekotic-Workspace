@@ -338,7 +338,7 @@ describe("secret documents", () => {
       }),
     ).rejects.toSatisfy((error: unknown) => {
       const message = error instanceof Error ? error.message : "";
-      return message.includes("admin");
+      return message.includes("Admin");
     });
 
     const audit = await devtoolsService.listSecretAudit(ID.secret);
@@ -353,7 +353,7 @@ describe("secret documents", () => {
     await devtoolsService.revealSecret({
       nodeId: ID.secret,
       secretId: entry.id,
-      role: "owner",
+      role: "admin",
       action: "copy",
     });
 
@@ -363,7 +363,7 @@ describe("secret documents", () => {
       devtoolsService.revealSecret({
         nodeId: ID.secret,
         secretId: entry.id,
-        role: "guest",
+        role: "viewer",
         action: "copy",
       }),
     ).rejects.toThrow();
@@ -374,7 +374,7 @@ describe("secret documents", () => {
       devtoolsService.revealSecret({
         nodeId: ID.secret,
         secretId: "nope",
-        role: "owner",
+        role: "admin",
         action: "reveal",
       }),
     ).rejects.toThrow();

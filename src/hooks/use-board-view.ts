@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { isRowArchived } from "@/lib/archive";
 import type { CellContext } from "@/lib/cell-values";
 import { buildGroups, type RowGroup } from "@/lib/board-grouping";
 import { queryRowIds, resolveColumns, visibleColumns } from "@/lib/board-view";
@@ -18,6 +19,9 @@ export interface BoardViewModel {
   readonly rowIds: readonly string[];
   readonly context: CellContext;
   readonly totalRows: number;
+  /** Records frozen out of the views — the count the toolbar toggle shows. */
+  readonly archivedRows: number;
+  readonly isShowingArchived: boolean;
   /** Column the view groups by, when it groups at all. */
   readonly groupColumn: BoardColumn | null;
   /** Groups over `rowIds`; null when the view is ungrouped. */
@@ -38,6 +42,7 @@ export function useBoardView(): BoardViewModel {
   const rowOrder = useBoardStore((state) => state.rowOrder);
   const people = useBoardStore((state) => state.people);
   const search = useBoardStore((state) => state.search);
+  const isShowingArchived = useBoardStore((state) => state.isShowingArchived);
 
   const columns = useMemo(() => (board ? resolveColumns(board, view) : []), [board, view]);
   const columnsShown = useMemo(() => visibleColumns(columns), [columns]);
@@ -76,8 +81,25 @@ export function useBoardView(): BoardViewModel {
   );
 
   const rowIds = useMemo(
-    () => queryRowIds({ view, rowsById, rowOrder, columns: columnsShown, context, search }),
-    [view, rowsById, rowOrder, columnsShown, context, search],
+    () =>
+      queryRowIds({
+        view,
+        rowsById,
+        rowOrder,
+        columns: columnsShown,
+        context,
+        search,
+        includeArchived: isShowingArchived,
+      }),
+    [view, rowsById, rowOrder, columnsShown, context, search, isShowingArchived],
+  );
+
+  const archivedRows = useMemo(
+    () => rowOrder.filter((rowId) => {
+      const row = rowsById[rowId];
+      return row ? isRowArchived(row) : false;
+    }).length,
+    [rowOrder, rowsById],
   );
 
   const byId = useMemo(() => new Map(columns.map((column) => [column.id, column])), [columns]);
@@ -107,6 +129,8 @@ export function useBoardView(): BoardViewModel {
     rowIds,
     context,
     totalRows: rowOrder.length,
+    archivedRows,
+    isShowingArchived,
     groupColumn,
     groups,
     dateColumn,

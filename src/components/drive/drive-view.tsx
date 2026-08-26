@@ -14,8 +14,10 @@ import { SecretDocumentPage } from "@/components/devtools/secret-document-page";
 import { DocumentPage } from "@/components/document/document-page";
 import { PermissionDeniedState } from "@/components/shared/state-panels";
 import { DRIVE_ROOT_PATH, FILES_ROOT_PATH } from "@/config/app";
-import { useCapabilities } from "@/hooks/use-capabilities";
+import { useCapabilities } from "@/hooks/use-permissions";
+import { useTrackRecent } from "@/hooks/use-recent";
 import { deniedReason } from "@/lib/permissions";
+import { nodeRef } from "@/lib/entity-ref";
 import { useDriveLocation } from "@/hooks/use-drive-location";
 import { formatCount } from "@/lib/format";
 import { pathLabel } from "@/lib/tree";
@@ -42,6 +44,17 @@ export function DriveView({ segments }: DriveViewProps) {
 
   const { node, visibleChildren, isNotFound } = location;
   const capabilities = useCapabilities(node);
+
+  /**
+   * Only containers are recorded here. Documents, boards and files record
+   * themselves, because reaching this component is not the same as opening
+   * them — a page renders its own surface below.
+   */
+  const recentTarget = useMemo(
+    () => (node && isContainer(node) && capabilities.view ? nodeRef(node) : null),
+    [node, capabilities.view],
+  );
+  useTrackRecent(recentTarget);
 
   /** Keep the sidebar tree opened to whatever the URL points at. */
   useEffect(() => {

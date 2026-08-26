@@ -1,5 +1,10 @@
 export * from "./errors";
 export * from "./simulation";
+export { commentService, type AddCommentInput } from "./comment-service";
 export { documentService, summarize, type DocumentSummaryPatch } from "./document-service";
 export { fileService, type ListFilesInput, type UploadInput } from "./file-service";
 export { linkService, type LinkMetadata } from "./link-service";
+export { myWorkService, type MyWorkInput } from "./my-work-service";
+export { notificationService, type EmitInput } from "./notification-service";
+export { searchService, type SearchInput } from "./search-service";
+export { watchService, type SetWatchInput } from "./watch-service";

@@ -1,4 +1,4 @@
-import type { DirectoryUser, UserSummary, WorkspaceMember } from "@/types";
+import type { DirectoryUser, UserSummary, WorkspaceMember, WorkspaceRole } from "@/types";
 
 export const CURRENT_USER: UserSummary = {
   id: "usr_khanh",
@@ -16,9 +16,15 @@ export const TEAM: readonly UserSummary[] = [
   { id: "usr_hai", name: "Hai Vo", email: "hai@nexdrop.io", initials: "HV", accentColor: "var(--kind-video)" },
 ] as const;
 
+/**
+ * One person per role (SY-RBC-42), so every column of the matrix is held by
+ * someone real and none of them is only a table row.
+ */
+const ROLES: readonly WorkspaceRole[] = ["admin", "manager", "member", "member", "viewer"];
+
 export const MEMBERS: readonly WorkspaceMember[] = TEAM.map((user, index) => ({
   ...user,
-  role: index === 0 ? "owner" : index < 3 ? "admin" : "member",
+  role: ROLES[index] ?? "viewer",
   joinedAt: `2025-0${index + 2}-14T08:00:00.000Z`,
 }));
 

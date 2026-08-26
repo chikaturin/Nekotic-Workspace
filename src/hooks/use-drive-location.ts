@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
+import { isArchivedNode } from "@/lib/archive";
 import { buildBreadcrumbs } from "@/lib/breadcrumbs";
 import { resolvePath, sortNodes } from "@/lib/tree";
 import { selectActiveWorkspace, selectTree, useWorkspaceStore } from "@/store/workspace-store";
-import { isDocument, type BreadcrumbTrail, type DriveLocation, type DriveNode } from "@/types";
+import type { BreadcrumbTrail, DriveLocation, DriveNode } from "@/types";
 
 export interface DriveLocationView extends DriveLocation {
   readonly breadcrumbs: BreadcrumbTrail;
@@ -23,10 +24,11 @@ export function useDriveLocation(segments: readonly string[]): DriveLocationView
   return useMemo(() => {
     const location = resolvePath(tree, segments);
     const breadcrumbs = buildBreadcrumbs(workspace, tree, location.ancestors, location.node);
-    // Trashed and archived items keep their place in the tree but stay out of
-    // the folder listing — Trash and Archive surface them instead.
+    // Archived items keep their place in the tree but stay out of the working
+    // listing, whatever their kind — the Archive view surfaces them instead.
+    // (Deleted ones are not in the tree at all; they live in the trash bin.)
     const visible = location.children.filter(
-      (node) => !node.isTrashed && !(isDocument(node) && node.isArchived),
+      (node) => !node.isTrashed && !isArchivedNode(node),
     );
 
     return {

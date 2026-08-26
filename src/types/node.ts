@@ -38,6 +38,12 @@ interface DriveNodeBase {
   readonly isFavorite: boolean;
   readonly isTrashed: boolean;
   readonly isShared: boolean;
+  /**
+   * Frozen out of the active workspace (SY-ARC-37). Archiving is inherited:
+   * everything below an archived container is read-only too — resolved through
+   * `lib/archive`, never by reading this flag alone.
+   */
+  readonly isArchived?: boolean;
   /** Access is restricted to a group the current user may not belong to. */
   readonly isRestricted?: boolean;
 }

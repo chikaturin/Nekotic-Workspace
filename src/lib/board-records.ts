@@ -115,14 +115,6 @@ export function reconcileRows(rows: RowMap, serverRows: readonly BoardRow[]): Ro
   return next;
 }
 
-export function insertRowAt(
-  order: readonly string[],
-  rowId: string,
-  index: number,
-): readonly string[] {
-  const position = Math.min(Math.max(index, 0), order.length);
-  return [...order.slice(0, position), rowId, ...order.slice(position)];
-}
 
 export function removeRowId(order: readonly string[], rowId: string): readonly string[] {
   const index = order.indexOf(rowId);
@@ -159,6 +151,32 @@ export function removeRow(index: RowIndex, rowId: string): RowIndex {
   delete rowsById[rowId];
 
   return { rowsById, rowOrder: removeRowId(index.rowOrder, rowId) };
+}
+
+/** Drop many records in one pass — what a bulk delete or move leaves behind. */
+export function removeRows(index: RowIndex, rowIds: readonly string[]): RowIndex {
+  const removed = new Set(rowIds.filter((rowId) => index.rowsById[rowId]));
+  if (removed.size === 0) return index;
+
+  const rowsById = { ...index.rowsById };
+  for (const rowId of removed) delete rowsById[rowId];
+
+  return { rowsById, rowOrder: index.rowOrder.filter((rowId) => !removed.has(rowId)) };
+}
+
+/** Append server-created records to the end of the order — what an import does. */
+export function appendRows(index: RowIndex, rows: readonly BoardRow[]): RowIndex {
+  if (rows.length === 0) return index;
+
+  const rowsById = { ...index.rowsById };
+  const added: string[] = [];
+
+  for (const row of rows) {
+    if (!rowsById[row.id]) added.push(row.id);
+    rowsById[row.id] = row;
+  }
+
+  return { rowsById, rowOrder: [...index.rowOrder, ...added] };
 }
 
 /** Cells for a duplicate: attachments and relations are copied by reference. */

@@ -1,4 +1,3 @@
-import { createId } from "@/lib/utils";
 import type {
   BoardColumn,
   ColumnConfigByType,
@@ -161,13 +160,6 @@ export function nextOptionColor(options: readonly SelectOption[]): SelectColor {
   return SELECT_COLORS[options.length % SELECT_COLORS.length] ?? "gray";
 }
 
-export function makeOption(label: string, options: readonly SelectOption[], seed: number): SelectOption {
-  return {
-    id: createId("opt", seed),
-    label: label.trim(),
-    color: nextOptionColor(options),
-  };
-}
 
 /** Options already holding `label`, case-insensitively. */
 export function findOptionByLabel(

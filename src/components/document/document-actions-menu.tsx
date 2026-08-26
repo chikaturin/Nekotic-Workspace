@@ -6,6 +6,7 @@ import {
   CopyPlus,
   Ellipsis,
   FolderInput,
+  History,
   LoaderCircle,
   Lock,
   LockOpen,
@@ -31,14 +32,16 @@ interface DocumentActionsMenuProps {
   /** Capabilities before the lock is applied, so unlocking stays possible. */
   readonly capabilities: CapabilitySet;
   readonly onMoveRequested: () => void;
+  readonly onHistoryRequested: () => void;
 }
 
-/** Pin · Lock · Duplicate · Move · Archive · Delete, each capability-gated. */
+/** Pin · Lock · History · Duplicate · Move · Archive · Delete, each gated. */
 export function DocumentActionsMenu({
   document,
   actions,
   capabilities,
   onMoveRequested,
+  onHistoryRequested,
 }: DocumentActionsMenuProps) {
   const isBusy = actions.pending !== null;
 
@@ -67,6 +70,11 @@ export function DocumentActionsMenu({
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
+
+        <DropdownMenuItem onSelect={onHistoryRequested}>
+          <History />
+          Version history
+        </DropdownMenuItem>
 
         <DropdownMenuItem disabled={!capabilities.edit} onSelect={() => void actions.duplicate()}>
           <CopyPlus />

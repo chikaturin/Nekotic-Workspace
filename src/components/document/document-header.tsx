@@ -1,6 +1,7 @@
 "use client";
 
 import { Archive, Lock, Maximize2, Minimize2, Pin } from "lucide-react";
+import { WatchButton } from "@/components/collab/watch-button";
 import { DocumentActionsMenu } from "@/components/document/document-actions-menu";
 import { SaveIndicator } from "@/components/document/save-indicator";
 import { UserAvatar } from "@/components/shared/user-avatar";
@@ -17,7 +18,13 @@ import {
 import type { DocumentActions } from "@/hooks/use-document-actions";
 import { countWords } from "@/lib/blocks";
 import { formatCount } from "@/lib/format";
-import type { CapabilitySet, DocumentDraft, SaveState, WorkspaceDocument } from "@/types";
+import type {
+  CapabilitySet,
+  DocumentDraft,
+  EntityRef,
+  SaveState,
+  WorkspaceDocument,
+} from "@/types";
 
 const ICON_CHOICES = ["📄", "📘", "💳", "🧩", "🚀", "🧠", "📊", "🔒", "🛠️", "🎯", "🗂️", "✅"] as const;
 
@@ -32,10 +39,13 @@ interface DocumentHeaderProps {
   readonly onIconChange: (icon: string) => void;
   readonly onRetrySave: () => void;
   readonly onMoveRequested: () => void;
+  readonly onHistoryRequested: () => void;
   /** Enter in the title jumps into the body. */
   readonly onTitleSubmit: () => void;
   readonly isFullScreen: boolean;
   readonly onToggleFullScreen: () => void;
+  /** The page itself, for the follow button. */
+  readonly watchTarget: EntityRef;
 }
 
 export function DocumentHeader({
@@ -49,9 +59,11 @@ export function DocumentHeader({
   onIconChange,
   onRetrySave,
   onMoveRequested,
+  onHistoryRequested,
   onTitleSubmit,
   isFullScreen,
   onToggleFullScreen,
+  watchTarget,
 }: DocumentHeaderProps) {
   const isEditable = capabilities.edit;
 
@@ -121,6 +133,8 @@ export function DocumentHeader({
             </Badge>
           )}
 
+          <WatchButton target={watchTarget} isCompact />
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -143,6 +157,7 @@ export function DocumentHeader({
             actions={actions}
             capabilities={baseCapabilities}
             onMoveRequested={onMoveRequested}
+            onHistoryRequested={onHistoryRequested}
           />
         </div>
       </div>

@@ -11,7 +11,7 @@ rather than black (toggle in the sidebar footer). Motion is used only to stage i
 ```bash
 pnpm install
 pnpm dev          # http://localhost:3000 → redirects to /drive
-pnpm test         # 521 unit tests
+pnpm test         # 764 unit tests
 pnpm test:coverage
 pnpm build
 ```
@@ -20,9 +20,15 @@ pnpm build
 
 | Route | Purpose |
 | --- | --- |
+| `/dashboard` | Task, QA and deadline widgets over every board you can open — the workspace home |
 | `/drive/[[...path]]` | Drive Mode. Path segments are node slugs: `/drive/development/backend/payment` |
-| `/favorites` `/recent` `/my-work` `/trash` | Flat cross-tree collections, same grid/list components |
-| `/notifications` | Mentions, shares and system alerts |
+| `/my-work` | Five readings of the boards you can open: assigned, mentioned, due today, overdue, recently updated |
+| `/favorites` | Starred projects, folders, boards, documents and files, grouped by type |
+| `/recent` | Least-recently-used list of the last 10 places you opened |
+| `/notifications` | Inbox: All · Mentions · Assigned · Following |
+| `/archive` | Frozen projects, folders, boards and pages — read-only, restorable |
+| `/trash` | Soft-deleted items with their original location, who deleted them and how long is left |
+| `/audit` | Append-only trail: timestamp, module, action, actor, IP, severity. Admin only |
 
 ## Layout
 
@@ -32,16 +38,18 @@ AppShell ─ src/components/layout/app-shell.tsx      ⌘K search · ⌘B collap
 │   ├── WorkspaceSwitcher        tenant switch swaps the whole tree
 │   ├── NewItemMenu              folder / board / upload into the open folder
 │   ├── TreePanel                Projects — multi-level tree
-│   └── SMART_VIEWS              Favorites · Recent · My Work · Notifications · Trash
+│   └── SMART_VIEWS              Dashboard · Favorites · Recent · My Work · Notifications · Trash · Audit
 │   └── StorageMeter + theme + collapse toggle
 ├── AppHeader
 │   ├── BreadcrumbNav            NexDrop / Development / Backend / Payment
 │   │                            · collapses to `…` past 4 levels
 │   │                            · every crumb is a drop target (move up the tree)
 │   │                            · sibling dropdown per crumb
-│   ├── GlobalSearch → CommandPalette (⌘K / Ctrl+K, cmdk)
+│   ├── GlobalSearch → GlobalSearchDialog (⌘K / Ctrl+K, cmdk, grouped results)
+│   ├── NotificationBell         unread badge · tabs · mark all read
 │   └── UserMenu (avatar)
-└── main → DriveView | CollectionView | NotificationList
+└── main → DriveView | MyWorkPage | FavoritesPage | RecentPage
+                     | NotificationsPage | ArchivePage | TrashPage
 ```
 
 ## Drive Mode
@@ -220,6 +228,70 @@ Services are the seam a real API replaces: `documentService`, `fileService` and 
 already take `AbortSignal`s, report progress, and throw `ServiceError` carrying a UI-ready
 `AppError` that `AsyncBoundary` knows how to render.
 
+## Collaboration
+
+Comments, mentions, watching, the notification inbox, My Work, global search, favorites and
+recent are documented in [docs/COLLABORATION.md](docs/COLLABORATION.md). Three shapes carry
+the whole layer:
+
+- **`EntityRef`** — one address for a project, folder, board, document, file or board record,
+  so every feature that points at something routes through the same function.
+- **`RealtimeTransport`** — the seam a socket plugs into. The backend has no realtime endpoint,
+  so the in-process bus ships; events are deduplicated by id *and* applied through id-keyed
+  upserts, which is what keeps a replayed frame from double-counting the unread badge.
+- **`Comment`** — one thread model for records and pages alike, two levels deep by
+  construction, with mentions encoded as `@[Name](usr_id)`.
+
+The board engine is documented in [docs/BOARD.md](docs/BOARD.md).
+
+## System engine
+
+Bulk actions, import, export, archive, trash, version history and the record
+activity log are documented in [docs/SYSTEM.md](docs/SYSTEM.md). None of them introduce a new
+kind of data — they all act on records and nodes that already exist — so the layer is three
+shapes rather than seven subsystems:
+
+- **request** — "do this to these ids". One bulk endpoint per action, never a loop of
+  single-row calls: 100 records is one round trip.
+- **plan** — "here is what *would* happen". Import mapping and validation are pure functions
+  over the parsed file, so the board is untouched until the user has seen which rows will fail.
+- **report** — "here is what happened, *including what did not*". `applied` and `skipped`
+  together always account for every id that was sent.
+
+Two design decisions carry the rest. Archiving is resolved by *inheritance*
+([`lib/archive.ts`](src/lib/archive.ts)) rather than copied onto children, so a board inside an
+archived project is read-only without its own flag — and you can always restore the thing you
+are standing on. Deleting *detaches* the subtree into a bin
+([`lib/trash.ts`](src/lib/trash.ts)) instead of flagging it in place, which is the only way a
+page can outlive the folder it was deleted from and be relocated — audibly — on the way back.
+
+## Governance
+
+Roles, permissions, inheritance, the audit log and the dashboard are documented in
+[docs/GOVERNANCE.md](docs/GOVERNANCE.md). **Frontend permissions are UX only** — a hidden
+button says "this is not for you" before a request is refused; it is not a boundary, and the
+backend still has to re-check every key.
+
+There is one way to ask, and no component compares a role to a literal:
+
+```tsx
+const can = usePermissions(node);
+<Button disabled={!can("board.column.create")}>Add column</Button>
+```
+
+36 keys named `module.thing.action`, four roles (Viewer · Member · Manager · Admin) where each
+is the one below it plus what it adds, and layers — restricted, trashed, archived, locked —
+that can only ever *narrow* the answer. `CapabilitySet` survives as a projection of the same
+catalogue rather than a second rule set, and resolves `edit` to the key the node actually needs.
+
+Access flows down the tree, and the dialog says which of the three states each row is in:
+**Inherited** (from an ancestor), **Explicit** (written here, same as it would inherit) or
+**Override** (written here, replacing it). The deepest rule wins, not the strongest — which is
+the only reading under which an exception can be written at all.
+
+**Preview as** in the workspace switcher narrows the whole interface to another role. It can
+only remove affordances: the effective role is `min(yours, previewed)`.
+
 ## Data model
 
 [`src/types`](src/types) is the contract every other layer depends on:
@@ -265,13 +337,30 @@ which return new forests and preserve identity for untouched branches, so React 
 | `⌘S` / `Ctrl+S` | Save the page, or the file being edited |
 | `Tab` / `Enter` | In the last table cell: add a row |
 | `Enter` | Open the focused item |
+| `Shift` + click | Tick a range of records between the last tick and this one |
+| `@` | Open the mention picker in any comment composer |
+| `⌘↵` / `Ctrl+↵` | Post the comment being written |
 | `Esc` | Close overlay |
 
 ## Tests
 
-`pnpm test` — 521 unit tests over the pure layers (tree algorithms, breadcrumbs, formatting,
+`pnpm test` — 764 unit tests over the pure layers (tree algorithms, breadcrumbs, formatting,
 slugs, DnD payloads, visual mapping, block operations, the autosave state machine, the upload
-queue reducer, file validation, permissions and the PDF writer), the services (documents, files,
-links, errors, simulation) and the stores (move, upload, pages, selection, workspace switch).
-Coverage thresholds are enforced at 80% in `vitest.config.mts`; the suite currently runs at
-94% statements / 85% branches / 96% lines.
+queue reducer, file validation, permissions, the board query engine, mention parsing, comment
+threading, search ranking, the LRU, bulk partitioning, import mapping and validation, the
+export projection, the line diff, archive inheritance, trash restore targets, the permission
+catalogue and role matrix, access inheritance, audit formatting and dashboard bucketing), the
+services (documents, files, links, boards, dev tools, comments, watches, notifications, search,
+my work, audit, dashboard) and the stores (move, upload, pages, selection, workspace switch,
+board, notifications, watch, recent, trash, access rules). Coverage thresholds are enforced at
+80% in `vitest.config.mts`; the suite currently runs at 92% statements / 81% branches / 95%
+lines.
+
+Some of those tests assert a *contract* rather than an effect: that 100 records are written by
+one `bulkUpdate` call and never by `updateCells`; that planning an import writes nothing; that a
+withheld column does not appear anywhere in the exported bytes; that a page restored from
+version 1 produces version 3 with version 2 still on record; that a document survives the
+permanent deletion of the folder it was deleted from; that no file under `src/` compares a role
+to a literal; that no narrowing layer can hand back a permission the role matrix withheld, for
+all 36 keys across all four roles; and that the audit service exposes no call that could change
+what was recorded.

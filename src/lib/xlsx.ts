@@ -18,6 +18,19 @@ export interface Workbook {
 
 const DEFAULT_SHEET_NAME = "Sheet1";
 
+/** Excel rejects these outright, and anything past 31 characters. */
+const ILLEGAL_SHEET_CHARS = /[:\\/?*[\]]/g;
+const MAX_SHEET_NAME = 31;
+
+/**
+ * Excel refuses to open a workbook whose sheet name it considers invalid, so a
+ * board called "Q3: Launch" has to be cleaned rather than passed through.
+ */
+export function safeSheetName(name: string): string {
+  const cleaned = name.replace(ILLEGAL_SHEET_CHARS, " ").trim().slice(0, MAX_SHEET_NAME);
+  return cleaned.length > 0 ? cleaned : DEFAULT_SHEET_NAME;
+}
+
 const ROW_PATTERN = /<row[^>]*>([\s\S]*?)<\/row>/g;
 const CELL_PATTERN = /<c\b([^>]*)(?:\/>|>([\s\S]*?)<\/c>)/g;
 const REFERENCE_PATTERN = /r="([A-Z]+)\d+"/;
@@ -29,10 +42,11 @@ const SHEET_NAME_PATTERN = /<sheet[^>]*name="([^"]*)"/;
 
 export function buildXlsx(rows: Grid, sheetName = DEFAULT_SHEET_NAME): Uint8Array<ArrayBuffer> {
   const encoder = new TextEncoder();
+  const safeName = safeSheetName(sheetName);
   const parts: readonly { name: string; xml: string }[] = [
     { name: "[Content_Types].xml", xml: contentTypesXml() },
     { name: "_rels/.rels", xml: rootRelsXml() },
-    { name: "xl/workbook.xml", xml: workbookXml(sheetName) },
+    { name: "xl/workbook.xml", xml: workbookXml(safeName) },
     { name: "xl/_rels/workbook.xml.rels", xml: workbookRelsXml() },
     { name: "xl/worksheets/sheet1.xml", xml: sheetXml(normalizeGrid(rows)) },
   ];

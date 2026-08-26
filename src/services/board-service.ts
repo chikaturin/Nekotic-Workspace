@@ -1,5 +1,7 @@
+import { isRowArchived } from "@/lib/archive";
+import { partitionBulkTargets } from "@/lib/bulk";
 import { convertCell } from "@/lib/cell-conversion";
-import { emptyCellFor } from "@/lib/cell-values";
+import { cellText, emptyCellFor, type CellContext } from "@/lib/cell-values";
 import {
   defaultConfigFor,
   makeColumn,
@@ -18,22 +20,27 @@ import {
   readDelay,
   writeDelay,
 } from "@/services/backend";
-import { appError, notFound, ServiceError } from "@/services/errors";
+import { appError, conflict, notFound, ServiceError } from "@/services/errors";
 import { shouldFailSave } from "@/services/simulation";
-import { findNodeById } from "@/lib/tree";
+import { findNodeById, flattenTree } from "@/lib/tree";
 import { getActiveTree } from "@/store/workspace-store";
-import { childrenOf, isBoard } from "@/types";
+import { isBoard } from "@/types";
 import type {
   Board,
   BoardColumn,
-  BoardComment,
+  BoardNode,
   BoardRow,
   BoardSnapshot,
+  BulkMoveResult,
+  BulkResult,
   CellEdit,
+  CellValue,
   ColumnPatch,
   ColumnType,
   ConflictNotice,
   ActivityEntry,
+  EntityRef,
+  FieldChange,
   SavedView,
   SelectOption,
 } from "@/types";
@@ -52,7 +59,6 @@ interface BoardRecord {
   order: string[];
   /** Monotonic per board. Deleting a row never releases its number. */
   sequence: number;
-  comments: Map<string, BoardComment[]>;
   activity: ActivityEntry[];
   optionSeed: number;
 }
@@ -78,7 +84,6 @@ function seedFromNode(nodeId: string): BoardRecord {
     rows: new Map(rows.map((row) => [row.id, row])),
     order: rows.map((row) => row.id),
     sequence: rows.length,
-    comments: new Map(),
     activity: [],
     optionSeed: 0,
   };
@@ -104,11 +109,18 @@ function nodeIdFromBoardId(boardId: string): string {
 
 /** Look a board up by id, seeding it from the tree if it is not loaded yet. */
 function recordByBoardId(boardId: string): BoardRecord {
+  const loaded = loadedRecord(boardId);
+  if (loaded) return loaded;
+
+  return recordFor(nodeIdFromBoardId(boardId));
+}
+
+/** The same lookup without the seeding side effect. */
+function loadedRecord(boardId: string): BoardRecord | null {
   for (const record of registry.values()) {
     if (record.board.id === boardId) return record;
   }
-
-  return recordFor(nodeIdFromBoardId(boardId));
+  return null;
 }
 
 /** Simulated write failure — the switch every rollback path is tested against. */
@@ -124,7 +136,20 @@ function rowOrThrow(record: BoardRecord, rowId: string): BoardRow {
   return row;
 }
 
-function logActivity(record: BoardRecord, rowId: string, summary: string, kind: ActivityEntry["kind"]) {
+/**
+ * Append to a record's history.
+ *
+ * One call is one entry, however many fields it carries: a write that changes
+ * Status and Due Date together is a single line in the timeline with two
+ * changes under it, never two lines racing for the same second.
+ */
+function logActivity(
+  record: BoardRecord,
+  rowId: string,
+  summary: string,
+  kind: ActivityEntry["kind"],
+  changes: readonly FieldChange[] = [],
+) {
   const actor = DIRECTORY.find((person) => person.id === CURRENT_USER.id) ?? DIRECTORY[0]!;
   record.activity.unshift({
     id: nextId("act"),
@@ -132,8 +157,53 @@ function logActivity(record: BoardRecord, rowId: string, summary: string, kind: 
     kind,
     actor,
     summary,
+    changes,
     createdAt: nowIso(),
   });
+}
+
+/** Lookups the activity log needs to render a value the way the column does. */
+function contextFor(record: BoardRecord): CellContext {
+  const labels = new Map<string, string>();
+  for (const [rowId, row] of record.rows) labels.set(rowId, row.displayId);
+
+  return {
+    people: new Map(DIRECTORY.map((person) => [person.id, person])),
+    relationLabels: labels,
+    relationResolved: false,
+  };
+}
+
+/** What a write did to one record, as text — the only form the UI ever sees. */
+function describeEdits(
+  record: BoardRecord,
+  before: BoardRow,
+  after: BoardRow,
+  columnIds: readonly string[],
+  context: CellContext,
+): readonly FieldChange[] {
+  const changes: FieldChange[] = [];
+
+  for (const columnId of new Set(columnIds)) {
+    const column = record.board.columns.find((candidate) => candidate.id === columnId);
+    if (!column) continue;
+
+    const from = before.cells[columnId];
+    const to = after.cells[columnId];
+    const fromText = from ? cellText(from, column, context) : "";
+    const toText = to ? cellText(to, column, context) : "";
+    if (fromText === toText) continue;
+
+    changes.push({ columnName: column.name, from: fromText, to: toText });
+  }
+
+  return changes;
+}
+
+function editSummary(changes: readonly FieldChange[], fallback: string): string {
+  if (changes.length === 0) return fallback;
+  if (changes.length === 1) return `changed ${changes[0]!.columnName}`;
+  return `changed ${changes.length} fields`;
 }
 
 /* -------------------------------------------------------------------- read */
@@ -292,9 +362,16 @@ async function updateCells(
     });
   }
 
+  const context = contextFor(record);
+
   for (const row of touched.values()) {
+    const before = record.rows.get(row.id);
     record.rows.set(row.id, row);
-    logActivity(record, row.id, `updated ${row.displayId}`, "updated");
+    if (!before) continue;
+
+    const columnIds = edits.filter((edit) => edit.rowId === row.id).map((edit) => edit.columnId);
+    const changes = describeEdits(record, before, row, columnIds, context);
+    logActivity(record, row.id, editSummary(changes, `updated ${row.displayId}`), "updated", changes);
   }
 
   return { rows: [...touched.values()], conflicts };
@@ -539,39 +616,24 @@ async function deleteView(
   return views;
 }
 
-/* -------------------------------------------------- comments and activity */
+/* ------------------------------------------------------------- activity */
 
-async function listComments(
-  boardId: string,
-  rowId: string,
-  signal?: AbortSignal,
-): Promise<readonly BoardComment[]> {
-  await readDelay(signal);
-  return recordByBoardId(boardId).comments.get(rowId) ?? [];
-}
+/**
+ * Record an activity entry from outside the board service — posting a comment
+ * on a record, today.
+ *
+ * Non-record targets have no board stream. A board that is not loaded is left
+ * alone rather than seeded: activity belongs to the board's own record, and a
+ * real backend writes it server-side whether or not this client has read the
+ * board.
+ */
+function noteActivity(target: EntityRef, summary: string, kind: ActivityEntry["kind"]): void {
+  if (target.kind !== "row" || !target.boardId || !target.rowId) return;
 
-async function addComment(
-  boardId: string,
-  rowId: string,
-  body: string,
-  signal?: AbortSignal,
-): Promise<BoardComment> {
-  await writeDelay(signal);
-  const record = recordByBoardId(boardId);
-  const row = rowOrThrow(record, rowId);
+  const record = loadedRecord(target.boardId);
+  if (!record || !record.rows.has(target.rowId)) return;
 
-  const comment: BoardComment = {
-    id: nextId("cmt"),
-    rowId,
-    author: DIRECTORY.find((person) => person.id === CURRENT_USER.id) ?? DIRECTORY[0]!,
-    body: body.trim(),
-    createdAt: nowIso(),
-  };
-
-  record.comments.set(rowId, [...(record.comments.get(rowId) ?? []), comment]);
-  logActivity(record, rowId, `commented on ${row.displayId}`, "commented");
-
-  return comment;
+  logActivity(record, target.rowId, summary, kind);
 }
 
 async function listActivity(
@@ -591,12 +653,284 @@ async function listActivity(
           kind: "created",
           actor: DIRECTORY.find((person) => person.id === row.createdBy) ?? DIRECTORY[0]!,
           summary: `created ${row.displayId}`,
+          changes: [],
           createdAt: row.createdAt,
         },
       ]
     : [];
 
   return [...record.activity.filter((entry) => entry.rowId === rowId), ...seeded];
+}
+
+/* ------------------------------------------------------------------- bulk */
+
+export interface BulkTargets {
+  readonly boardId: string;
+  readonly rowIds: readonly string[];
+}
+
+export interface BulkUpdateInput extends BulkTargets {
+  /** One value per column, written to every record the action may touch. */
+  readonly values: Readonly<Record<string, CellValue>>;
+}
+
+/**
+ * Write the same values across a selection.
+ *
+ * This is the endpoint that exists so the client never loops: 100 records is
+ * one round trip. The answer accounts for every id that was asked for —
+ * `applied` plus `skipped` — because a bulk write that silently drops a record
+ * is worse than one that refuses.
+ */
+async function bulkUpdate(
+  { boardId, rowIds, values }: BulkUpdateInput,
+  signal?: AbortSignal,
+): Promise<BulkResult> {
+  await writeDelay(signal);
+  const record = recordByBoardId(boardId);
+  assertWritable(record, "those records");
+
+  const { targets, skipped } = partitionBulkTargets(rowIds, (id) => record.rows.get(id));
+  const columnIds = Object.keys(values);
+  const context = contextFor(record);
+  const now = nowIso();
+  const rows: BoardRow[] = [];
+
+  for (const row of targets) {
+    const next: BoardRow = {
+      ...row,
+      cells: { ...row.cells, ...values },
+      updatedAt: now,
+      revision: row.revision + 1,
+    };
+
+    record.rows.set(next.id, next);
+    rows.push(next);
+
+    const changes = describeEdits(record, row, next, columnIds, context);
+    logActivity(record, next.id, editSummary(changes, `updated ${next.displayId}`), "updated", changes);
+  }
+
+  return { requested: rowIds.length, rows, applied: rows.map((row) => row.id), skipped };
+}
+
+export interface BulkArchiveInput extends BulkTargets {
+  readonly isArchived: boolean;
+}
+
+/**
+ * Freeze or unfreeze a selection. Archived records stay readable and keep their
+ * history; they simply stop accepting writes — which is why this call is the
+ * one that may target them.
+ */
+async function bulkArchive(
+  { boardId, rowIds, isArchived }: BulkArchiveInput,
+  signal?: AbortSignal,
+): Promise<BulkResult> {
+  await writeDelay(signal);
+  const record = recordByBoardId(boardId);
+  assertWritable(record, isArchived ? "the archive" : "the restore");
+
+  const { targets, skipped } = partitionBulkTargets(rowIds, (id) => record.rows.get(id), {
+    allowArchived: true,
+  });
+
+  const now = nowIso();
+  const rows: BoardRow[] = [];
+
+  for (const row of targets) {
+    const wasArchived = isRowArchived(row);
+    const next: BoardRow = {
+      ...row,
+      archivedAt: isArchived ? now : null,
+      updatedAt: now,
+      revision: row.revision + 1,
+    };
+
+    record.rows.set(next.id, next);
+    rows.push(next);
+
+    // Re-archiving something already archived is a no-op worth honouring but
+    // not worth logging twice.
+    if (wasArchived !== isArchived) {
+      logActivity(
+        record,
+        next.id,
+        isArchived ? "archived this record" : "restored this record",
+        isArchived ? "archived" : "restored",
+      );
+    }
+  }
+
+  return { requested: rowIds.length, rows, applied: rows.map((row) => row.id), skipped };
+}
+
+/** Permanent, and said so at the call site: records have no trash of their own. */
+async function bulkDelete(
+  { boardId, rowIds }: BulkTargets,
+  signal?: AbortSignal,
+): Promise<BulkResult> {
+  await writeDelay(signal);
+  const record = recordByBoardId(boardId);
+  assertWritable(record, "the deletion");
+
+  // Archiving freezes edits, not removal — a frozen record can still be binned.
+  const { targets, skipped } = partitionBulkTargets(rowIds, (id) => record.rows.get(id), {
+    allowArchived: true,
+  });
+
+  const removed = new Set(targets.map((row) => row.id));
+  for (const id of removed) record.rows.delete(id);
+  record.order = record.order.filter((id) => !removed.has(id));
+  record.activity = record.activity.filter((entry) => !removed.has(entry.rowId));
+
+  return { requested: rowIds.length, rows: [], applied: [...removed], skipped };
+}
+
+export interface BulkMoveInput extends BulkTargets {
+  /** Drive node of the destination board. */
+  readonly targetNodeId: string;
+}
+
+const NOISE = /[^a-z0-9]/g;
+const normalizeName = (value: string): string => value.toLowerCase().replace(NOISE, "");
+
+/**
+ * Move records to another board.
+ *
+ * The two boards have different schemas, so cells travel through the column
+ * *conversion* path: matched by name, then re-read into the destination's type.
+ * Anything the destination cannot hold is reported by name rather than dropped
+ * quietly, and the destination assigns its own record ids.
+ */
+async function bulkMove(
+  { boardId, rowIds, targetNodeId }: BulkMoveInput,
+  signal?: AbortSignal,
+): Promise<BulkMoveResult> {
+  await writeDelay(signal);
+
+  const source = recordByBoardId(boardId);
+  const target = recordFor(targetNodeId);
+
+  if (target.board.id === source.board.id) {
+    throw conflict("Those records are already on that board");
+  }
+
+  assertWritable(source, "the move");
+  assertWritable(target, "the move");
+
+  const { targets, skipped } = partitionBulkTargets(rowIds, (id) => source.rows.get(id));
+
+  const pairs = new Map<string, BoardColumn>();
+  for (const column of source.board.columns) {
+    const match = target.board.columns.find(
+      (candidate) => normalizeName(candidate.name) === normalizeName(column.name),
+    );
+    if (match) pairs.set(column.id, match);
+  }
+
+  const droppedColumns = source.board.columns
+    .filter((column) => !pairs.has(column.id))
+    .map((column) => column.name);
+
+  const context = contextFor(source);
+  const now = nowIso();
+  const created: BoardRow[] = [];
+
+  for (const row of targets) {
+    const cells = emptyCells(target.board.columns) as Record<string, CellValue>;
+
+    for (const column of source.board.columns) {
+      const destination = pairs.get(column.id);
+      const value = row.cells[column.id];
+      if (!destination || !value) continue;
+
+      cells[destination.id] = convertCell(value, column, destination, context).value;
+    }
+
+    target.sequence += 1;
+    const moved: BoardRow = {
+      id: nextId("row"),
+      boardId: target.board.id,
+      displayId: formatRowId(target.board.rowIdPrefix, target.sequence),
+      sequence: target.sequence,
+      cells,
+      createdAt: row.createdAt,
+      updatedAt: now,
+      createdBy: row.createdBy,
+      revision: 1,
+    };
+
+    target.rows.set(moved.id, moved);
+    target.order.push(moved.id);
+    logActivity(target, moved.id, `moved ${row.displayId} from ${source.board.name}`, "moved");
+    created.push(moved);
+
+    source.rows.delete(row.id);
+  }
+
+  const gone = new Set(targets.map((row) => row.id));
+  source.order = source.order.filter((id) => !gone.has(id));
+  source.activity = source.activity.filter((entry) => !gone.has(entry.rowId));
+
+  return {
+    requested: rowIds.length,
+    rows: created,
+    // The ids the *source* board must forget; `rows` are their new identities.
+    applied: [...gone],
+    skipped,
+    targetBoardId: target.board.id,
+    targetNodeId,
+    droppedColumns,
+  };
+}
+
+/* ----------------------------------------------------------------- import */
+
+export interface ImportRowsInput {
+  readonly boardId: string;
+  /** Already validated and mapped by the wizard — cells keyed by column id. */
+  readonly rows: readonly Readonly<Record<string, CellValue>>[];
+}
+
+/**
+ * Create many records in one call. Record ids come from the board's own
+ * counter, so an import lands as `TASK-042 … TASK-141` with no gaps and no
+ * client-invented identifiers.
+ */
+async function importRows(
+  { boardId, rows }: ImportRowsInput,
+  signal?: AbortSignal,
+): Promise<readonly BoardRow[]> {
+  await writeDelay(signal);
+  const record = recordByBoardId(boardId);
+  assertWritable(record, "the import");
+
+  const now = nowIso();
+  const created: BoardRow[] = [];
+
+  for (const cells of rows) {
+    record.sequence += 1;
+
+    const row: BoardRow = {
+      id: nextId("row"),
+      boardId: record.board.id,
+      displayId: formatRowId(record.board.rowIdPrefix, record.sequence),
+      sequence: record.sequence,
+      cells: { ...emptyCells(record.board.columns), ...cells },
+      createdAt: now,
+      updatedAt: now,
+      createdBy: CURRENT_USER.id,
+      revision: 1,
+    };
+
+    record.rows.set(row.id, row);
+    record.order.push(row.id);
+    logActivity(record, row.id, `imported ${row.displayId}`, "imported");
+    created.push(row);
+  }
+
+  return created;
 }
 
 /* -------------------------------------------------------------- relations */
@@ -607,6 +941,13 @@ export interface BoardDescriptor {
   readonly name: string;
 }
 
+/** Every live board node in the active workspace. Cheap — no seeding. */
+function boardNodes(): readonly BoardNode[] {
+  return flattenTree(getActiveTree()).filter(
+    (node): node is BoardNode => isBoard(node) && !node.isTrashed,
+  );
+}
+
 /**
  * Boards a relation column can point at. Derived from the tree, so listing
  * them never seeds — a 5.000-record board is not built just to name it.
@@ -614,19 +955,53 @@ export interface BoardDescriptor {
 async function listBoards(signal?: AbortSignal): Promise<readonly BoardDescriptor[]> {
   await readDelay(signal);
 
-  const descriptors: BoardDescriptor[] = [];
+  return boardNodes().map((node) => ({
+    boardId: boardIdFor(node.id),
+    nodeId: node.id,
+    name: node.name,
+  }));
+}
 
-  const walk = (nodes: readonly import("@/types").DriveNode[]) => {
-    for (const node of nodes) {
-      if (isBoard(node) && !node.isTrashed) {
-        descriptors.push({ boardId: boardIdFor(node.id), nodeId: node.id, name: node.name });
-      }
-      for (const child of childrenOf(node)) walk([child]);
-    }
-  };
+export interface BoardScanEntry {
+  readonly node: BoardNode;
+  readonly board: Board;
+  readonly rows: readonly BoardRow[];
+}
 
-  walk(getActiveTree());
-  return descriptors;
+export interface ScanOptions {
+  /** Permission gate. Boards that fail it are never seeded, let alone read. */
+  readonly allow?: (node: BoardNode) => boolean;
+}
+
+/**
+ * Records across every board, for the workspace-wide readers: global search
+ * and My Work.
+ *
+ * Seeding is cached in the registry, so the first scan pays for the boards it
+ * touches once and later scans are map reads.
+ */
+async function scanBoards(
+  { allow }: ScanOptions = {},
+  signal?: AbortSignal,
+): Promise<readonly BoardScanEntry[]> {
+  await readDelay(signal);
+
+  const entries: BoardScanEntry[] = [];
+
+  for (const node of boardNodes()) {
+    if (allow && !allow(node)) continue;
+
+    const record = recordFor(node.id);
+    entries.push({
+      node,
+      board: record.board,
+      rows: record.order
+        .map((id) => record.rows.get(id))
+        .filter((row): row is BoardRow => Boolean(row)),
+    });
+  }
+
+  return entries;
 }
 
 export interface RelationTarget {
@@ -729,6 +1104,11 @@ export const boardService = {
   duplicateRow,
   deleteRow,
   updateCells,
+  bulkUpdate,
+  bulkArchive,
+  bulkDelete,
+  bulkMove,
+  importRows,
   createColumn,
   updateColumn,
   reorderColumn,
@@ -736,13 +1116,13 @@ export const boardService = {
   convertColumn,
   createSelectOption,
   listBoards,
+  scanBoards,
   relationIndex,
   listBacklinks,
   updateView,
   createView,
   deleteView,
-  listComments,
-  addComment,
+  noteActivity,
   listActivity,
   reset,
 };

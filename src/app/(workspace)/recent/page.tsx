@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { CollectionView } from "@/components/drive/collection-view";
+import { RecentPage } from "@/components/collections/recent-page";
 
-export const metadata: Metadata = { title: "recent" };
+export const metadata: Metadata = { title: "Recent" };
 
 export default function Page() {
-  return <CollectionView viewId="recent" />;
+  return <RecentPage />;
 }

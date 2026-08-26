@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAsyncResource } from "@/hooks/use-async-resource";
-import { useWorkspaceRole } from "@/hooks/use-capabilities";
+import { useWorkspaceRole } from "@/hooks/use-permissions";
 import { devtoolsService } from "@/services/devtools-service";
 import { toAppError } from "@/services/errors";
 import { useWorkspaceStore } from "@/store/workspace-store";

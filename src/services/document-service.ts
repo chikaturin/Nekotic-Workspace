@@ -1,4 +1,6 @@
-import { documentExcerpt } from "@/lib/blocks";
+import { VERSION_HISTORY_LIMIT } from "@/config/app";
+import { documentExcerpt, documentLines } from "@/lib/blocks";
+import { describeDiff, diffLines, summarizeDiff } from "@/lib/diff";
 import { flattenTree } from "@/lib/tree";
 import { contentForSlug } from "@/mock/document-content";
 import { TREES_BY_WORKSPACE } from "@/mock/tree";
@@ -11,7 +13,14 @@ import {
 } from "@/services/backend";
 import { conflict, notFound, ServiceError, appError } from "@/services/errors";
 import { shouldFailSave } from "@/services/simulation";
-import { isDocument, type Block, type DocumentDraft, type WorkspaceDocument } from "@/types";
+import { CURRENT_USER } from "@/mock/users";
+import {
+  isDocument,
+  type Block,
+  type DocumentDraft,
+  type DocumentVersion,
+  type WorkspaceDocument,
+} from "@/types";
 
 /**
  * In-memory stand-in for the documents API. Content lives here, never in the
@@ -49,6 +58,80 @@ function catalog(): Map<string, WorkspaceDocument> {
 
   store = seeded;
   return seeded;
+}
+
+/**
+ * Version history (SY-VER-39).
+ *
+ * A version is a *snapshot*, not a delta, so restoring never has to replay a
+ * chain. Restoring writes a new version rather than rewinding — the record of
+ * what happened stays complete, which is the whole point of keeping it.
+ */
+const versionsByNode = new Map<string, DocumentVersion[]>();
+
+function versionsFor(document: WorkspaceDocument): DocumentVersion[] {
+  const existing = versionsByNode.get(document.nodeId);
+  if (existing) return existing;
+
+  const seeded: DocumentVersion[] = [
+    {
+      id: `${document.nodeId}_v1`,
+      version: document.version,
+      title: document.title,
+      blocks: document.blocks,
+      createdAt: document.updatedAt,
+      author: document.owner,
+      summary: `${documentLines(document.blocks).length} lines`,
+    },
+  ];
+
+  versionsByNode.set(document.nodeId, seeded);
+  return seeded;
+}
+
+/** Record a snapshot, newest first, keeping the history bounded. */
+function pushVersion(
+  previous: WorkspaceDocument,
+  next: WorkspaceDocument,
+  author: WorkspaceDocument["owner"],
+): void {
+  const history = versionsFor(previous);
+  const diff = summarizeDiff(diffLines(documentLines(previous.blocks), documentLines(next.blocks)));
+
+  history.unshift({
+    id: nextId("docv"),
+    version: next.version,
+    title: next.title,
+    blocks: next.blocks,
+    createdAt: next.updatedAt,
+    author,
+    summary: previous.title === next.title ? describeDiff(diff) : `renamed · ${describeDiff(diff)}`,
+  });
+
+  if (history.length > VERSION_HISTORY_LIMIT) history.length = VERSION_HISTORY_LIMIT;
+}
+
+async function listVersions(
+  nodeId: string,
+  signal?: AbortSignal,
+): Promise<readonly DocumentVersion[]> {
+  await readDelay(signal);
+  return versionsFor(mustFind(nodeId));
+}
+
+/**
+ * Restore a snapshot by saving it forward. It goes through `save`, so a locked
+ * page refuses a restore for exactly the reason it refuses an edit.
+ */
+async function restoreVersion(
+  nodeId: string,
+  versionId: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceDocument> {
+  const version = versionsFor(mustFind(nodeId)).find((candidate) => candidate.id === versionId);
+  if (!version) throw notFound("That version");
+
+  return save(nodeId, { title: version.title, icon: mustFind(nodeId).icon, blocks: version.blocks }, signal);
 }
 
 function mustFind(nodeId: string): WorkspaceDocument {
@@ -119,7 +202,7 @@ async function save(
     );
   }
 
-  return commit({
+  const next = commit({
     ...current,
     title: draft.title.trim().length > 0 ? draft.title : "Untitled",
     icon: draft.icon,
@@ -127,6 +210,9 @@ async function save(
     updatedAt: nowIso(),
     version: current.version + 1,
   });
+
+  pushVersion(current, next, CURRENT_USER);
+  return next;
 }
 
 async function setPinned(nodeId: string, isPinned: boolean): Promise<WorkspaceDocument> {
@@ -217,6 +303,7 @@ async function remove(nodeId: string): Promise<void> {
 /** Test seam — drops the in-memory catalog so it re-seeds from the mock tree. */
 function reset(): void {
   store = null;
+  versionsByNode.clear();
 }
 
 export const documentService = {
@@ -228,6 +315,8 @@ export const documentService = {
   setLocked,
   setArchived,
   remove,
+  listVersions,
+  restoreVersion,
   summarize,
   reset,
 };

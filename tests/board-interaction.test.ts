@@ -287,18 +287,11 @@ describe("board service schema and collaboration endpoints", () => {
     expect(updated.hiddenColumnIds).toEqual(["c_env"]);
   });
 
-  test("comments and activity are recorded against the row", async () => {
+  test("activity records the row's creation", async () => {
     const current = await board();
     const rowId = (await boardService.getBoard(ID.roadmap)).rows[0]!.id;
 
-    expect(await boardService.listComments(current.id, rowId)).toHaveLength(0);
-
-    const comment = await boardService.addComment(current.id, rowId, "  QA-128 blocked  ");
-    expect(comment.body).toBe("QA-128 blocked");
-    expect(await boardService.listComments(current.id, rowId)).toHaveLength(1);
-
     const activity = await boardService.listActivity(current.id, rowId);
-    expect(activity.some((entry) => entry.kind === "commented")).toBe(true);
     expect(activity.some((entry) => entry.kind === "created")).toBe(true);
   });
 

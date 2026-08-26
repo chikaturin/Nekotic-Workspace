@@ -1,7 +1,21 @@
 "use client";
 
-import { Download, Ellipsis, ExternalLink, PenLine, Share2, Star, StarOff, Trash2 } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  Download,
+  Ellipsis,
+  ExternalLink,
+  PenLine,
+  Share2,
+  ShieldCheck,
+  Star,
+  StarOff,
+  Trash2,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { PermissionDialog } from "@/components/permissions/permission-dialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,9 +24,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useFileDownload } from "@/hooks/use-file-preview";
+import { usePermissions } from "@/hooks/use-permissions";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/workspace-store";
-import { isContainer, type DriveNode } from "@/types";
+import { isArchivedNode } from "@/lib/archive";
+import { isFile, type DriveNode } from "@/types";
 
 interface DriveItemMenuProps {
   readonly node: DriveNode;
@@ -27,7 +44,28 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
   const trashNode = useWorkspaceStore((state) => state.trashNode);
   const renameNode = useWorkspaceStore((state) => state.renameNode);
   const openPreview = useWorkspaceStore((state) => state.openPreview);
+  const setNodeArchived = useWorkspaceStore((state) => state.setNodeArchived);
+  const can = usePermissions(node);
   const pushFeedback = useWorkspaceStore((state) => state.pushFeedback);
+
+  const downloadFile = useFileDownload();
+  const [isAccessOpen, setIsAccessOpen] = useState(false);
+
+  /**
+   * A toast that says "copied" while nothing reached the clipboard is worse
+   * than no button at all, so the message follows the write rather than
+   * announcing it in advance.
+   */
+  async function copyShareLink() {
+    const url = new URL(href, window.location.origin).toString();
+
+    try {
+      await navigator.clipboard.writeText(url);
+      pushFeedback(`Share link copied for “${node.name}”`, "success");
+    } catch {
+      pushFeedback("Could not reach the clipboard — copy the address bar instead", "error");
+    }
+  }
 
   function handleRename() {
     const next = window.prompt("Rename item", node.name);
@@ -59,29 +97,61 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
           {node.isFavorite ? <StarOff /> : <Star />}
           {node.isFavorite ? "Remove from favorites" : "Add to favorites"}
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={handleRename}>
+        <DropdownMenuItem disabled={!can("node.rename")} onSelect={handleRename}>
           <PenLine />
           Rename
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => pushFeedback(`Share link copied for “${node.name}”`, "success")}>
+        <DropdownMenuItem disabled={!can("node.share")} onSelect={() => void copyShareLink()}>
           <Share2 />
           Copy share link
         </DropdownMenuItem>
-        {!isContainer(node) && (
-          <DropdownMenuItem onSelect={() => pushFeedback("Download is not wired in this mock")}>
+        <DropdownMenuItem
+          disabled={!can("workspace.permission.manage")}
+          onSelect={() => setIsAccessOpen(true)}
+        >
+          <ShieldCheck />
+          Manage access
+        </DropdownMenuItem>
+        {isFile(node) && (
+          <DropdownMenuItem onSelect={() => void downloadFile(node)}>
             <Download />
             Download
           </DropdownMenuItem>
         )}
 
+        {/* Files have no read-only mode of their own, so they are not archived —
+            they are moved to Trash or left where they are. */}
+        {!isFile(node) && (
+          <DropdownMenuItem
+            // An inherited freeze cannot be lifted from here at all: the
+            // resolver has already closed the key for everything below the
+            // ancestor that holds it.
+            disabled={!can("node.archive")}
+            onSelect={() => setNodeArchived(node.id, !isArchivedNode(node))}
+          >
+            {isArchivedNode(node) ? <ArchiveRestore /> : <Archive />}
+            {isArchivedNode(node) ? "Restore from archive" : "Archive"}
+          </DropdownMenuItem>
+        )}
+
         <DropdownMenuSeparator />
-        <DropdownMenuItem variant="danger" onSelect={() => trashNode(node.id)}>
+        <DropdownMenuItem
+          variant="danger"
+          disabled={!can("node.delete")}
+          onSelect={() => trashNode(node.id)}
+        >
           <Trash2 />
           Move to Trash
         </DropdownMenuItem>
       </DropdownMenuContent>
+
+      <PermissionDialog
+        node={node}
+        isOpen={isAccessOpen}
+        onClose={() => setIsAccessOpen(false)}
+      />
     </DropdownMenu>
   );
 }

@@ -17,8 +17,10 @@ describe("buildBreadcrumbs", () => {
   test("renders workspace / project / folder / folder for a deep path", () => {
     const trail = trailFor(["development", "backend", "payment"]);
 
+    // The first crumb is the workspace, whatever it is called — asserting the
+    // brand here makes a rename look like a regression.
     expect(trail.map((crumb) => crumb.label)).toEqual([
-      "NexDrop",
+      workspace.name,
       "Development",
       "Backend",
       "Payment",

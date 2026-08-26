@@ -1,19 +1,29 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { LoaderCircle, RotateCcw, ShieldAlert, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { AppError } from "@/types";
 
+interface StatePanelAction {
+  readonly label: string;
+  /** A link instead of a handler — "back to the workspace root" and friends. */
+  readonly href?: string;
+  readonly onClick?: () => void;
+}
+
 interface StatePanelProps {
   readonly icon: LucideIcon;
   readonly title: string;
   readonly description: string;
   readonly tone?: "neutral" | "danger";
-  readonly action?: { readonly label: string; readonly onClick: () => void };
+  readonly action?: StatePanelAction;
   readonly className?: string;
+  /** Retry is the common case, so the icon is opt-out rather than opt-in. */
+  readonly hasActionIcon?: boolean;
 }
 
 /** Shared shell for the non-happy paths so they all read the same. */
@@ -24,6 +34,7 @@ export function StatePanel({
   tone = "neutral",
   action,
   className,
+  hasActionIcon = true,
 }: StatePanelProps) {
   return (
     <motion.div
@@ -53,12 +64,17 @@ export function StatePanel({
         <p className="mx-auto max-w-sm text-[13px] text-muted-foreground">{description}</p>
       </div>
 
-      {action && (
-        <Button variant="outline" size="sm" onClick={action.onClick} className="gap-1.5">
-          <RotateCcw />
-          {action.label}
-        </Button>
-      )}
+      {action &&
+        (action.href ? (
+          <Button variant="outline" size="sm" asChild>
+            <Link href={action.href}>{action.label}</Link>
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" onClick={action.onClick} className="gap-1.5">
+            {hasActionIcon && <RotateCcw />}
+            {action.label}
+          </Button>
+        ))}
     </motion.div>
   );
 }

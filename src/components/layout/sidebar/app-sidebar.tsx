@@ -8,9 +8,11 @@ import {
   Clock,
   FolderPlus,
   HardDrive,
+  LayoutDashboard,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  ScrollText,
   Star,
   Sun,
   Trash2,
@@ -32,9 +34,10 @@ import {
   SMART_VIEWS,
 } from "@/config/app";
 import { useCurrentTarget } from "@/hooks/use-current-target";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
-import { UNREAD_COUNT } from "@/mock/notifications";
+import { selectUnreadCount, useNotificationStore } from "@/store/notification-store";
 import { selectActiveWorkspace, selectTree, useWorkspaceStore } from "@/store/workspace-store";
 import type { SmartViewId } from "@/types";
 
@@ -56,6 +59,8 @@ export function AppSidebar() {
   const tree = useWorkspaceStore(selectTree);
   const { targetId, targetName } = useCurrentTarget();
   const { theme, toggleTheme } = useTheme();
+  const unreadCount = useNotificationStore(selectUnreadCount);
+  const can = usePermissions();
 
   return (
     <motion.aside
@@ -117,6 +122,12 @@ export function AppSidebar() {
 
         <SidebarSection title="Workspace" isCollapsed={isCollapsed}>
           <SidebarNavItem
+            href="/dashboard"
+            label="Dashboard"
+            icon={LayoutDashboard}
+            isCollapsed={isCollapsed}
+          />
+          <SidebarNavItem
             href={FILES_ROOT_PATH}
             label="Files"
             icon={HardDrive}
@@ -130,9 +141,20 @@ export function AppSidebar() {
               label={view.label}
               icon={SMART_VIEW_ICONS[view.id]}
               isCollapsed={isCollapsed}
-              badgeCount={view.id === "notifications" ? UNREAD_COUNT : undefined}
+              badgeCount={view.id === "notifications" ? unreadCount : undefined}
             />
           ))}
+
+          {/* Hidden rather than disabled: a rail entry that always refuses is
+              an invitation to ask why. The page checks the same key again. */}
+          {can("workspace.audit.view") && (
+            <SidebarNavItem
+              href="/audit"
+              label="Audit log"
+              icon={ScrollText}
+              isCollapsed={isCollapsed}
+            />
+          )}
         </SidebarSection>
       </div>
 

@@ -2,13 +2,15 @@
 
 import type { ReactNode } from "react";
 import { AppHeader } from "@/components/layout/header/app-header";
-import { CommandPalette } from "@/components/layout/header/command-palette";
+import { GlobalSearchDialog } from "@/components/search/global-search-dialog";
 import { AppSidebar } from "@/components/layout/sidebar/app-sidebar";
+import { RolePreviewBanner } from "@/components/permissions/role-preview-banner";
 import { FeedbackToast } from "@/components/shared/feedback-toast";
 import { DrivePreviewDialog } from "@/components/drive/drive-preview-dialog";
 import { UploadQueuePanel } from "@/components/files/upload-queue-panel";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useHotkey } from "@/hooks/use-hotkey";
+import { useResponsiveSidebar } from "@/hooks/use-responsive-sidebar";
 import { useWorkspaceStore } from "@/store/workspace-store";
 
 /**
@@ -19,6 +21,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const setSearchOpen = useWorkspaceStore((state) => state.setSearchOpen);
   const toggleSidebar = useWorkspaceStore((state) => state.toggleSidebar);
 
+  useResponsiveSidebar();
   useHotkey("mod+k", () => setSearchOpen(true), { enableInInputs: true });
   useHotkey("mod+b", toggleSidebar);
 
@@ -29,11 +32,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <AppHeader />
+          <RolePreviewBanner />
           <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
         </div>
       </div>
 
-      <CommandPalette />
+      <GlobalSearchDialog />
       <DrivePreviewDialog />
       <UploadQueuePanel />
       <FeedbackToast />

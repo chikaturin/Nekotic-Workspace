@@ -7,10 +7,10 @@ import { ViewerDetails } from "@/components/files/preview/viewer-details";
 import { ViewerHeader } from "@/components/files/preview/viewer-header";
 import { AsyncBoundary } from "@/components/shared/async-boundary";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCapabilities } from "@/hooks/use-capabilities";
+import { useCapabilities } from "@/hooks/use-permissions";
 import { useFilePreview } from "@/hooks/use-file-preview";
 import { useHotkey } from "@/hooks/use-hotkey";
 import { fileSummaryLine } from "@/lib/file-metadata";
@@ -59,6 +59,14 @@ export function FilePreviewDialog({ node, siblings, onClose, onSelect }: FilePre
       <DialogContent fullscreen hideClose className="flex flex-col bg-background p-0">
         {node && (
           <>
+            {/* The viewer draws its own chrome, but a dialog still has to be
+                announceable: without a title it opens as an unnamed region. */}
+            <DialogTitle className="sr-only">{node.name}</DialogTitle>
+            <DialogDescription className="sr-only">
+              File preview. Use the left and right arrow keys to move between files, and I to
+              toggle the details panel.
+            </DialogDescription>
+
             <ViewerHeader
               node={node}
               canEdit={capabilities.edit}

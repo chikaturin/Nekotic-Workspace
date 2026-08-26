@@ -1,18 +1,16 @@
 "use client";
 
-import { Bell, PanelLeftOpen } from "lucide-react";
-import Link from "next/link";
+import { PanelLeftOpen } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import { BreadcrumbNav } from "@/components/layout/header/breadcrumb-nav";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { GlobalSearch } from "@/components/layout/header/global-search";
 import { UserMenu } from "@/components/layout/header/user-menu";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DRIVE_ROOT_PATH, FILES_ROOT_PATH, SMART_VIEWS } from "@/config/app";
 import { useDriveLocation } from "@/hooks/use-drive-location";
 import { useDriveSegments } from "@/hooks/use-current-target";
-import { UNREAD_COUNT } from "@/mock/notifications";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspace-store";
 import type { BreadcrumbTrail } from "@/types";
 
@@ -78,20 +76,7 @@ export function AppHeader() {
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button size="icon" variant="ghost" asChild className="relative">
-              <Link href="/notifications" aria-label={`Notifications (${UNREAD_COUNT} unread)`}>
-                <Bell />
-                {UNREAD_COUNT > 0 && (
-                  <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-accent ring-2 ring-surface" />
-                )}
-              </Link>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{UNREAD_COUNT} unread notifications</TooltipContent>
-        </Tooltip>
-
+        <NotificationBell />
         <UserMenu />
       </div>
     </header>

@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import { childCount, findNodeById } from "@/lib/tree";
 import { CURRENT_USER } from "@/mock/users";
-import { selectActiveWorkspace, selectTree, useWorkspaceStore } from "@/store/workspace-store";
+import {
+  selectActiveWorkspace,
+  selectTrash,
+  selectTree,
+  useWorkspaceStore,
+} from "@/store/workspace-store";
 import { childrenOf, isFile, type FileAsset } from "@/types";
 import { buildTestTree, ID } from "./helpers";
 
@@ -12,6 +17,7 @@ beforeEach(() => {
   useWorkspaceStore.setState({
     activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
+    trashByWorkspace: { [WORKSPACE_ID]: [] },
     expandedIds: [],
     selectedIds: [],
     previewNodeId: null,
@@ -201,20 +207,26 @@ describe("folder and item lifecycle", () => {
     expect(findNodeById(tree(), ID.payment)?.type).toBe("folder");
   });
 
-  test("trashNode flags the node and drops it from the selection", () => {
+  test("trashNode detaches the node into the bin and drops it from the selection", () => {
     actions().setSelection([ID.payment]);
 
     actions().trashNode(ID.payment);
 
-    expect(findNodeById(tree(), ID.payment)?.isTrashed).toBe(true);
+    // Deleting detaches: the node leaves the tree entirely rather than staying
+    // in place behind a flag, which is what lets it outlive its parent.
+    expect(findNodeById(tree(), ID.payment)).toBeNull();
+    expect(selectTrash(actions())).toHaveLength(1);
+    expect(selectTrash(actions())[0]?.node.isTrashed).toBe(true);
     expect(actions().selectedIds).toHaveLength(0);
   });
 
-  test("restoreNode clears the trashed flag", () => {
+  test("restoreNode puts the node back where it came from", () => {
     actions().trashNode(ID.payment);
     actions().restoreNode(ID.payment);
 
     expect(findNodeById(tree(), ID.payment)?.isTrashed).toBe(false);
+    expect(findNodeById(tree(), ID.payment)?.parentId).toBe(ID.backend);
+    expect(selectTrash(actions())).toHaveLength(0);
   });
 
   test("deleteForever removes the node from the tree", () => {

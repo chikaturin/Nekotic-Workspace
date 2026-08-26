@@ -1,8 +1,9 @@
 "use client";
 
-import { Copy, Eye, EyeOff, Loader2, Lock, ShieldCheck } from "lucide-react";
+import { Copy, Eye, EyeOff, History, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { useCallback, useState } from "react";
 import { environmentOption } from "@/components/devtools/environment-picker";
+import { SecretVersionsDialog } from "@/components/versions/version-dialogs";
 import { SelectChip } from "@/components/board/cells/select-cell";
 import { AsyncBoundary } from "@/components/shared/async-boundary";
 import { UserAvatar } from "@/components/shared/user-avatar";
@@ -10,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListLoadingState } from "@/components/shared/state-panels";
 import { useAsyncResource } from "@/hooks/use-async-resource";
-import { useCapabilities, useWorkspaceRole } from "@/hooks/use-capabilities";
+import { useCapabilities, useEffectiveRole, usePermissions } from "@/hooks/use-permissions";
+import { ROLE_LABELS } from "@/lib/permissions";
 import { useSecretDocument } from "@/hooks/use-secret-document";
 import { formatRelativeTime } from "@/lib/format";
 import { devtoolsService } from "@/services/devtools-service";
@@ -26,11 +28,14 @@ import type { DocumentNode, SecretAuditEntry, SecretEntry } from "@/types";
  */
 export function SecretDocumentPage({ node }: { node: DocumentNode }) {
   const capabilities = useCapabilities(node);
-  const role = useWorkspaceRole();
+  const can = usePermissions(node);
+  const role = useEffectiveRole(node);
   const controller = useSecretDocument(node.id);
   const [isAuditOpen, setIsAuditOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const secretDocument = controller.state.status === "success" ? controller.state.data : null;
 
-  const canReveal = role === "owner" || role === "admin";
+  const canReveal = can("secret.reveal");
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -47,13 +52,24 @@ export function SecretDocumentPage({ node }: { node: DocumentNode }) {
         </div>
 
         <Badge variant={canReveal ? "success" : "default"} className="ml-2">
-          {canReveal ? `${role} access` : `${role} — masked only`}
+          {canReveal ? `${ROLE_LABELS[role]} access` : `${ROLE_LABELS[role]} — masked only`}
         </Badge>
 
         <Button
           size="sm"
-          variant={isAuditOpen ? "subtle" : "ghost"}
+          variant="ghost"
           className="ml-auto gap-1.5"
+          disabled={secretDocument === null}
+          onClick={() => setIsHistoryOpen(true)}
+        >
+          <History />
+          Rotation history
+        </Button>
+
+        <Button
+          size="sm"
+          variant={isAuditOpen ? "subtle" : "ghost"}
+          className="gap-1.5"
           aria-pressed={isAuditOpen}
           onClick={() => setIsAuditOpen((open) => !open)}
         >
@@ -61,6 +77,14 @@ export function SecretDocumentPage({ node }: { node: DocumentNode }) {
           Audit log
         </Button>
       </header>
+
+      {secretDocument && (
+        <SecretVersionsDialog
+          isOpen={isHistoryOpen}
+          document={secretDocument}
+          onClose={() => setIsHistoryOpen(false)}
+        />
+      )}
 
       {!canReveal && (
         <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-4 py-2">

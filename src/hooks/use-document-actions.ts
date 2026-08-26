@@ -2,18 +2,18 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { usePermissions } from "@/hooks/use-permissions";
 import { canToggleLock } from "@/lib/permissions";
 import { hrefForNode } from "@/lib/tree";
 import { CURRENT_USER } from "@/mock/users";
 import { documentService } from "@/services/document-service";
 import { toAppError } from "@/services/errors";
 import { getActiveTree, selectTree, useWorkspaceStore } from "@/store/workspace-store";
-import type { CapabilitySet, DocumentActionId, DriveNode, WorkspaceDocument } from "@/types";
+import type { DocumentActionId, DriveNode, WorkspaceDocument } from "@/types";
 
 interface UseDocumentActionsInput {
   readonly node: DriveNode | null;
   readonly document: WorkspaceDocument | null;
-  readonly capabilities: CapabilitySet;
   /** Applies the service result back into the editor. */
   readonly onDocumentChanged: (document: WorkspaceDocument) => void;
 }
@@ -37,10 +37,10 @@ export interface DocumentActions {
 export function useDocumentActions({
   node,
   document,
-  capabilities,
   onDocumentChanged,
 }: UseDocumentActionsInput): DocumentActions {
   const router = useRouter();
+  const can = usePermissions(node);
   const [pending, setPending] = useState<DocumentActionId | null>(null);
 
   const tree = useWorkspaceStore(selectTree);
@@ -129,7 +129,7 @@ export function useDocumentActions({
 
   return {
     pending,
-    canToggleLock: document ? canToggleLock(capabilities, document, CURRENT_USER) : false,
+    canToggleLock: document ? canToggleLock(can, document, CURRENT_USER) : false,
     togglePin,
     toggleLock,
     duplicate,

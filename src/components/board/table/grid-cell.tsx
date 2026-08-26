@@ -20,6 +20,8 @@ interface GridCellProps {
   readonly rowIndex: number;
   readonly columnIndex: number;
   readonly shared: GridShared;
+  /** Frozen: an archived record, an archived board, or a viewer who may read. */
+  readonly isReadOnly: boolean;
 }
 
 /**
@@ -35,6 +37,7 @@ export const GridCell = memo(function GridCell({
   rowIndex,
   columnIndex,
   shared,
+  isReadOnly,
 }: GridCellProps) {
   const isFocused = useGridStore(selectIsFocused(rowIndex, columnIndex));
   const isSelected = useGridStore(selectIsSelected(rowIndex, columnIndex));
@@ -89,7 +92,9 @@ export const GridCell = memo(function GridCell({
       aria-selected={isSelected}
       onMouseDown={handleMouseDown}
       onMouseEnter={handleMouseEnter}
-      onDoubleClick={() => useGridStore.getState().beginEdit(row.id, column.id)}
+      onDoubleClick={() => {
+        if (!isReadOnly) useGridStore.getState().beginEdit(row.id, column.id);
+      }}
       style={widthStyle(column.id, column.isPrimary)}
       className={cn(
         "relative h-full shrink-0 border-b border-r border-hairline",
@@ -98,7 +103,7 @@ export const GridCell = memo(function GridCell({
         isFocused && "z-30 ring-2 ring-inset ring-accent",
       )}
     >
-      {isEditing ? (
+      {isEditing && !isReadOnly ? (
         <CellEditor
           value={value}
           column={column}

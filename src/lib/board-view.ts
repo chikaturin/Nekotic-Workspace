@@ -1,3 +1,4 @@
+import { isRowArchived } from "@/lib/archive";
 import { cellOf, cellSortKey, cellText, isCellEmpty, type CellContext } from "@/lib/cell-values";
 import { clampColumnWidth } from "@/lib/board-schema";
 import type { RowMap } from "@/lib/board-records";
@@ -179,6 +180,11 @@ export interface ViewQueryInput {
   readonly context: CellContext;
   /** Free-text search across every visible column. */
   readonly search?: string;
+  /**
+   * Archived records are frozen, not deleted: they stay out of every view
+   * until the board is explicitly asked to show them (SY-ARC-37).
+   */
+  readonly includeArchived?: boolean;
 }
 
 /**
@@ -192,6 +198,7 @@ export function queryRowIds({
   columns,
   context,
   search = "",
+  includeArchived = false,
 }: ViewQueryInput): readonly string[] {
   const byId = new Map(columns.map((column) => [column.id, column]));
   const filters = (view?.filters ?? []).filter((filter) => byId.has(filter.columnId));
@@ -202,6 +209,7 @@ export function queryRowIds({
   for (const rowId of rowOrder) {
     const row = rowsById[rowId];
     if (!row) continue;
+    if (!includeArchived && isRowArchived(row)) continue;
 
     const test = (filter: ViewFilter) => {
       const column = byId.get(filter.columnId);

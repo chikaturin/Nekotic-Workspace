@@ -19,17 +19,16 @@ export function normalizePrefix(value: string): string {
   return value.replace(NON_LETTERS, "").toUpperCase().slice(0, PREFIX_MAX_LENGTH);
 }
 
-export function isValidPrefix(value: string): boolean {
-  return normalizePrefix(value).length >= 2;
-}
-
 export interface RowReference {
   readonly raw: string;
   readonly prefix: string;
   readonly sequence: number;
 }
 
-const REFERENCE_PATTERN = /\b([A-Z]{2,6})-(\d{1,6})\b/g;
+/** Shared so the comment parser tokenises references exactly as search does. */
+export const ROW_REFERENCE_SOURCE = "\\b([A-Z]{2,6})-(\\d{1,6})\\b";
+
+const REFERENCE_PATTERN = new RegExp(ROW_REFERENCE_SOURCE, "g");
 
 /**
  * Pull `QA-128`-style references out of free text — what comments and global

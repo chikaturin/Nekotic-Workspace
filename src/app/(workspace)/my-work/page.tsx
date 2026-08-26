@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { CollectionView } from "@/components/drive/collection-view";
+import { MyWorkPage } from "@/components/my-work/my-work-page";
 
-export const metadata: Metadata = { title: "my work" };
+export const metadata: Metadata = { title: "My Work" };
 
 export default function Page() {
-  return <CollectionView viewId="my-work" />;
+  return <MyWorkPage />;
 }

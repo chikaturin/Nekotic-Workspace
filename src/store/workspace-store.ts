@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { MOCK_NOW } from "@/config/app";
+import { archiveLabelFor, isArchivedNode } from "@/lib/archive";
 import {
   cloneNode,
   findNodeById,
@@ -11,6 +12,7 @@ import {
   removeNode,
   updateNode,
 } from "@/lib/tree";
+import { extractTrashed, restoreTargetFor, trashNodeFrom, untrash } from "@/lib/trash";
 import type { DocumentSummaryPatch } from "@/services/document-service";
 import { createId, slugify, uniqueSlug } from "@/lib/utils";
 import { CURRENT_USER } from "@/mock/users";
@@ -29,9 +31,40 @@ import {
   type FileNode,
   type FolderNode,
   type SortState,
+  type TrashEntry,
   type ViewMode,
   type Workspace,
 } from "@/types";
+
+/**
+ * Deleting detaches (SY-TRH-38): the subtree leaves the tree and lives in the
+ * bin until it is restored or purged. Nodes the dataset ships as deleted are
+ * moved across at start-up, so there is one representation of "deleted" rather
+ * than two that can disagree.
+ */
+function seedWorkspaces(): {
+  readonly trees: Record<string, readonly DriveNode[]>;
+  readonly bins: Record<string, readonly TrashEntry[]>;
+} {
+  const trees: Record<string, readonly DriveNode[]> = {};
+  const bins: Record<string, readonly TrashEntry[]> = {};
+
+  for (const [workspaceId, tree] of Object.entries(TREES_BY_WORKSPACE)) {
+    // The seed carries no deletion record, so the node's own last-touched time
+    // and owner stand in for it — never a clock read, which would desync SSR.
+    const result = extractTrashed(tree, (node) => ({
+      deletedAt: node.updatedAt,
+      deletedBy: node.owner,
+    }));
+
+    trees[workspaceId] = result.tree;
+    bins[workspaceId] = result.entries;
+  }
+
+  return { trees, bins };
+}
+
+const SEEDED = seedWorkspaces();
 
 const DOCUMENT_LABELS: Readonly<Record<DocumentKind, string>> = {
   page: "page",
@@ -40,6 +73,13 @@ const DOCUMENT_LABELS: Readonly<Record<DocumentKind, string>> = {
 };
 
 export type FeedbackTone = "info" | "success" | "error";
+
+export interface RowRequest {
+  readonly nodeId: string;
+  readonly rowId: string;
+  /** Bumped every time, so asking for the same row twice still fires. */
+  readonly nonce: number;
+}
 
 export interface Feedback {
   readonly id: number;
@@ -51,6 +91,8 @@ interface WorkspaceState {
   readonly workspaces: readonly Workspace[];
   readonly activeWorkspaceId: string;
   readonly treeByWorkspace: Readonly<Record<string, readonly DriveNode[]>>;
+  /** Soft-deleted subtrees, detached from the tree they came out of. */
+  readonly trashByWorkspace: Readonly<Record<string, readonly TrashEntry[]>>;
 
   readonly expandedIds: readonly string[];
   readonly selectedIds: readonly string[];
@@ -58,6 +100,12 @@ interface WorkspaceState {
   readonly sort: SortState;
 
   readonly previewNodeId: string | null;
+  /**
+   * A record the app has been asked to open, set when a notification, a search
+   * hit or a My Work item routes to a board. The board consumes it after it
+   * loads — the grid store is reset per board and cannot carry the intent.
+   */
+  readonly rowRequest: RowRequest | null;
   readonly isSidebarCollapsed: boolean;
   readonly isSearchOpen: boolean;
   readonly feedback: Feedback | null;
@@ -84,9 +132,14 @@ interface WorkspaceActions {
   renameNode: (nodeId: string, name: string) => void;
   createFolder: (parentId: string | null, name: string) => void;
   moveNode: (nodeId: string, targetParentId: string | null) => void;
+  /** Archive or restore a project, folder, board or page (SY-ARC-37). */
+  setNodeArchived: (nodeId: string, isArchived: boolean) => void;
   trashNode: (nodeId: string) => void;
+  /** One state write for a multi-select delete, not one per item. */
+  trashNodes: (nodeIds: readonly string[]) => void;
   restoreNode: (nodeId: string) => void;
   deleteForever: (nodeId: string) => void;
+  emptyTrash: () => void;
   /** Insert a file that the upload service has already stored. */
   addUploadedAsset: (parentId: string | null, asset: FileAsset) => string;
   /** Create an empty page and return the node so the caller can navigate. */
@@ -108,7 +161,13 @@ interface WorkspaceActions {
   openPreview: (nodeId: string) => void;
   closePreview: () => void;
 
+  /** Ask the board at `nodeId` to open `rowId` in its drawer once it is ready. */
+  requestRow: (nodeId: string, rowId: string) => void;
+  clearRowRequest: () => void;
+
   toggleSidebar: () => void;
+  /** Set directly — the responsive rail drives this, not a click. */
+  setSidebarCollapsed: (isCollapsed: boolean) => void;
   setSearchOpen: (open: boolean) => void;
   pushFeedback: (message: string, tone?: FeedbackTone) => void;
   dismissFeedback: () => void;
@@ -124,7 +183,8 @@ const INITIAL_EXPANDED: readonly string[] = ["nd_development", "nd_development_b
 export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   workspaces: WORKSPACES,
   activeWorkspaceId: DEFAULT_WORKSPACE_ID,
-  treeByWorkspace: TREES_BY_WORKSPACE,
+  treeByWorkspace: SEEDED.trees,
+  trashByWorkspace: SEEDED.bins,
 
   expandedIds: INITIAL_EXPANDED,
   selectedIds: [],
@@ -132,6 +192,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   sort: INITIAL_SORT,
 
   previewNodeId: null,
+  rowRequest: null,
   isSidebarCollapsed: false,
   isSearchOpen: false,
   feedback: null,
@@ -278,37 +339,127 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       };
     }),
 
-  trashNode: (nodeId) =>
+  setNodeArchived: (nodeId, isArchived) =>
     set((state) => {
       const node = findNodeById(currentTree(state), nodeId);
-      if (!node) return state;
+      if (!node || isArchivedNode(node) === isArchived) return state;
 
       return {
         ...writeTree(
           state,
-          updateNode(currentTree(state), nodeId, (item) => ({ ...item, isTrashed: true })),
+          updateNode(currentTree(state), nodeId, (item) => ({ ...item, isArchived })),
         ),
-        selectedIds: state.selectedIds.filter((id) => id !== nodeId),
-        feedback: makeFeedback(state, `Moved “${node.name}” to Trash`, "info"),
+        feedback: makeFeedback(
+          state,
+          isArchived
+            ? `Archived ${archiveLabelFor(node)} “${node.name}” — it is read-only until restored`
+            : `Restored “${node.name}” from the archive`,
+          isArchived ? "info" : "success",
+        ),
       };
     }),
 
-  restoreNode: (nodeId) =>
-    set((state) =>
-      writeTree(
-        state,
-        updateNode(currentTree(state), nodeId, (item) => ({ ...item, isTrashed: false })),
-      ),
-    ),
+  trashNode: (nodeId) => get().trashNodes([nodeId]),
 
+  trashNodes: (nodeIds) =>
+    set((state) => {
+      let tree = currentTree(state);
+      const added: TrashEntry[] = [];
+
+      for (const nodeId of nodeIds) {
+        const result = trashNodeFrom(tree, nodeId, {
+          deletedAt: MOCK_NOW,
+          deletedBy: CURRENT_USER,
+        });
+
+        tree = result.tree;
+        if (result.entry) added.push(result.entry);
+      }
+
+      if (added.length === 0) return state;
+
+      const removed = new Set(added.map((entry) => entry.id));
+      const first = added[0]!;
+
+      return {
+        ...writeTree(state, tree),
+        ...writeTrash(state, [...added, ...currentTrash(state)]),
+        selectedIds: state.selectedIds.filter((id) => !removed.has(id)),
+        feedback: makeFeedback(
+          state,
+          added.length === 1
+            ? `Moved “${first.node.name}” to Trash`
+            : `Moved ${added.length} items to Trash`,
+          "info",
+        ),
+      };
+    }),
+
+  /**
+   * Put a deleted item back. Its original folder may itself have been purged
+   * in the meantime — restoring then walks up to the deepest surviving
+   * ancestor and *says so*, rather than dropping the item somewhere silently.
+   */
+  restoreNode: (nodeId) =>
+    set((state) => {
+      const bin = currentTrash(state);
+      const entry = bin.find((candidate) => candidate.id === nodeId);
+      if (!entry) return state;
+
+      const tree = currentTree(state);
+      const { parentId, isRelocated } = restoreTargetFor(tree, entry);
+      const restored = untrash(entry.node, parentId);
+      const location = parentId ? (findNodeById(tree, parentId)?.name ?? "Workspace") : "Workspace";
+
+      return {
+        ...writeTree(state, insertNode(tree, parentId, restored)),
+        ...writeTrash(
+          state,
+          bin.filter((candidate) => candidate.id !== nodeId),
+        ),
+        feedback: makeFeedback(
+          state,
+          isRelocated
+            ? `Restored “${restored.name}” to ${location} — its original folder no longer exists`
+            : `Restored “${restored.name}” to ${location}`,
+          isRelocated ? "info" : "success",
+        ),
+      };
+    }),
+
+  /** Permanent, whether the item is in the bin or still in the tree. */
   deleteForever: (nodeId) =>
     set((state) => {
+      const bin = currentTrash(state);
+      const entry = bin.find((candidate) => candidate.id === nodeId);
+
+      if (entry) {
+        return {
+          ...writeTrash(
+            state,
+            bin.filter((candidate) => candidate.id !== nodeId),
+          ),
+          feedback: makeFeedback(state, `Deleted “${entry.node.name}” permanently`, "error"),
+        };
+      }
+
       const { tree, removed } = removeNode(currentTree(state), nodeId);
       if (!removed) return state;
 
       return {
         ...writeTree(state, tree),
         feedback: makeFeedback(state, `Deleted “${removed.name}” permanently`, "error"),
+      };
+    }),
+
+  emptyTrash: () =>
+    set((state) => {
+      const count = currentTrash(state).length;
+      if (count === 0) return state;
+
+      return {
+        ...writeTrash(state, []),
+        feedback: makeFeedback(state, `Deleted ${count} items permanently`, "error"),
       };
     }),
 
@@ -497,7 +648,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   openPreview: (nodeId) => set({ previewNodeId: nodeId }),
   closePreview: () => set({ previewNodeId: null }),
 
+  requestRow: (nodeId, rowId) =>
+    set((state) => ({
+      rowRequest: { nodeId, rowId, nonce: (state.rowRequest?.nonce ?? 0) + 1 },
+    })),
+
+  clearRowRequest: () => set({ rowRequest: null }),
+
   toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
+
+  setSidebarCollapsed: (isCollapsed) => set({ isSidebarCollapsed: isCollapsed }),
   setSearchOpen: (open) => set({ isSearchOpen: open }),
 
   pushFeedback: (message, tone = "info") =>
@@ -516,6 +676,16 @@ function currentTree(state: WorkspaceState): readonly DriveNode[] {
 function writeTree(state: WorkspaceState, tree: readonly DriveNode[]) {
   return {
     treeByWorkspace: { ...state.treeByWorkspace, [state.activeWorkspaceId]: tree },
+  };
+}
+
+function currentTrash(state: WorkspaceState): readonly TrashEntry[] {
+  return state.trashByWorkspace[state.activeWorkspaceId] ?? [];
+}
+
+function writeTrash(state: WorkspaceState, entries: readonly TrashEntry[]) {
+  return {
+    trashByWorkspace: { ...state.trashByWorkspace, [state.activeWorkspaceId]: entries },
   };
 }
 
@@ -550,6 +720,13 @@ export const selectActiveWorkspace = (state: WorkspaceStore): Workspace =>
 
 export const selectTree = (state: WorkspaceStore): readonly DriveNode[] =>
   state.treeByWorkspace[state.activeWorkspaceId] ?? [];
+
+export const selectTrash = (state: WorkspaceStore): readonly TrashEntry[] =>
+  state.trashByWorkspace[state.activeWorkspaceId] ?? [];
+
+/** Badge count for the sidebar — a scalar, so it never re-renders the tree. */
+export const selectTrashCount = (state: WorkspaceStore): number =>
+  (state.trashByWorkspace[state.activeWorkspaceId] ?? []).length;
 
 /** Tree of the active workspace, readable outside React. */
 export function getActiveTree(): readonly DriveNode[] {

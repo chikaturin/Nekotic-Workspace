@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useAutosave } from "@/hooks/use-autosave";
 import { useAsyncResource } from "@/hooks/use-async-resource";
-import { useCapabilities } from "@/hooks/use-capabilities";
+import { useCapabilities } from "@/hooks/use-permissions";
 import { documentCapabilities } from "@/lib/permissions";
 import { documentService, summarize } from "@/services/document-service";
 import { useWorkspaceStore } from "@/store/workspace-store";
@@ -33,6 +33,8 @@ export interface DocumentController {
   readonly retrySave: () => void;
   /** Applied after an action mutates the document outside the editor. */
   readonly applyDocument: (document: WorkspaceDocument) => void;
+  /** Fold in a document whose *content* changed — a restored version. */
+  readonly applyRestoredDocument: (document: WorkspaceDocument) => void;
 }
 
 function toDraft(document: WorkspaceDocument): DocumentDraft {
@@ -116,6 +118,20 @@ export function useDocument(nodeId: string, node: DriveNode | null): DocumentCon
     [resource, nodeId, applyDocumentSummary],
   );
 
+  /**
+   * Restoring a version is different from pinning one: the content *is* what
+   * changed, so the draft is replaced rather than protected. Anything unsaved
+   * would otherwise sit on top of the version that was just brought back.
+   */
+  const applyRestoredDocument = useCallback(
+    (updated: WorkspaceDocument) => {
+      resource.setData(updated);
+      setOverlay({ nodeId, draft: toDraft(updated) });
+      applyDocumentSummary(nodeId, summarize(updated));
+    },
+    [resource, nodeId, applyDocumentSummary],
+  );
+
   const reload = useCallback(() => {
     setOverlay(null);
     resource.reload();
@@ -135,5 +151,6 @@ export function useDocument(nodeId: string, node: DriveNode | null): DocumentCon
     flush: autosave.flush,
     retrySave: autosave.retry,
     applyDocument,
+    applyRestoredDocument,
   };
 }

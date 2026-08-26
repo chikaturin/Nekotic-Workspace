@@ -1,3 +1,5 @@
+import type { WorkspaceRole } from "./permission";
+
 /** Minimal identity shape embedded in nodes, activity and comments. */
 export interface UserSummary {
   readonly id: string;
@@ -16,8 +18,6 @@ export interface UserSummary {
 export interface DirectoryUser extends UserSummary {
   readonly isActive: boolean;
 }
-
-export type WorkspaceRole = "owner" | "admin" | "member" | "guest";
 
 export interface WorkspaceMember extends UserSummary {
   readonly role: WorkspaceRole;

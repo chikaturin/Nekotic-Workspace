@@ -6,6 +6,7 @@ import { useCallback } from "react";
 import { Tree, type NodeApi, type NodeRendererProps } from "react-arborist";
 import { DRIVE_ROOT_PATH, TREE_INDENT, TREE_ROW_HEIGHT } from "@/config/app";
 import { useContainerSize } from "@/hooks/use-container-size";
+import { isArchivedNode } from "@/lib/archive";
 import { nodeVisual } from "@/lib/node-visuals";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/workspace-store";
@@ -32,7 +33,7 @@ export function ArboristTree({ nodes }: { nodes: readonly DriveNode[] }) {
     <div ref={ref} className={TREE_VIEWPORT_CLASS}>
       {size.height > 0 && (
         <Tree<DriveNode>
-          data={nodes.filter((node) => !node.isTrashed)}
+          data={nodes.filter((node) => !node.isTrashed && !isArchivedNode(node))}
           idAccessor="id"
           childrenAccessor={(node) => (isContainer(node) ? [...childrenOf(node)] : null)}
           width={size.width}

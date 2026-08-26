@@ -3,7 +3,6 @@ import type {
   BlockType,
   CodeLanguage,
   TextualBlock,
-  TextualBlockType,
 } from "@/types";
 
 /** Block kinds that carry a single editable `text` field. */
@@ -20,9 +19,6 @@ const TEXTUAL_TYPES = new Set<BlockType>([
 
 export const isTextualBlock = (block: Block): block is TextualBlock =>
   TEXTUAL_TYPES.has(block.type);
-
-export const isTextualType = (type: BlockType): type is TextualBlockType =>
-  TEXTUAL_TYPES.has(type);
 
 export const DEFAULT_TABLE_COLUMNS = 3;
 export const DEFAULT_TABLE_ROWS = 3;
@@ -355,6 +351,45 @@ export function documentPlainText(blocks: readonly Block[]): string {
     })
     .filter((text) => text.length > 0)
     .join("\n");
+}
+
+/** Structural markers so a diff shows a heading becoming a paragraph. */
+const LINE_PREFIX: Partial<Record<BlockType, string>> = {
+  heading1: "# ",
+  heading2: "## ",
+  heading3: "### ",
+  quote: "> ",
+  bulletList: "• ",
+  numberedList: "1. ",
+};
+
+/**
+ * The document as numbered lines — the snapshot version history stores and the
+ * unit a version diff compares. Structure is part of the text on purpose: a
+ * paragraph promoted to a heading is a change worth seeing.
+ */
+export function documentLines(blocks: readonly Block[]): readonly string[] {
+  return blocks.flatMap((block): readonly string[] => {
+    if (block.type === "checklist") return [`[${block.isChecked ? "x" : " "}] ${block.text}`];
+    if (isTextualBlock(block)) return [`${LINE_PREFIX[block.type] ?? ""}${block.text}`];
+
+    switch (block.type) {
+      case "code":
+        return [`\`\`\`${block.language}`, ...block.code.split("\n"), "\`\`\`"];
+      case "image": {
+        const label = block.caption || block.images.map((image) => image.alt).join(", ");
+        return [`[image] ${label}`.trimEnd()];
+      }
+      case "attachment":
+        return [`[file] ${block.name}`];
+      case "link":
+        return [`[link] ${block.title || block.url}`];
+      case "table":
+        return block.rows.map((row) => `| ${row.join(" | ")} |`);
+      case "embed":
+        return [`[board] ${block.boardNodeId ?? "none selected"}`];
+    }
+  });
 }
 
 export function documentExcerpt(blocks: readonly Block[], maxLength = 140): string {

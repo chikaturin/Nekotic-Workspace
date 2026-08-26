@@ -499,6 +499,14 @@ the missing-board state; the page around it is unaffected.
   ~10 ms; it needs debouncing or an index before the dataset grows.
 - Row virtualisation assumes a fixed row height per view (`short` / `medium` /
   `tall`). Variable-height rows would need measurement.
-- The sort UI writes one level; the engine already supports multi-level sort.
-- Kanban, Calendar and Timeline are placeholders that read the same query —
-  `VW-KAN-12` to `VW-TIM-14`.
+
+Collaboration — comments, mentions, watching, the inbox, My Work, global
+search, favorites and recent — is documented separately in
+[COLLABORATION.md](./COLLABORATION.md).
+
+Bulk actions, import, export, archive, trash, version history and the record
+activity log are documented in [SYSTEM.md](./SYSTEM.md). Three of them reach
+into the board engine directly: bulk writes go through dedicated endpoints
+rather than the single-cell one, archived records are excluded from
+`queryRowIds` unless the view asks for them, and every write now records
+*what* changed — column, before, after — for the drawer's Activity tab.

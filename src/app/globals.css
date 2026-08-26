@@ -92,7 +92,6 @@
   --kind-other: oklch(0.72 0.02 256);
 }
 
-
 @theme inline {
   --color-background: var(--background);
   --color-canvas: var(--canvas);
@@ -133,7 +132,8 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  --font-sans: ui-sans-serif, "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans:
+    ui-sans-serif, "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
 }
 

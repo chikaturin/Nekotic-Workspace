@@ -2,11 +2,13 @@
 
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { GridHeader } from "@/components/board/table/grid-header";
+import { BulkActionBar } from "@/components/board/bulk/bulk-action-bar";
+import { GridHeader, type SelectionState } from "@/components/board/table/grid-header";
 import { GridRow } from "@/components/board/table/grid-row";
 import { GroupHeader } from "@/components/board/table/group-header";
 import { GUTTER_WIDTH, widthVar, type GridShared } from "@/components/board/table/grid-shared";
 import { ConvertColumnDialog } from "@/components/board/table/convert-column-dialog";
+import { useBulkActions } from "@/hooks/use-bulk-actions";
 import { useGridClipboard } from "@/hooks/use-grid-clipboard";
 import { useGridKeyboard } from "@/hooks/use-grid-keyboard";
 import { useVirtualRows } from "@/hooks/use-virtual-rows";
@@ -14,8 +16,8 @@ import type { BoardViewModel } from "@/hooks/use-board-view";
 import { flattenGroups, flattenUngrouped } from "@/lib/board-grouping";
 import { ROW_HEIGHTS } from "@/lib/grid-geometry";
 import { useBoardStore } from "@/store/board-store";
-import { selectCollapsedGroups, useGridStore } from "@/store/grid-store";
-import type { BoardColumn, CellValue, ColumnType } from "@/types";
+import { selectCollapsedGroups, selectSelectedRowIds, useGridStore } from "@/store/grid-store";
+import type { BoardColumn, CellValue, ColumnType, PermissionResolver } from "@/types";
 
 interface TableGridProps {
   readonly model: BoardViewModel;
@@ -23,6 +25,10 @@ interface TableGridProps {
   readonly folderId: string | null;
   /** Rows a board-level validation has flagged. */
   readonly warnedRowIds?: ReadonlySet<string>;
+  /** Bound permission resolver for this board (SY-RBC-42). */
+  readonly can: PermissionResolver;
+  /** Opens the export dialog already scoped to the ticked records. */
+  readonly onExportSelection: () => void;
 }
 
 const NO_WARNINGS: ReadonlySet<string> = new Set();
@@ -34,7 +40,13 @@ const NO_WARNINGS: ReadonlySet<string> = new Set();
  * variables (a resize drag mutates the DOM, not React state) and every cell
  * subscribes to its own record, so editing one cell touches one row.
  */
-export function TableGrid({ model, folderId, warnedRowIds = NO_WARNINGS }: TableGridProps) {
+export function TableGrid({
+  model,
+  folderId,
+  warnedRowIds = NO_WARNINGS,
+  can,
+  onExportSelection,
+}: TableGridProps) {
   const { board, view, columnsShown, context, groups, groupColumn } = model;
 
   const rowHeight = ROW_HEIGHTS[view?.rowHeight ?? "medium"];
@@ -51,8 +63,18 @@ export function TableGrid({ model, folderId, warnedRowIds = NO_WARNINGS }: Table
     type: ColumnType;
   } | null>(null);
 
+  /**
+   * The view's row order, for shift-click ranges. It lives in a ref because it
+   * changes on every edit and `shared` must not.
+   */
+  const orderedRef = useRef<readonly string[]>([]);
+
   const collapsed = useGridStore(selectCollapsedGroups(view?.id ?? null));
   const toggleGroup = useGridStore((state) => state.toggleGroup);
+  const selectedMap = useGridStore(selectSelectedRowIds);
+
+  const bulk = useBulkActions(model);
+  const isReadOnly = !can("row.update");
 
   /**
    * Grouped and ungrouped take the same path: one flat, uniform-height list of
@@ -76,6 +98,12 @@ export function TableGrid({ model, folderId, warnedRowIds = NO_WARNINGS }: Table
     [scrollToIndex, flattened.flatIndexByRecord],
   );
 
+  const onToggleRow = useCallback((rowId: string, isRange: boolean) => {
+    const grid = useGridStore.getState();
+    if (isRange) grid.extendRowSelection(orderedRef.current, rowId);
+    else grid.toggleRowSelection(rowId);
+  }, []);
+
   const onCommitCell = useCallback(
     (rowId: string, columnId: string, value: CellValue) => {
       void editCells([{ rowId, columnId, value }]);
@@ -98,6 +126,9 @@ export function TableGrid({ model, folderId, warnedRowIds = NO_WARNINGS }: Table
       columns: columnsShown,
       rowHeight,
       warnedRowIds,
+      can,
+      isReadOnly,
+      onToggleRow,
       onCreateOption,
       onCommitCell,
     }),
@@ -109,9 +140,45 @@ export function TableGrid({ model, folderId, warnedRowIds = NO_WARNINGS }: Table
       columnsShown,
       rowHeight,
       warnedRowIds,
+      can,
+      isReadOnly,
+      onToggleRow,
       onCreateOption,
       onCommitCell,
     ],
+  );
+
+  /**
+   * How much of what is on screen is ticked. Derived from the view's own row
+   * ids, so "select all" means "all the records you can see", not every record
+   * a filter is hiding.
+   */
+  const selectionState = useMemo<SelectionState>(() => {
+    if (rowIds.length === 0) return "none";
+
+    const ticked = rowIds.filter((rowId) => selectedMap[rowId]).length;
+    if (ticked === 0) return "none";
+    return ticked === rowIds.length ? "all" : "some";
+  }, [rowIds, selectedMap]);
+
+  /**
+   * The header is memoised, so its callbacks have to be stable too: an inline
+   * arrow here re-renders every column header on every keystroke in a cell.
+   */
+  /**
+   * Reads the row ids through the ref rather than the controller: the query
+   * returns a fresh array on every cell edit, and depending on it here would
+   * re-render every column header on every keystroke.
+   */
+  const onToggleAll = useCallback(() => {
+    const grid = useGridStore.getState();
+    if (selectionState === "all") grid.clearRowSelection();
+    else grid.setRowSelection(orderedRef.current);
+  }, [selectionState]);
+
+  const onConvert = useCallback(
+    (column: BoardColumn, type: ColumnType) => setConversion({ column, type }),
+    [],
   );
 
   const slice = useMemo(
@@ -119,7 +186,7 @@ export function TableGrid({ model, folderId, warnedRowIds = NO_WARNINGS }: Table
     [rowIds, columnsShown, rowsById, context],
   );
 
-  const { onCopy, onCut, onPaste, clearSelection } = useGridClipboard(slice);
+  const { onCopy, onCut, onPaste, clearSelection } = useGridClipboard(slice, isReadOnly);
 
   const bounds = useMemo(
     () => ({ rowCount: rowIds.length, columnCount: columnsShown.length }),
@@ -132,7 +199,12 @@ export function TableGrid({ model, folderId, warnedRowIds = NO_WARNINGS }: Table
     columns: columnsShown,
     onClearSelection: clearSelection,
     onScrollToRow: scrollToRecord,
+    isReadOnly,
   });
+
+  useEffect(() => {
+    orderedRef.current = rowIds;
+  }, [rowIds]);
 
   /** A drag selection ends wherever the pointer is released. */
   useEffect(() => {
@@ -170,7 +242,7 @@ export function TableGrid({ model, folderId, warnedRowIds = NO_WARNINGS }: Table
   const visible = flattened.flat.slice(range.start, range.end);
 
   return (
-    <>
+    <div className="relative flex min-h-0 flex-1 flex-col">
       <div
         ref={scrollRef}
         onScroll={onScroll}
@@ -192,7 +264,12 @@ export function TableGrid({ model, folderId, warnedRowIds = NO_WARNINGS }: Table
         >
           <GridHeader
             columns={columnsShown}
-            onConvert={(column, type) => setConversion({ column, type })}
+            selectionState={selectionState}
+            can={can}
+            // A partial selection extends to everything on screen; only a full
+            // one clears, because the bar already carries its own dismiss.
+            onToggleAll={onToggleAll}
+            onConvert={onConvert}
             onResizePreview={previewResize}
             onResizeCommit={commitResize}
           />
@@ -224,17 +301,27 @@ export function TableGrid({ model, folderId, warnedRowIds = NO_WARNINGS }: Table
 
           <div style={{ height: range.paddingBottom }} aria-hidden />
 
-          <button
-            type="button"
-            onClick={() => void addRow()}
-            style={{ height: rowHeight, paddingLeft: GUTTER_WIDTH }}
-            className="sticky left-0 flex w-full items-center gap-1.5 border-b border-hairline px-2 text-[12px] text-faint-foreground hover:bg-hover hover:text-foreground"
-          >
-            <Plus className="size-3.5" />
-            New record
-          </button>
+          {can("row.create") && (
+            <button
+              type="button"
+              onClick={() => void addRow()}
+              style={{ height: rowHeight, paddingLeft: GUTTER_WIDTH }}
+              className="sticky left-0 flex w-full items-center gap-1.5 border-b border-hairline px-2 text-[12px] text-faint-foreground hover:bg-hover hover:text-foreground"
+            >
+              <Plus className="size-3.5" />
+              New record
+            </button>
+          )}
         </div>
       </div>
+
+      <BulkActionBar
+        controller={bulk}
+        people={people}
+        currentBoardId={board?.id ?? ""}
+        can={can}
+        onExport={onExportSelection}
+      />
 
       <ConvertColumnDialog
         column={conversion?.column ?? null}
@@ -243,6 +330,6 @@ export function TableGrid({ model, folderId, warnedRowIds = NO_WARNINGS }: Table
         context={context}
         onClose={() => setConversion(null)}
       />
-    </>
+    </div>
   );
 }

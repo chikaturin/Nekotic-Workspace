@@ -1,10 +1,15 @@
+export type * from "./audit";
 export type * from "./board";
+export type * from "./collab";
 export type * from "./breadcrumb";
+export type * from "./dashboard";
 export type * from "./devtools";
 export type * from "./document";
 export type * from "./file";
 export * from "./permission";
 export type * from "./view";
+export type * from "./realtime";
+export type * from "./system";
 export type * from "./user";
 export type * from "./workspace";
 export * from "./async";

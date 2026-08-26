@@ -11,6 +11,8 @@ interface GridKeyboardInput {
   readonly columns: readonly BoardColumn[];
   readonly onClearSelection: () => void;
   readonly onScrollToRow: (index: number) => void;
+  /** Navigation stays live on a frozen board; only the write keys go quiet. */
+  readonly isReadOnly?: boolean;
 }
 
 /** Types whose editor opens on a keystroke rather than needing a click. */
@@ -26,6 +28,7 @@ export function useGridKeyboard({
   columns,
   onClearSelection,
   onScrollToRow,
+  isReadOnly = false,
 }: GridKeyboardInput) {
   return useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
@@ -78,7 +81,7 @@ export function useGridKeyboard({
 
         case "Enter": {
           event.preventDefault();
-          if (rowId && column) grid.beginEdit(rowId, column.id);
+          if (!isReadOnly && rowId && column) grid.beginEdit(rowId, column.id);
           return;
         }
 
@@ -97,7 +100,7 @@ export function useGridKeyboard({
         case "Backspace":
         case "Delete":
           event.preventDefault();
-          onClearSelection();
+          if (!isReadOnly) onClearSelection();
           return;
 
         default:
@@ -111,12 +114,12 @@ export function useGridKeyboard({
       }
 
       // Typing over a cell replaces it, the way a spreadsheet does.
-      if (!isMod && !event.altKey && event.key.length === 1 && rowId && column) {
+      if (!isReadOnly && !isMod && !event.altKey && event.key.length === 1 && rowId && column) {
         if (!TYPEAHEAD_TYPES.has(column.type)) return;
         event.preventDefault();
         grid.beginEdit(rowId, column.id, event.key);
       }
     },
-    [bounds, rowIds, columns, onClearSelection, onScrollToRow],
+    [bounds, rowIds, columns, onClearSelection, onScrollToRow, isReadOnly],
   );
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import { useAsyncResource } from "@/hooks/use-async-resource";
-import { useCapabilities } from "@/hooks/use-capabilities";
+import { useCapabilities } from "@/hooks/use-permissions";
 import { findNodeById, visibleFilesOf } from "@/lib/tree";
 import { fileService } from "@/services/file-service";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";

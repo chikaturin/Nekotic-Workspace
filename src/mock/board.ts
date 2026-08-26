@@ -159,9 +159,16 @@ const DESCRIPTIONS = [
 
 interface RowContext {
   readonly template: BoardTemplate;
+  /** Row-level hash — drives the title, the author and the timestamps. */
   readonly seed: number;
   readonly index: number;
   readonly base: number;
+  /**
+   * Per-column hash. Deriving every cell from the row hash alone correlates
+   * the columns: with a 7-person directory and a 7-way "no date" test, the
+   * records assigned to one person were exactly the records with no deadline.
+   */
+  readonly cellSeed: number;
 }
 
 function primaryText({ template, seed, index }: RowContext): string {
@@ -176,14 +183,14 @@ function primaryText({ template, seed, index }: RowContext): string {
 }
 
 function cellFor(column: BoardColumn, context: RowContext): CellValue {
-  const { seed, index, base, template } = context;
+  const { cellSeed, index, base, template } = context;
 
   switch (column.type) {
     case "text":
       return { kind: "text", value: column.isPrimary ? primaryText(context) : "" };
 
     case "longText":
-      return { kind: "longText", value: pick(DESCRIPTIONS, seed >> 13) };
+      return { kind: "longText", value: pick(DESCRIPTIONS, cellSeed) };
 
     case "select": {
       const { options } = column.config;
@@ -195,17 +202,28 @@ function cellFor(column: BoardColumn, context: RowContext): CellValue {
         return { kind: "select", optionIds: [options[methodIndex]?.id ?? options[0]!.id] };
       }
 
-      return { kind: "select", optionIds: [pick(options, seed >> 5).id] };
+      return { kind: "select", optionIds: [pick(options, cellSeed).id] };
     }
 
     case "user":
-      return { kind: "user", userIds: seed % 9 === 0 ? [] : [pick(DIRECTORY, seed).id] };
+      return {
+        kind: "user",
+        userIds: cellSeed % 9 === 0 ? [] : [pick(DIRECTORY, cellSeed).id],
+      };
 
     case "date": {
-      const isEmpty = column.id === "col_start" ? seed % 5 === 0 : seed % 7 === 0;
+      const isEmpty = cellSeed % (column.id === "col_start" ? 5 : 11) === 0;
       if (isEmpty) return { kind: "date", iso: null };
 
-      const offset = column.id === "col_start" ? -((seed % 25) + 2) : (seed % 40) - 12;
+      // Every ninth deadline lands on the reference day, so "Due today" and
+      // the calendar both have something real to show.
+      const offset =
+        column.id === "col_start"
+          ? -((cellSeed % 25) + 2)
+          : cellSeed % 9 === 0
+            ? 0
+            : (cellSeed % 40) - 12;
+
       return { kind: "date", iso: new Date(base + offset * DAY_MS).toISOString() };
     }
 
@@ -230,10 +248,12 @@ export function buildRows(
     const seed = hash(`${boardId}:${index}`);
     const sequence = index + 1;
     const person = pick(DIRECTORY, seed);
-    const context: RowContext = { template, seed, index, base };
 
     const cells: Record<string, CellValue> = {};
-    for (const column of columns) cells[column.id] = cellFor(column, context);
+    for (const column of columns) {
+      const cellSeed = hash(`${boardId}:${index}:${column.id}`);
+      cells[column.id] = cellFor(column, { template, seed, cellSeed, index, base });
+    }
 
     rows.push({
       id: `${boardId}_row_${sequence}`,

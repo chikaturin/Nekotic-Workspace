@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isCancellation, toAppError } from "@/services/errors";
-import { errorState, loadingState, successState, type AsyncState } from "@/types";
+import { errorState, idleState, loadingState, successState, type AsyncState } from "@/types";
 
 interface Settled<T> {
   /** Identity of the request this result belongs to. */
@@ -18,6 +18,12 @@ export interface AsyncResource<T> {
   readonly reload: () => void;
   /** Replace the loaded value locally after a successful mutation. */
   readonly setData: (data: T) => void;
+  /**
+   * Update the loaded value in place. Used where several writers touch the
+   * same list — an optimistic insert and a realtime frame, for instance — and
+   * each needs to build on whatever the others already applied.
+   */
+  readonly patchData: (update: (current: T) => T) => void;
 }
 
 /**
@@ -67,7 +73,7 @@ export function useAsyncResource<T>(
   }, [run, enabled, requestToken]);
 
   const state = useMemo<AsyncState<T>>(() => {
-    if (!enabled) return { status: "idle" };
+    if (!enabled) return idleState<T>();
     if (isSettled && settled) return settled.state;
 
     // Keep the previous page of data visible while a reload is in flight.
@@ -82,9 +88,19 @@ export function useAsyncResource<T>(
     [requestToken],
   );
 
+  const patchData = useCallback(
+    (update: (current: T) => T) =>
+      setSettled((current) =>
+        current && current.state.status === "success"
+          ? { token: current.token, state: successState(update(current.state.data)) }
+          : current,
+      ),
+    [],
+  );
+
   // Refreshing means "reloading on top of data already on screen" — the first
   // load is a plain loading state, not a refresh.
   const isRefreshing = enabled && !isSettled && settled?.state.status === "success";
 
-  return { state, isRefreshing, reload, setData };
+  return { state, isRefreshing, reload, setData, patchData };
 }

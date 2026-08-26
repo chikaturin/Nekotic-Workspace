@@ -2,6 +2,7 @@
 
 import { Copy, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -19,7 +20,7 @@ import type { BoardViewModel } from "@/hooks/use-board-view";
 import { VIEW_TYPE_LABELS, viewVisual } from "@/lib/board-visuals";
 import { useBoardStore } from "@/store/board-store";
 import { cn } from "@/lib/utils";
-import type { BoardViewType, SavedView } from "@/types";
+import type { BoardViewType, PermissionResolver, SavedView } from "@/types";
 
 const VIEW_TYPES: readonly BoardViewType[] = ["table", "kanban", "calendar", "timeline"];
 
@@ -30,8 +31,14 @@ const VIEW_TYPES: readonly BoardViewType[] = ["table", "kanban", "calendar", "ti
  * loads or copies a record. That is the whole point of keeping views separate
  * from the board.
  */
-export function ViewTabs({ model }: { model: BoardViewModel }) {
+/**
+ * Creating, renaming and deleting a saved view changes what the whole team
+ * sees, so it takes `board.view.manage`. Reading a board through one — the
+ * filter, sort and group controls below the tabs — takes nothing.
+ */
+export function ViewTabs({ model, can }: { model: BoardViewModel; can: PermissionResolver }) {
   const { board, view } = model;
+  const canManage = can("board.view.manage");
   const setActiveView = useBoardStore((state) => state.setActiveView);
   const createView = useBoardStore((state) => state.createView);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -44,6 +51,7 @@ export function ViewTabs({ model }: { model: BoardViewModel }) {
           view={saved}
           isActive={saved.id === view?.id}
           isRenaming={renamingId === saved.id}
+          canManage={canManage}
           onSelect={() => setActiveView(saved.id)}
           onRenameStart={() => setRenamingId(saved.id)}
           onRenameEnd={() => setRenamingId(null)}
@@ -52,7 +60,13 @@ export function ViewTabs({ model }: { model: BoardViewModel }) {
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button size="icon-sm" variant="ghost" aria-label="New view" className="shrink-0">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label="New view"
+            disabled={!canManage}
+            className="shrink-0"
+          >
             <Plus />
           </Button>
         </DropdownMenuTrigger>
@@ -81,6 +95,7 @@ interface ViewTabProps {
   readonly view: SavedView;
   readonly isActive: boolean;
   readonly isRenaming: boolean;
+  readonly canManage: boolean;
   readonly onSelect: () => void;
   readonly onRenameStart: () => void;
   readonly onRenameEnd: () => void;
@@ -90,6 +105,7 @@ function ViewTab({
   view,
   isActive,
   isRenaming,
+  canManage,
   onSelect,
   onRenameStart,
   onRenameEnd,
@@ -99,6 +115,7 @@ function ViewTab({
   const deleteView = useBoardStore((state) => state.deleteView);
   const setViewType = useBoardStore((state) => state.setViewType);
   const [draft, setDraft] = useState(view.name);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const visual = viewVisual(view.type);
 
   const summary = [
@@ -143,7 +160,7 @@ function ViewTab({
         <button
           type="button"
           onClick={onSelect}
-          onDoubleClick={onRenameStart}
+          onDoubleClick={() => canManage && onRenameStart()}
           className={cn(
             "flex items-baseline gap-1.5 text-[12px]",
             isActive ? "text-foreground" : "text-muted-foreground",
@@ -170,17 +187,17 @@ function ViewTab({
         <DropdownMenuContent align="start" className="w-52">
           <DropdownMenuLabel>{view.name}</DropdownMenuLabel>
 
-          <DropdownMenuItem onSelect={onRenameStart}>
+          <DropdownMenuItem disabled={!canManage} onSelect={onRenameStart}>
             <Pencil />
             Rename
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => void duplicateView(view.id)}>
+          <DropdownMenuItem disabled={!canManage} onSelect={() => void duplicateView(view.id)}>
             <Copy />
             Duplicate view
           </DropdownMenuItem>
 
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
+            <DropdownMenuSubTrigger disabled={!canManage}>
               <visual.Icon />
               View type
             </DropdownMenuSubTrigger>
@@ -211,12 +228,30 @@ function ViewTab({
           </DropdownMenuSub>
 
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => void deleteView(view.id)}>
+          <DropdownMenuItem
+            variant="danger"
+            disabled={!canManage}
+            onSelect={() => setIsConfirmingDelete(true)}
+          >
             <Trash2 />
             Delete view
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* A saved view is shared: deleting one takes it away from the team, not
+          just from this tab. The records themselves are untouched. */}
+      <ConfirmDialog
+        isOpen={isConfirmingDelete}
+        title={`Delete the “${view.name}” view?`}
+        description="Everyone on this board loses this view, with its filters, sorting and grouping. The records themselves are not affected."
+        confirmLabel="Delete view"
+        onClose={() => setIsConfirmingDelete(false)}
+        onConfirm={() => {
+          setIsConfirmingDelete(false);
+          void deleteView(view.id);
+        }}
+      />
     </div>
   );
 }

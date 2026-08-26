@@ -44,13 +44,6 @@ export function boxSize(box: RangeBox): number {
   return (box.bottom - box.top + 1) * (box.right - box.left + 1);
 }
 
-export function isSingleCell(range: GridRange): boolean {
-  return (
-    range.anchor.rowIndex === range.focus.rowIndex &&
-    range.anchor.columnIndex === range.focus.columnIndex
-  );
-}
-
 export function clampAddress(address: CellAddress, bounds: GridBounds): CellAddress {
   return {
     rowIndex: Math.min(Math.max(address.rowIndex, 0), Math.max(0, bounds.rowCount - 1)),

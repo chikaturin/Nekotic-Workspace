@@ -1,21 +1,26 @@
 "use client";
 
 import { FileText } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { CommentPanel } from "@/components/comments/comment-panel";
 import { BlockEditor } from "@/components/document/block-editor";
 import { DocumentHeader } from "@/components/document/document-header";
 import { EditorToolbar } from "@/components/document/editor-toolbar";
 import { LockedBanner } from "@/components/document/locked-banner";
 import { MovePageDialog } from "@/components/document/move-page-dialog";
+import { DocumentVersionsDialog } from "@/components/versions/version-dialogs";
 import { AsyncBoundary } from "@/components/shared/async-boundary";
 import { StatePanel } from "@/components/shared/state-panels";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBlockEditor } from "@/hooks/use-block-editor";
-import { useCapabilities } from "@/hooks/use-capabilities";
+import { useCapabilities } from "@/hooks/use-permissions";
+import { useDirectory } from "@/hooks/use-directory";
 import { useDocument } from "@/hooks/use-document";
 import { useDocumentActions } from "@/hooks/use-document-actions";
 import { useHotkey } from "@/hooks/use-hotkey";
+import { useTrackRecent } from "@/hooks/use-recent";
 import { hasUnsavedWork } from "@/lib/autosave";
+import { nodeRef } from "@/lib/entity-ref";
 import { cn } from "@/lib/utils";
 import type { DocumentNode } from "@/types";
 
@@ -31,12 +36,16 @@ export function DocumentPage({ node }: DocumentPageProps) {
   const controller = useDocument(node.id, node);
   const baseCapabilities = useCapabilities(node);
   const [isMoveOpen, setIsMoveOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const people = useDirectory();
+
+  const target = useMemo(() => nodeRef(node), [node]);
+  useTrackRecent(target);
 
   const actions = useDocumentActions({
     node,
     document: controller.document,
-    capabilities: baseCapabilities,
     onDocumentChanged: controller.applyDocument,
   });
 
@@ -92,8 +101,10 @@ export function DocumentPage({ node }: DocumentPageProps) {
                 onIconChange={controller.setIcon}
                 onRetrySave={controller.retrySave}
                 onMoveRequested={() => setIsMoveOpen(true)}
+                onHistoryRequested={() => setIsHistoryOpen(true)}
                 isFullScreen={isFullScreen}
                 onToggleFullScreen={() => setIsFullScreen((full) => !full)}
+                watchTarget={target}
                 onTitleSubmit={() => {
                   const first = draft.blocks[0];
                   if (first) api.requestFocus(first.id, "start");
@@ -128,6 +139,15 @@ export function DocumentPage({ node }: DocumentPageProps) {
                       folderId={node.parentId}
                     />
                   )}
+
+                  {/* Commenting is not editing: a locked page still takes one. */}
+                  <div className="border-t border-border pt-4">
+                    <CommentPanel
+                      target={target}
+                      people={people}
+                      canComment={baseCapabilities.edit}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -137,6 +157,15 @@ export function DocumentPage({ node }: DocumentPageProps) {
                 onMove={actions.move}
                 nodeId={node.id}
                 currentParentId={node.parentId}
+              />
+
+              <DocumentVersionsDialog
+                isOpen={isHistoryOpen}
+                document={document}
+                blocks={draft.blocks}
+                canRestore={controller.capabilities.edit}
+                onRestored={controller.applyRestoredDocument}
+                onClose={() => setIsHistoryOpen(false)}
               />
             </>
           );

@@ -36,6 +36,13 @@ interface GridState {
   readonly isDragSelecting: boolean;
   /** Collapsed group keys, kept per view so switching views restores them. */
   readonly collapsedByView: Readonly<Record<string, readonly string[]>>;
+  /**
+   * Records ticked for a bulk action (SY-BLK-34). A map, not an array, so a
+   * row's checkbox subscribes to one boolean instead of the whole selection.
+   */
+  readonly selectedRowIds: Readonly<Record<string, true>>;
+  /** Anchor for a shift-click range. */
+  readonly lastSelectedRowId: string | null;
 }
 
 interface GridActions {
@@ -51,6 +58,13 @@ interface GridActions {
   closeDrawer: () => void;
   toggleGroup: (viewId: string, groupKey: string) => void;
   setCollapsedGroups: (viewId: string, keys: readonly string[]) => void;
+
+  toggleRowSelection: (rowId: string) => void;
+  /** Shift-click: tick everything between the anchor and `rowId` in view order. */
+  extendRowSelection: (orderedRowIds: readonly string[], rowId: string) => void;
+  setRowSelection: (rowIds: readonly string[]) => void;
+  clearRowSelection: () => void;
+
   reset: () => void;
 }
 
@@ -62,6 +76,8 @@ const INITIAL: GridState = {
   drawerRowId: null,
   isDragSelecting: false,
   collapsedByView: {},
+  selectedRowIds: {},
+  lastSelectedRowId: null,
 };
 
 export const useGridStore = create<GridStore>()((set, get) => ({
@@ -112,6 +128,42 @@ export const useGridStore = create<GridStore>()((set, get) => ({
   setCollapsedGroups: (viewId, keys) =>
     set((state) => ({ collapsedByView: { ...state.collapsedByView, [viewId]: keys } })),
 
+  toggleRowSelection: (rowId) =>
+    set((state) => {
+      const next = { ...state.selectedRowIds };
+      if (next[rowId]) delete next[rowId];
+      else next[rowId] = true;
+
+      return { selectedRowIds: next, lastSelectedRowId: rowId };
+    }),
+
+  extendRowSelection: (orderedRowIds, rowId) =>
+    set((state) => {
+      const anchor = state.lastSelectedRowId;
+      const from = anchor ? orderedRowIds.indexOf(anchor) : -1;
+      const to = orderedRowIds.indexOf(rowId);
+
+      // No anchor (or it scrolled out of the current filter) — plain toggle.
+      if (from < 0 || to < 0) {
+        return { selectedRowIds: { ...state.selectedRowIds, [rowId]: true }, lastSelectedRowId: rowId };
+      }
+
+      const next = { ...state.selectedRowIds };
+      for (const id of orderedRowIds.slice(Math.min(from, to), Math.max(from, to) + 1)) {
+        next[id] = true;
+      }
+
+      return { selectedRowIds: next, lastSelectedRowId: rowId };
+    }),
+
+  setRowSelection: (rowIds) =>
+    set({
+      selectedRowIds: Object.fromEntries(rowIds.map((id) => [id, true])),
+      lastSelectedRowId: rowIds.at(-1) ?? null,
+    }),
+
+  clearRowSelection: () => set({ selectedRowIds: {}, lastSelectedRowId: null }),
+
   reset: () => set(INITIAL),
 }));
 
@@ -153,6 +205,23 @@ export function selectIsEditing(rowId: string, columnId: string) {
   return (state: GridStore): boolean =>
     state.editing?.rowId === rowId && state.editing.columnId === columnId;
 }
+
+/**
+ * Bulk selection, read as booleans and counts only.
+ *
+ * zustand v5 subscribes through `useSyncExternalStore`, so a selector that
+ * allocates on every read re-renders forever. The stored map is handed out by
+ * reference and turned into a list inside a `useMemo`, never here.
+ */
+export function selectIsRowSelected(rowId: string) {
+  return (state: GridStore): boolean => state.selectedRowIds[rowId] === true;
+}
+
+export const selectSelectedRowIds = (state: GridStore): Readonly<Record<string, true>> =>
+  state.selectedRowIds;
+
+export const selectSelectionCount = (state: GridStore): number =>
+  Object.keys(state.selectedRowIds).length;
 
 export function clampToBounds(address: CellAddress, bounds: GridBounds): CellAddress {
   return clampAddress(address, bounds);

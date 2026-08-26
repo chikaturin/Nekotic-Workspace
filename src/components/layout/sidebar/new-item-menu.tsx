@@ -16,7 +16,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useCapabilities } from "@/hooks/use-capabilities";
+import { useCapabilities } from "@/hooks/use-permissions";
 import { useCreateBoard } from "@/hooks/use-create-board";
 import { useCreateDocument } from "@/hooks/use-create-document";
 import { useCreateFile } from "@/hooks/use-create-file";

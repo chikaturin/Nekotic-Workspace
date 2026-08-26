@@ -3,6 +3,7 @@
 import { Plus } from "lucide-react";
 import { memo, useState, type DragEvent, type PointerEvent } from "react";
 import { ColumnMenu } from "@/components/board/table/column-menu";
+import { Checkbox } from "@/components/ui/checkbox";
 import { GUTTER_WIDTH, widthStyle } from "@/components/board/table/grid-shared";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,12 +17,19 @@ import { clampColumnWidth, COLUMN_TYPE_LABELS } from "@/lib/board-schema";
 import { columnVisual } from "@/lib/board-visuals";
 import { useBoardStore } from "@/store/board-store";
 import { cn } from "@/lib/utils";
-import type { BoardColumn, ColumnType } from "@/types";
+import type { BoardColumn, ColumnType, PermissionResolver } from "@/types";
 
 const COLUMN_MIME = "application/x-nexdrop-column";
 
+/** How much of the current view is ticked — what the header box shows. */
+export type SelectionState = "none" | "some" | "all";
+
 interface GridHeaderProps {
   readonly columns: readonly BoardColumn[];
+  readonly selectionState: SelectionState;
+  readonly onToggleAll: () => void;
+  /** Bound permission resolver — the header gates each column action on its own key. */
+  readonly can: PermissionResolver;
   readonly onConvert: (column: BoardColumn, type: ColumnType) => void;
   readonly onResizePreview: (columnId: string, width: number) => void;
   readonly onResizeCommit: (columnId: string, width: number) => void;
@@ -34,6 +42,9 @@ interface GridHeaderProps {
  */
 export const GridHeader = memo(function GridHeader({
   columns,
+  selectionState,
+  onToggleAll,
+  can,
   onConvert,
   onResizePreview,
   onResizeCommit,
@@ -59,14 +70,22 @@ export const GridHeader = memo(function GridHeader({
     >
       <div
         style={{ width: GUTTER_WIDTH }}
-        className="sticky left-0 z-10 shrink-0 border-r border-hairline bg-elevated"
-      />
+        className="sticky left-0 z-10 flex shrink-0 items-center border-r border-hairline bg-elevated px-1.5"
+      >
+        <Checkbox
+          checked={selectionState === "all"}
+          isIndeterminate={selectionState === "some"}
+          aria-label={selectionState === "all" ? "Clear selection" : "Select all records"}
+          onChange={onToggleAll}
+        />
+      </div>
 
       {columns.map((column, index) => (
         <HeaderCell
           key={column.id}
           column={column}
           index={index}
+          can={can}
           isDragOver={dragOverId === column.id}
           onDragStateChange={setDragOverId}
           onDrop={handleDrop}
@@ -80,6 +99,7 @@ export const GridHeader = memo(function GridHeader({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
+            disabled={!can("board.column.create")}
             aria-label="Add column"
             className="flex h-9 w-11 shrink-0 items-center justify-center border-r border-hairline text-faint-foreground hover:bg-hover hover:text-foreground"
           >
@@ -110,6 +130,7 @@ export const GridHeader = memo(function GridHeader({
 interface HeaderCellProps {
   readonly column: BoardColumn;
   readonly index: number;
+  readonly can: PermissionResolver;
   readonly isDragOver: boolean;
   readonly onDragStateChange: (id: string | null) => void;
   readonly onDrop: (event: DragEvent<HTMLDivElement>, index: number) => void;
@@ -121,6 +142,7 @@ interface HeaderCellProps {
 function HeaderCell({
   column,
   index,
+  can,
   isDragOver,
   onDragStateChange,
   onDrop,
@@ -131,6 +153,7 @@ function HeaderCell({
   const renameColumn = useBoardStore((state) => state.renameColumn);
   const [draftName, setDraftName] = useState<string | null>(null);
   const visual = columnVisual(column.type);
+  const canEditColumn = can("board.column.update");
 
   function beginResize(event: PointerEvent<HTMLButtonElement>) {
     event.preventDefault();
@@ -163,7 +186,7 @@ function HeaderCell({
     <div
       role="columnheader"
       aria-colindex={index + 1}
-      draggable={draftName === null}
+      draggable={draftName === null && canEditColumn}
       onDragStart={(event) => {
         event.dataTransfer.setData(COLUMN_MIME, column.id);
         event.dataTransfer.effectAllowed = "move";
@@ -187,7 +210,9 @@ function HeaderCell({
       {draftName === null ? (
         <button
           type="button"
-          onDoubleClick={() => setDraftName(column.name)}
+          onDoubleClick={() => {
+            if (canEditColumn) setDraftName(column.name);
+          }}
           className="min-w-0 flex-1 truncate text-left text-[12px] font-medium text-foreground"
         >
           {column.name}
@@ -216,6 +241,7 @@ function HeaderCell({
 
       <ColumnMenu
         column={column}
+        can={can}
         onRename={() => setDraftName(column.name)}
         onConvert={(type) => onConvert(column, type)}
       />

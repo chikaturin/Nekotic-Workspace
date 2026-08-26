@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { CollectionView } from "@/components/drive/collection-view";
+import { TrashPage } from "@/components/collections/trash-page";
 
-export const metadata: Metadata = { title: "trash" };
+export const metadata: Metadata = { title: "Trash" };
 
 export default function Page() {
-  return <CollectionView viewId="trash" />;
+  return <TrashPage />;
 }

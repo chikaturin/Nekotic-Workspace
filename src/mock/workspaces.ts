@@ -1,4 +1,4 @@
-import { MEMBERS } from "@/mock/users";
+import { CURRENT_USER, MEMBERS } from "@/mock/users";
 import type { Workspace } from "@/types";
 
 const GIGABYTE = 1024 ** 3;
@@ -6,7 +6,7 @@ const GIGABYTE = 1024 ** 3;
 export const WORKSPACES: readonly Workspace[] = [
   {
     id: "ws_nexdrop",
-    name: "NexDrop",
+    name: "Nekotic Workspace",
     slug: "nexdrop",
     plan: "team",
     badge: "ND",
@@ -23,6 +23,20 @@ export const WORKSPACES: readonly Workspace[] = [
     color: "var(--kind-image)",
     members: MEMBERS.slice(0, 3),
     storage: { usedBytes: 9 * GIGABYTE, totalBytes: 15 * GIGABYTE },
+  },
+  {
+    // Deliberately empty, so the dashboard's first-run state (SY-DSH-44) is a
+    // place you can actually stand rather than a branch nobody ever reaches.
+    id: "ws_atlas",
+    name: "Atlas",
+    slug: "atlas",
+    plan: "free",
+    badge: "AT",
+    color: "var(--kind-spreadsheet)",
+    members: [
+      { ...CURRENT_USER, role: "admin", joinedAt: "2026-08-24T08:00:00.000Z" },
+    ],
+    storage: { usedBytes: 0, totalBytes: 15 * GIGABYTE },
   },
 ] as const;
 

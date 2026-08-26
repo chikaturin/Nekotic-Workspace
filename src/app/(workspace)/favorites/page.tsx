@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { CollectionView } from "@/components/drive/collection-view";
+import { FavoritesPage } from "@/components/collections/favorites-page";
 
-export const metadata: Metadata = { title: "favorites" };
+export const metadata: Metadata = { title: "Favorites" };
 
 export default function Page() {
-  return <CollectionView viewId="favorites" />;
+  return <FavoritesPage />;
 }

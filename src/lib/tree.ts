@@ -294,6 +294,31 @@ export function searchNodes(
     }));
 }
 
+/**
+ * Flatten, pruning any node that fails `allow` *together with its subtree*.
+ *
+ * Permission is inherited: a file inside a folder the viewer cannot open must
+ * not surface in search results just because the file itself carries no
+ * restriction of its own.
+ */
+export function collectAllowed(
+  nodes: readonly DriveNode[],
+  allow: (node: DriveNode) => boolean,
+): readonly DriveNode[] {
+  const visible: DriveNode[] = [];
+
+  const walk = (pool: readonly DriveNode[]) => {
+    for (const node of pool) {
+      if (!allow(node)) continue;
+      visible.push(node);
+      walk(childrenOf(node));
+    }
+  };
+
+  walk(nodes);
+  return visible;
+}
+
 /** Nodes matching a predicate, flattened — powers the smart views. */
 export function collectNodes(
   nodes: readonly DriveNode[],

@@ -56,7 +56,18 @@ export function shouldFailUpload(fileName: string): boolean {
   return config.failUploads || fileName.toLowerCase().includes(UPLOAD_FAILURE_MARKER);
 }
 
-/** Documents whose title contains the marker always fail to save. */
+/**
+ * Documents whose title contains the marker always fail to save.
+ *
+ * Only ever call this with an *identifier* — a file name, a board name, a
+ * document title. Applying it to free-form prose would make "the check is
+ * failing" an unpostable sentence.
+ */
 export function shouldFailSave(title: string): boolean {
   return config.failSaves || title.toLowerCase().includes(UPLOAD_FAILURE_MARKER);
+}
+
+/** Failure switch for writes that carry no identifier — comments, for one. */
+export function shouldFailWrite(): boolean {
+  return config.failSaves;
 }

@@ -4,13 +4,13 @@ import { Braces, History, TriangleAlert, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { CodeEditor } from "@/components/devtools/code-editor";
 import { EnvironmentPicker } from "@/components/devtools/environment-picker";
-import { VersionHistoryPanel } from "@/components/devtools/version-history-panel";
+import { ConfigVersionsDialog } from "@/components/versions/version-dialogs";
 import { SaveIndicator } from "@/components/document/save-indicator";
 import { AsyncBoundary } from "@/components/shared/async-boundary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCapabilities } from "@/hooks/use-capabilities";
+import { useCapabilities, usePermissions } from "@/hooks/use-permissions";
 import { useConfigDocument } from "@/hooks/use-config-document";
 import { useHotkey } from "@/hooks/use-hotkey";
 import { formatJson } from "@/lib/json-lint";
@@ -22,8 +22,9 @@ import type { DocumentNode } from "@/types";
  */
 export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
   const capabilities = useCapabilities(node);
+  const can = usePermissions(node);
   const controller = useConfigDocument(node.id);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   useHotkey("mod+s", () => void controller.save(), { enableInInputs: true });
 
@@ -50,7 +51,7 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
                 <EnvironmentPicker
                   optionId={document.environmentOptionId}
                   canEdit={canEdit}
-                  canManage={capabilities.manage}
+                  canManage={can("document.update")}
                   onChange={(optionId) => void controller.setEnvironment(optionId)}
                 />
                 {!canEdit && <Badge variant="default">read only</Badge>}
@@ -78,10 +79,9 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
 
                 <Button
                   size="sm"
-                  variant={isHistoryOpen ? "subtle" : "ghost"}
+                  variant="ghost"
                   className="gap-1.5"
-                  aria-pressed={isHistoryOpen}
-                  onClick={() => setIsHistoryOpen((open) => !open)}
+                  onClick={() => setIsHistoryOpen(true)}
                 >
                   <History />
                   History
@@ -117,27 +117,25 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
               </div>
             )}
 
-            <div className="flex min-h-0 flex-1">
-              <div className="min-h-0 min-w-0 flex-1">
-                <CodeEditor
-                  value={controller.draft}
-                  format={document.format}
-                  readOnly={!canEdit}
-                  errorLine={controller.problem?.line ?? null}
-                  ariaLabel={`Edit ${document.name}`}
-                  onChange={controller.setDraft}
-                />
-              </div>
-
-              {isHistoryOpen && (
-                <VersionHistoryPanel
-                  nodeId={node.id}
-                  currentVersion={document.version}
-                  canEdit={canEdit}
-                  onRestored={controller.applyDocument}
-                />
-              )}
+            <div className="min-h-0 flex-1">
+              <CodeEditor
+                value={controller.draft}
+                format={document.format}
+                readOnly={!canEdit}
+                errorLine={controller.problem?.line ?? null}
+                ariaLabel={`Edit ${document.name}`}
+                onChange={controller.setDraft}
+              />
             </div>
+
+            <ConfigVersionsDialog
+              isOpen={isHistoryOpen}
+              document={document}
+              draft={controller.draft}
+              canRestore={canEdit}
+              onRestored={controller.applyDocument}
+              onClose={() => setIsHistoryOpen(false)}
+            />
           </>
         )}
       </AsyncBoundary>

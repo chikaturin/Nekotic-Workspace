@@ -377,7 +377,11 @@ export const AURORA_TREE: readonly DriveNode[] = hydrate(AURORA_SPEC, {
   idPrefix: "al",
 });
 
+/** A workspace nobody has put anything in yet. */
+export const ATLAS_TREE: readonly DriveNode[] = [];
+
 export const TREES_BY_WORKSPACE: Readonly<Record<string, readonly DriveNode[]>> = {
   ws_nexdrop: NEXDROP_TREE,
   ws_aurora: AURORA_TREE,
+  ws_atlas: ATLAS_TREE,
 };

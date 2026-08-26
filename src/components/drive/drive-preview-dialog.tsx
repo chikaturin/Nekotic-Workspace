@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 import { FilePreviewDialog } from "@/components/files/file-preview-dialog";
+import { useTrackRecent } from "@/hooks/use-recent";
+import { nodeRef } from "@/lib/entity-ref";
 import { childrenOf, isFile, type DriveNode, type FileNode } from "@/types";
 import { findNodeById, findPathToId } from "@/lib/tree";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
@@ -18,6 +20,9 @@ export function DrivePreviewDialog() {
 
   const node = previewNodeId ? findNodeById(tree, previewNodeId) : null;
   const fileNode = node && isFile(node) ? node : null;
+
+  // Previewing a file is opening it, so it belongs in Recent.
+  useTrackRecent(useMemo(() => (fileNode ? nodeRef(fileNode) : null), [fileNode]));
 
   const siblings = useMemo<readonly FileNode[]>(() => {
     if (!fileNode) return [];

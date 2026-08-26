@@ -23,6 +23,9 @@ export function BacklinksPanel({ rowId }: { rowId: string }) {
 
   const { state } = useAsyncResource<readonly Backlink[]>(loader, { keepPreviousData: true });
   const links = state.status === "success" ? state.data : [];
+  // "Nothing links here" and "the lookup failed" are different facts, and only
+  // one of them is about the record.
+  const failure = state.status === "error" ? state.error : null;
 
   return (
     <section className="space-y-2">
@@ -56,7 +59,16 @@ export function BacklinksPanel({ rowId }: { rowId: string }) {
           </li>
         ))}
 
-        {links.length === 0 && (
+        {failure && (
+          <li className="text-[12px] text-danger">
+            {failure.message}
+            <span className="metric mt-0.5 block text-[10px] text-faint-foreground">
+              Backlinks could not be read. Nothing was changed.
+            </span>
+          </li>
+        )}
+
+        {!failure && links.length === 0 && (
           <li className="text-[12px] text-faint-foreground">
             Nothing links here yet. Relations from other boards show up on their own.
           </li>

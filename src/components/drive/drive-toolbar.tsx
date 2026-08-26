@@ -28,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCapabilities } from "@/hooks/use-capabilities";
+import { useCapabilities } from "@/hooks/use-permissions";
 import { useCreateDocument } from "@/hooks/use-create-document";
 import { useCreateFile } from "@/hooks/use-create-file";
 import { FILE_TEMPLATES } from "@/lib/file-templates";
@@ -73,7 +73,7 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
   const selectedIds = useWorkspaceStore((state) => state.selectedIds);
   const clearSelection = useWorkspaceStore((state) => state.clearSelection);
   const toggleFavorite = useWorkspaceStore((state) => state.toggleFavorite);
-  const trashNode = useWorkspaceStore((state) => state.trashNode);
+  const trashNodes = useWorkspaceStore((state) => state.trashNodes);
   const createFolder = useWorkspaceStore((state) => state.createFolder);
 
   const hasSelection = selectedIds.length > 0;
@@ -100,10 +100,8 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
             size="icon-sm"
             variant="ghost"
             aria-label="Trash selected"
-            onClick={() => {
-              selectedIds.forEach(trashNode);
-              clearSelection();
-            }}
+            // One state write for the whole selection, not one per item.
+            onClick={() => trashNodes(selectedIds)}
           >
             <Trash2 />
           </Button>

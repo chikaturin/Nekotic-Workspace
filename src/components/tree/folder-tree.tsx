@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Fragment } from "react";
 import { TreeRow } from "@/components/tree/tree-row";
 import { DRIVE_ROOT_PATH } from "@/config/app";
+import { isArchivedNode } from "@/lib/archive";
 import { childrenOf, isContainer, type DriveNode } from "@/types";
 import { useWorkspaceStore } from "@/store/workspace-store";
 
@@ -32,7 +33,9 @@ function TreeLevel({ nodes, depth, parentHref, showLeaves }: TreeLevelProps) {
   const expandedIds = useWorkspaceStore((state) => state.expandedIds);
   const toggleExpanded = useWorkspaceStore((state) => state.toggleExpanded);
 
-  const visible = nodes.filter((node) => !node.isTrashed && (showLeaves || isContainer(node)));
+  const visible = nodes.filter(
+    (node) => !node.isTrashed && !isArchivedNode(node) && (showLeaves || isContainer(node)),
+  );
   if (visible.length === 0) return null;
 
   return (

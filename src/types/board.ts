@@ -132,6 +132,11 @@ export interface BoardRow {
   readonly createdBy: string;
   /** Bumped by the server on every write — the optimistic-concurrency token. */
   readonly revision: number;
+  /**
+   * When the record was archived (SY-ARC-37). Archived records are hidden from
+   * every view by default and are read-only until they are restored.
+   */
+  readonly archivedAt?: string | null;
   /** True while the row exists only optimistically. */
   readonly isPending?: boolean;
 }
@@ -290,22 +295,41 @@ export interface ConflictNotice {
   readonly message: string;
 }
 
-export interface BoardComment {
-  readonly id: string;
-  readonly rowId: string;
-  readonly author: DirectoryUser;
-  readonly body: string;
-  readonly createdAt: string;
+export type ActivityKind =
+  | "created"
+  | "updated"
+  | "commented"
+  | "attached"
+  | "archived"
+  | "restored"
+  | "imported"
+  | "moved";
+
+/**
+ * One field that changed, already rendered to the text the column displays.
+ * The timeline reads these — it never sees, and never renders, a raw payload.
+ */
+export interface FieldChange {
+  readonly columnName: string;
+  readonly from: string;
+  readonly to: string;
 }
 
-export type ActivityKind = "created" | "updated" | "commented" | "attached";
-
+/**
+ * One entry in a record's history.
+ *
+ * A single write produces a single entry however many fields it touched, so
+ * "changed Status and Due Date" is one line in the timeline with two changes
+ * under it rather than two competing lines at the same second.
+ */
 export interface ActivityEntry {
   readonly id: string;
   readonly rowId: string;
   readonly kind: ActivityKind;
   readonly actor: DirectoryUser;
+  /** Human sentence fragment: `changed Status`, `created TASK-001`. */
   readonly summary: string;
+  readonly changes: readonly FieldChange[];
   readonly createdAt: string;
 }
 
