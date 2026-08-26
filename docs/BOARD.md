@@ -29,18 +29,18 @@ queryRowIds(view, records, columns) ──▶ string[]
    (Table)           (Kanban)          (Calendar)         (Timeline)
 ```
 
-Each view is a *projection function* over the ids that query returns. None of
+Each view is a _projection function_ over the ids that query returns. None of
 them holds records, and none of them can disagree with the table.
 
 ### Model
 
-| Type | File | Notes |
-| --- | --- | --- |
-| `Board` | [types/board.ts](../src/types/board.ts) | schema + saved views + `rowIdPrefix` |
-| `BoardColumn` | same | discriminated union on `type`; carries `id`, `name`, `type`, `position`, `width`, `hidden`, `config`, `isPrimary` |
-| `BoardRow` | same | `id`, `displayId`, `sequence`, `cells`, `revision`, timestamps |
-| `CellValue` | same | tagged union, one variant per column type |
-| `SavedView` | same | `type`, `filters`, `sorts`, `hiddenColumnIds`, `columnOrder`, `columnWidths`, `rowHeight`, `groupByColumnId`, `dateColumnId`, `endDateColumnId` |
+| Type          | File                                    | Notes                                                                                                                                           |
+| ------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Board`       | [types/board.ts](../src/types/board.ts) | schema + saved views + `rowIdPrefix`                                                                                                            |
+| `BoardColumn` | same                                    | discriminated union on `type`; carries `id`, `name`, `type`, `position`, `width`, `hidden`, `config`, `isPrimary`                               |
+| `BoardRow`    | same                                    | `id`, `displayId`, `sequence`, `cells`, `revision`, timestamps                                                                                  |
+| `CellValue`   | same                                    | tagged union, one variant per column type                                                                                                       |
+| `SavedView`   | same                                    | `type`, `filters`, `sorts`, `hiddenColumnIds`, `columnOrder`, `columnWidths`, `rowHeight`, `groupByColumnId`, `dateColumnId`, `endDateColumnId` |
 
 `BoardColumn` is a **union**, not a struct with a loose `config: any`:
 
@@ -64,7 +64,7 @@ column. Two things fall out of that:
 1. A cell whose kind no longer matches its column (a schema change that raced an
    edit) reads as empty rather than crashing the wrong editor — `cellOf()`.
 2. **Column conversion never loses data.** A value the target type cannot parse
-   is stored *as text on the new value*:
+   is stored _as text on the new value_:
 
 ```ts
 { kind: "date", iso: null, text: "sometime next sprint" }
@@ -76,13 +76,13 @@ than as a special case in the UI.
 
 ### Split: schema vs presentation
 
-| Operation | Writes to | Visible to |
-| --- | --- | --- |
-| Rename column, change type, change config, add/delete column | **board.columns** | every view |
-| Resize, hide/show, reorder, sort, filter, row height | **the active SavedView** | that view only |
+| Operation                                                    | Writes to                | Visible to     |
+| ------------------------------------------------------------ | ------------------------ | -------------- |
+| Rename column, change type, change config, add/delete column | **board.columns**        | every view     |
+| Resize, hide/show, reorder, sort, filter, row height         | **the active SavedView** | that view only |
 
 Hiding a column in the table therefore cannot blank the Kanban card, and the
-schema stays the single description of what the data *is*.
+schema stays the single description of what the data _is_.
 
 `resolveColumns(board, view)` merges the two and returns the render order.
 `pruneView(view, columns)` drops filters/sorts/order entries that point at a
@@ -128,7 +128,7 @@ cursor writes to `grid-store`, which no row subscribes to.
         └──────────────▶ RowDrawer ──────┘   same records, same editors
 ```
 
-`useBoardView` is the only query. It runs `queryRowIds`, which applies filters →
+`useBoardView` is the only query It runs `queryRowIds`, which applies filters →
 search → sort in one pass and returns row ids. Kanban will group those same ids
 by `view.groupByColumnId`; Calendar will bucket them by `view.dateColumnId`. No
 new record store, no synchronisation step.
@@ -171,9 +171,9 @@ identity guarantee directly, because it is easy to break by accident.
 `GridCell` does not receive the selection. It selects three booleans:
 
 ```tsx
-const isFocused  = useGridStore(selectIsFocused(rowIndex, columnIndex));
+const isFocused = useGridStore(selectIsFocused(rowIndex, columnIndex));
 const isSelected = useGridStore(selectIsSelected(rowIndex, columnIndex));
-const isEditing  = useGridStore(selectIsEditing(row.id, column.id));
+const isEditing = useGridStore(selectIsEditing(row.id, column.id));
 ```
 
 Moving the cursor changes two booleans, so two cells re-render — not 300.
@@ -187,13 +187,13 @@ renders** — and only the pointer-up commits to the store and the API.
 
 ### Cost summary
 
-| Interaction | Components re-rendered |
-| --- | --- |
-| Move the cursor | 2 cells |
-| Edit one cell | 1 row (its ~10 cells) |
-| Drag a column edge | 0 (DOM write only) |
-| Scroll | the grid container + the rows entering the window |
-| Change filter/sort/search | the container; rows only if their record changed |
+| Interaction               | Components re-rendered                            |
+| ------------------------- | ------------------------------------------------- |
+| Move the cursor           | 2 cells                                           |
+| Edit one cell             | 1 row (its ~10 cells)                             |
+| Drag a column edge        | 0 (DOM write only)                                |
+| Scroll                    | the grid container + the rows entering the window |
+| Change filter/sort/search | the container; rows only if their record changed  |
 
 ---
 
@@ -243,16 +243,16 @@ moved on it applies the write anyway (last-write-wins) and returns a
 
 ### Mutation inventory
 
-| Action | Optimistic | Rollback | Reconciliation |
-| --- | --- | --- | --- |
-| `editCells` | yes | guarded per cell | server rows + conflicts |
-| `addRow` / `duplicateRow` | yes (`tmp_` row) | remove the placeholder | id + displayId swap |
-| `deleteRow` | yes | re-insert at its index | — |
-| `renameColumn` / config | yes | restore the column list | server column |
-| `convertColumn` | no (server rewrites rows) | — | column + rewritten rows |
-| `addColumn` / `deleteColumn` | no | — | server column list |
-| Resize / hide / reorder / sort | yes (view patch) | restore the view field | server view |
-| `createOption` | no | — | server option |
+| Action                         | Optimistic                | Rollback                | Reconciliation          |
+| ------------------------------ | ------------------------- | ----------------------- | ----------------------- |
+| `editCells`                    | yes                       | guarded per cell        | server rows + conflicts |
+| `addRow` / `duplicateRow`      | yes (`tmp_` row)          | remove the placeholder  | id + displayId swap     |
+| `deleteRow`                    | yes                       | re-insert at its index  | —                       |
+| `renameColumn` / config        | yes                       | restore the column list | server column           |
+| `convertColumn`                | no (server rewrites rows) | —                       | column + rewritten rows |
+| `addColumn` / `deleteColumn`   | no                        | —                       | server column list      |
+| Resize / hide / reorder / sort | yes (view patch)          | restore the view field  | server view             |
+| `createOption`                 | no                        | —                       | server option           |
 
 Column conversion is deliberately **not** optimistic: it rewrites every row, and
 guessing the result client-side would double the work and risk drift.
@@ -341,12 +341,12 @@ owes us.
 `useBoardView` runs `queryRowIds` once — filters, then search, then sort — and
 every view consumes the ids it returns:
 
-| View | Projection | Interaction writes |
-| --- | --- | --- |
-| Table | `flattenGroups` / `flattenUngrouped` → one uniform-height list | any cell |
-| Kanban | `buildGroups` → a column per bucket | the group column's cell |
-| Calendar | `buildMonth` → six Monday-first weeks + `unscheduled` | the date column's cell |
-| Timeline | `timelineScale` + `buildBars` → offsets in whole days | the start and end date cells |
+| View     | Projection                                                     | Interaction writes           |
+| -------- | -------------------------------------------------------------- | ---------------------------- |
+| Table    | `flattenGroups` / `flattenUngrouped` → one uniform-height list | any cell                     |
+| Kanban   | `buildGroups` → a column per bucket                            | the group column's cell      |
+| Calendar | `buildMonth` → six Monday-first weeks + `unscheduled`          | the date column's cell       |
+| Timeline | `timelineScale` + `buildBars` → offsets in whole days          | the start and end date cells |
 
 A drag in any view is one `editCells` call on the board record. That is why
 "drag in Kanban" and "edit in the table" are the same mutation with different
@@ -362,7 +362,7 @@ offered on a date, `before` is not offered on a select, and attachment columns
 only offer presence checks.
 
 Values are matched by identity first: a select or user condition accepts an
-option id, a user id, *or* the label, so a filter written by the UI and one
+option id, a user id, _or_ the label, so a filter written by the UI and one
 written by hand agree. Date conditions compare calendar days, not instants.
 
 ### Sort (`VW-SRT-16`)
@@ -472,7 +472,7 @@ The contract is enforced by shape, not by discipline:
 
 A relation column names its target board, so a whole column resolves in **one**
 request instead of one per cell (`relationIndex`). A row id missing from a
-*resolved* index renders as `[Deleted Item]`; before resolution it is merely
+_resolved_ index renders as `[Deleted Item]`; before resolution it is merely
 unknown, never shown as deleted.
 
 Backlinks are derived, not stored: `listBacklinks` asks which rows point here,
@@ -509,4 +509,4 @@ activity log are documented in [SYSTEM.md](./SYSTEM.md). Three of them reach
 into the board engine directly: bulk writes go through dedicated endpoints
 rather than the single-cell one, archived records are excluded from
 `queryRowIds` unless the view asks for them, and every write now records
-*what* changed — column, before, after — for the drawer's Activity tab.
+_what_ changed — column, before, after — for the drawer's Activity tab.
