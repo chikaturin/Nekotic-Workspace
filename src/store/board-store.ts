@@ -1,0 +1,700 @@
+"use client";
+
+import { create } from "zustand";
+import {
+  applyCellEdits,
+  captureCells,
+  copyCells,
+  indexRows,
+  reconcileRows,
+  removeRow,
+  replaceRow,
+  revertCellEdits,
+  type RowMap,
+} from "@/lib/board-records";
+import { emptyCellFor } from "@/lib/cell-values";
+import { formatRowId } from "@/lib/row-id";
+import { pruneView } from "@/lib/board-view";
+import { boardService } from "@/services/board-service";
+import { isCancellation, toAppError } from "@/services/errors";
+import { CURRENT_USER } from "@/mock/users";
+import { useWorkspaceStore } from "@/store/workspace-store";
+import type {
+  AppError,
+  Board,
+  BoardColumn,
+  BoardRow,
+  BoardViewType,
+  CellEdit,
+  CellValue,
+  ColumnPatch,
+  ColumnType,
+  ConflictNotice,
+  DirectoryUser,
+  FilterConjunction,
+  RowHeight,
+  SavedView,
+  SelectOption,
+  ViewFilter,
+  ViewSort,
+} from "@/types";
+
+/**
+ * The board is the single source of truth.
+ *
+ * Records are normalised once (`rowsById` + `rowOrder`) and every view — table,
+ * kanban, calendar, timeline — reads that one set through `lib/board-view`.
+ * There is deliberately no per-view copy of the data.
+ */
+
+type BoardStatus = "idle" | "loading" | "ready" | "error";
+
+interface BoardState {
+  readonly nodeId: string | null;
+  readonly status: BoardStatus;
+  readonly error: AppError | null;
+  readonly board: Board | null;
+  readonly rowsById: RowMap;
+  readonly rowOrder: readonly string[];
+  readonly people: readonly DirectoryUser[];
+  readonly activeViewId: string | null;
+  readonly search: string;
+  /** Writes in flight — the toolbar shows a saving hint while it is above 0. */
+  readonly pendingWrites: number;
+  readonly conflicts: readonly ConflictNotice[];
+}
+
+interface BoardActions {
+  load: (nodeId: string) => Promise<void>;
+  reload: () => Promise<void>;
+  setActiveView: (viewId: string) => void;
+  setSearch: (query: string) => void;
+  dismissConflict: (id: string) => void;
+
+  editCells: (edits: readonly CellEdit[]) => Promise<void>;
+  addRow: (afterRowId?: string | null) => Promise<string | null>;
+  duplicateRow: (rowId: string) => Promise<string | null>;
+  deleteRow: (rowId: string) => Promise<void>;
+
+  addColumn: (type: ColumnType, name: string) => Promise<void>;
+  renameColumn: (columnId: string, name: string) => Promise<void>;
+  updateColumnConfig: (columnId: string, patch: ColumnPatch) => Promise<void>;
+  convertColumn: (columnId: string, type: ColumnType) => Promise<number>;
+  deleteColumn: (columnId: string) => Promise<void>;
+  createOption: (columnId: string, label: string) => Promise<SelectOption | null>;
+
+  setSort: (columnId: string, direction: "asc" | "desc" | null) => Promise<void>;
+
+  /* View configuration — all of it lives on the SavedView, never on the data. */
+  setSorts: (sorts: readonly ViewSort[]) => Promise<void>;
+  setFilters: (filters: readonly ViewFilter[]) => Promise<void>;
+  setFilterConjunction: (conjunction: FilterConjunction) => Promise<void>;
+  setGroupBy: (columnId: string | null) => Promise<void>;
+  setHideEmptyGroups: (hide: boolean) => Promise<void>;
+  setDateColumn: (columnId: string | null) => Promise<void>;
+  setEndDateColumn: (columnId: string | null) => Promise<void>;
+  setViewType: (type: BoardViewType) => Promise<void>;
+  setRowHeight: (rowHeight: RowHeight) => Promise<void>;
+
+  /* Saved views. Switching between them never copies a record. */
+  createView: (name: string, type: BoardViewType) => Promise<string | null>;
+  duplicateView: (viewId: string) => Promise<string | null>;
+  renameView: (viewId: string, name: string) => Promise<void>;
+  deleteView: (viewId: string) => Promise<void>;
+
+  /** Presentation lives on the view, so these never touch the schema. */
+  resizeColumn: (columnId: string, width: number) => void;
+  commitColumnWidth: (columnId: string, width: number) => Promise<void>;
+  setColumnHidden: (columnId: string, hidden: boolean) => Promise<void>;
+  moveColumnTo: (columnId: string, toIndex: number) => Promise<void>;
+}
+
+export type BoardStore = BoardState & BoardActions;
+
+const INITIAL: BoardState = {
+  nodeId: null,
+  status: "idle",
+  error: null,
+  board: null,
+  rowsById: {},
+  rowOrder: [],
+  people: [],
+  activeViewId: null,
+  search: "",
+  pendingWrites: 0,
+  conflicts: [],
+};
+
+let loadToken = 0;
+
+export const useBoardStore = create<BoardStore>()((set, get) => {
+  const feedback = (message: string, tone: "info" | "success" | "error" = "error") =>
+    useWorkspaceStore.getState().pushFeedback(message, tone);
+
+  /** Wrap a write: count it, surface failures, always settle the counter. */
+  async function write<T>(request: () => Promise<T>, onError: () => void): Promise<T | null> {
+    set((state) => ({ pendingWrites: state.pendingWrites + 1 }));
+
+    try {
+      return await request();
+    } catch (error) {
+      const appError = toAppError(error);
+      onError();
+      if (!isCancellation(appError)) feedback(appError.message);
+      return null;
+    } finally {
+      set((state) => ({ pendingWrites: Math.max(0, state.pendingWrites - 1) }));
+    }
+  }
+
+  function currentBoard(): Board | null {
+    return get().board;
+  }
+
+  function patchView(viewId: string, patch: Partial<SavedView>): void {
+    set((state) => {
+      if (!state.board) return state;
+
+      return {
+        board: {
+          ...state.board,
+          views: state.board.views.map((view) =>
+            view.id === viewId ? { ...view, ...patch } : view,
+          ),
+        },
+      };
+    });
+  }
+
+  /** Optimistic view patch with a rollback to the fields it touched. */
+  async function patchActiveView(
+    patch: Partial<SavedView>,
+    rollback: (view: SavedView) => Partial<SavedView>,
+  ): Promise<void> {
+    const board = currentBoard();
+    const view = activeView();
+    if (!board || !view) return;
+
+    patchView(view.id, patch);
+
+    await write(
+      () => boardService.updateView(board.id, view.id, patch),
+      () => patchView(view.id, rollback(view)),
+    );
+  }
+
+  function activeView(): SavedView | null {
+    const { board, activeViewId } = get();
+    return board?.views.find((view) => view.id === activeViewId) ?? board?.views[0] ?? null;
+  }
+
+  return {
+    ...INITIAL,
+
+    load: async (nodeId) => {
+      const token = (loadToken += 1);
+      set({ ...INITIAL, nodeId, status: "loading" });
+
+      try {
+        const snapshot = await boardService.getBoard(nodeId);
+        if (token !== loadToken) return;
+
+        const { rowsById, rowOrder } = indexRows(snapshot.rows);
+        set({
+          status: "ready",
+          board: snapshot.board,
+          rowsById,
+          rowOrder,
+          people: snapshot.people,
+          activeViewId: snapshot.board.views[0]?.id ?? null,
+          error: null,
+        });
+      } catch (error) {
+        if (token !== loadToken) return;
+        set({ status: "error", error: toAppError(error) });
+      }
+    },
+
+    reload: async () => {
+      const { nodeId } = get();
+      if (nodeId) await get().load(nodeId);
+    },
+
+    setActiveView: (viewId) => set({ activeViewId: viewId }),
+    setSearch: (query) => set({ search: query }),
+    dismissConflict: (id) =>
+      set((state) => ({ conflicts: state.conflicts.filter((conflict) => conflict.id !== id) })),
+
+    /* ------------------------------------------------------------- records */
+
+    editCells: async (edits) => {
+      const board = currentBoard();
+      if (!board || edits.length === 0) return;
+
+      const before = get().rowsById;
+      const reverts = captureCells(before, edits);
+      const baseRevisions = Object.fromEntries(
+        reverts.map((revert) => [revert.rowId, before[revert.rowId]?.revision ?? 0]),
+      );
+
+      // Optimistic: the grid shows the new value before the request leaves.
+      set({ rowsById: applyCellEdits(before, edits, new Date().toISOString()) });
+
+      const result = await write(
+        () => boardService.updateCells({ boardId: board.id, edits, baseRevisions }),
+        () => set((state) => ({ rowsById: revertCellEdits(state.rowsById, reverts) })),
+      );
+
+      if (!result) return;
+
+      set((state) => ({
+        rowsById: reconcileRows(state.rowsById, result.rows),
+        conflicts: [...state.conflicts, ...result.conflicts],
+      }));
+    },
+
+    addRow: async (afterRowId = null) => {
+      const board = currentBoard();
+      if (!board) return null;
+
+      const tempId = `tmp_${Date.now().toString(36)}`;
+      const now = new Date().toISOString();
+
+      // The display id is the server's to assign; the placeholder says so.
+      const optimistic: BoardRow = {
+        id: tempId,
+        boardId: board.id,
+        displayId: `${board.rowIdPrefix}-…`,
+        sequence: 0,
+        cells: Object.fromEntries(
+          board.columns.map((column) => [column.id, emptyCellFor(column.type)]),
+        ),
+        createdAt: now,
+        updatedAt: now,
+        createdBy: CURRENT_USER.id,
+        revision: 0,
+        isPending: true,
+      };
+
+      const index = afterRowId ? get().rowOrder.indexOf(afterRowId) + 1 : get().rowOrder.length;
+      set((state) => ({
+        rowsById: { ...state.rowsById, [tempId]: optimistic },
+        rowOrder: [
+          ...state.rowOrder.slice(0, index),
+          tempId,
+          ...state.rowOrder.slice(index),
+        ],
+      }));
+
+      const created = await write(
+        () => boardService.createRow({ boardId: board.id, afterRowId }),
+        () => set((state) => removeRow(state, tempId)),
+      );
+
+      if (!created) return null;
+
+      set((state) => replaceRow(state, tempId, created));
+      return created.id;
+    },
+
+    duplicateRow: async (rowId) => {
+      const board = currentBoard();
+      const source = get().rowsById[rowId];
+      if (!board || !source) return null;
+
+      const tempId = `tmp_${Date.now().toString(36)}`;
+      const optimistic: BoardRow = {
+        ...source,
+        id: tempId,
+        displayId: `${board.rowIdPrefix}-…`,
+        sequence: 0,
+        cells: copyCells(source),
+        revision: 0,
+        isPending: true,
+      };
+
+      const index = get().rowOrder.indexOf(rowId) + 1;
+      set((state) => ({
+        rowsById: { ...state.rowsById, [tempId]: optimistic },
+        rowOrder: [...state.rowOrder.slice(0, index), tempId, ...state.rowOrder.slice(index)],
+      }));
+
+      const created = await write(
+        () => boardService.duplicateRow(board.id, rowId),
+        () => set((state) => removeRow(state, tempId)),
+      );
+
+      if (!created) return null;
+
+      set((state) => replaceRow(state, tempId, created));
+      return created.id;
+    },
+
+    deleteRow: async (rowId) => {
+      const board = currentBoard();
+      const row = get().rowsById[rowId];
+      if (!board || !row) return;
+
+      const index = get().rowOrder.indexOf(rowId);
+      set((state) => removeRow(state, rowId));
+
+      await write(
+        () => boardService.deleteRow(board.id, rowId),
+        () =>
+          set((state) => ({
+            rowsById: { ...state.rowsById, [rowId]: row },
+            rowOrder: [
+              ...state.rowOrder.slice(0, index),
+              rowId,
+              ...state.rowOrder.slice(index),
+            ],
+          })),
+      );
+    },
+
+    /* ------------------------------------------------------------- schema */
+
+    addColumn: async (type, name) => {
+      const board = currentBoard();
+      if (!board) return;
+
+      const column = await write(
+        () => boardService.createColumn(board.id, type, name),
+        () => {},
+      );
+      if (!column) return;
+
+      set((state) =>
+        state.board
+          ? { board: { ...state.board, columns: [...state.board.columns, column] } }
+          : state,
+      );
+    },
+
+    renameColumn: async (columnId, name) => {
+      await get().updateColumnConfig(columnId, { name });
+    },
+
+    updateColumnConfig: async (columnId, patch) => {
+      const board = currentBoard();
+      if (!board) return;
+
+      const previous = board.columns;
+      set((state) =>
+        state.board
+          ? {
+              board: {
+                ...state.board,
+                columns: state.board.columns.map((column) =>
+                  column.id === columnId
+                    ? ({
+                        ...column,
+                        ...(patch.name === undefined ? {} : { name: patch.name }),
+                        ...(patch.config ? { config: { ...column.config, ...patch.config } } : {}),
+                      } as BoardColumn)
+                    : column,
+                ),
+              },
+            }
+          : state,
+      );
+
+      await write(
+        () => boardService.updateColumn(board.id, columnId, patch),
+        () =>
+          set((state) => (state.board ? { board: { ...state.board, columns: previous } } : state)),
+      );
+    },
+
+    convertColumn: async (columnId, type) => {
+      const board = currentBoard();
+      if (!board) return 0;
+
+      const result = await write(
+        () => boardService.convertColumn(board.id, columnId, type),
+        () => {},
+      );
+      if (!result) return 0;
+
+      set((state) => ({
+        board: state.board
+          ? {
+              ...state.board,
+              columns: state.board.columns.map((column) =>
+                column.id === columnId ? result.column : column,
+              ),
+            }
+          : state.board,
+        rowsById: reconcileRows(state.rowsById, result.rows),
+      }));
+
+      return result.preserved;
+    },
+
+    deleteColumn: async (columnId) => {
+      const board = currentBoard();
+      if (!board) return;
+
+      const columns = await write(
+        () => boardService.deleteColumn(board.id, columnId),
+        () => {},
+      );
+      if (!columns) return;
+
+      set((state) => ({
+        board: state.board
+          ? {
+              ...state.board,
+              columns,
+              views: state.board.views.map((view) => pruneView(view, columns)),
+            }
+          : state.board,
+      }));
+    },
+
+    createOption: async (columnId, label) => {
+      const board = currentBoard();
+      if (!board) return null;
+
+      const column = board.columns.find((candidate) => candidate.id === columnId);
+      if (!column || column.type !== "select") return null;
+
+      const color = (["blue", "green", "amber", "red", "violet", "cyan", "pink", "gray"] as const)[
+        column.config.options.length % 8
+      ];
+
+      const option = await write(
+        () => boardService.createSelectOption(board.id, columnId, label, color ?? "gray"),
+        () => {},
+      );
+      if (!option) return null;
+
+      set((state) => ({
+        board: state.board
+          ? {
+              ...state.board,
+              columns: state.board.columns.map((candidate) =>
+                candidate.id === columnId && candidate.type === "select"
+                  ? {
+                      ...candidate,
+                      config: {
+                        ...candidate.config,
+                        options: [...candidate.config.options, option],
+                      },
+                    }
+                  : candidate,
+              ),
+            }
+          : state.board,
+      }));
+
+      return option;
+    },
+
+    /* --------------------------------------------------------- view state */
+
+    setSort: async (columnId, direction) => {
+      await get().setSorts(direction === null ? [] : [{ columnId, direction }]);
+    },
+
+    setSorts: async (sorts) => {
+      await patchActiveView({ sorts }, (view) => ({ sorts: view.sorts }));
+    },
+
+    setFilters: async (filters) => {
+      await patchActiveView({ filters }, (view) => ({ filters: view.filters }));
+    },
+
+    setFilterConjunction: async (filterConjunction) => {
+      await patchActiveView({ filterConjunction }, (view) => ({
+        filterConjunction: view.filterConjunction,
+      }));
+    },
+
+    setGroupBy: async (groupByColumnId) => {
+      await patchActiveView({ groupByColumnId }, (view) => ({
+        groupByColumnId: view.groupByColumnId,
+      }));
+    },
+
+    setHideEmptyGroups: async (hideEmptyGroups) => {
+      await patchActiveView({ hideEmptyGroups }, (view) => ({
+        hideEmptyGroups: view.hideEmptyGroups,
+      }));
+    },
+
+    setDateColumn: async (dateColumnId) => {
+      await patchActiveView({ dateColumnId }, (view) => ({ dateColumnId: view.dateColumnId }));
+    },
+
+    setEndDateColumn: async (endDateColumnId) => {
+      await patchActiveView({ endDateColumnId }, (view) => ({
+        endDateColumnId: view.endDateColumnId,
+      }));
+    },
+
+    setViewType: async (type) => {
+      await patchActiveView({ type }, (view) => ({ type: view.type }));
+    },
+
+    setRowHeight: async (rowHeight) => {
+      await patchActiveView({ rowHeight }, (view) => ({ rowHeight: view.rowHeight }));
+    },
+
+    createView: async (name, type) => {
+      const board = currentBoard();
+      if (!board) return null;
+
+      const view = await write(
+        () => boardService.createView(board.id, { name, type }),
+        () => {},
+      );
+      if (!view) return null;
+
+      set((state) => ({
+        board: state.board ? { ...state.board, views: [...state.board.views, view] } : state.board,
+        activeViewId: view.id,
+      }));
+
+      return view.id;
+    },
+
+    duplicateView: async (viewId) => {
+      const board = currentBoard();
+      const source = board?.views.find((view) => view.id === viewId);
+      if (!board || !source) return null;
+
+      const view = await write(
+        () =>
+          boardService.createView(board.id, {
+            name: `${source.name} copy`,
+            type: source.type,
+            from: source,
+          }),
+        () => {},
+      );
+      if (!view) return null;
+
+      set((state) => ({
+        board: state.board ? { ...state.board, views: [...state.board.views, view] } : state.board,
+        activeViewId: view.id,
+      }));
+
+      return view.id;
+    },
+
+    renameView: async (viewId, name) => {
+      const board = currentBoard();
+      const previous = board?.views.find((view) => view.id === viewId)?.name;
+      if (!board || previous === undefined) return;
+
+      patchView(viewId, { name });
+
+      await write(
+        () => boardService.updateView(board.id, viewId, { name }),
+        () => patchView(viewId, { name: previous }),
+      );
+    },
+
+    deleteView: async (viewId) => {
+      const board = currentBoard();
+      if (!board) return;
+
+      const views = await write(
+        () => boardService.deleteView(board.id, viewId),
+        () => {},
+      );
+      if (!views) return;
+
+      set((state) => ({
+        board: state.board ? { ...state.board, views } : state.board,
+        activeViewId:
+          state.activeViewId === viewId ? views[0]?.id ?? null : state.activeViewId,
+      }));
+    },
+
+    resizeColumn: (columnId, width) => {
+      const view = activeView();
+      if (!view) return;
+
+      patchView(view.id, { columnWidths: { ...view.columnWidths, [columnId]: width } });
+    },
+
+    commitColumnWidth: async (columnId, width) => {
+      const board = currentBoard();
+      const view = activeView();
+      if (!board || !view) return;
+
+      const columnWidths = { ...view.columnWidths, [columnId]: width };
+      patchView(view.id, { columnWidths });
+
+      await write(
+        () => boardService.updateView(board.id, view.id, { columnWidths }),
+        () => patchView(view.id, { columnWidths: view.columnWidths }),
+      );
+    },
+
+    setColumnHidden: async (columnId, hidden) => {
+      const board = currentBoard();
+      const view = activeView();
+      if (!board || !view) return;
+
+      const hiddenColumnIds = hidden
+        ? [...new Set([...view.hiddenColumnIds, columnId])]
+        : view.hiddenColumnIds.filter((id) => id !== columnId);
+
+      patchView(view.id, { hiddenColumnIds });
+
+      await write(
+        () => boardService.updateView(board.id, view.id, { hiddenColumnIds }),
+        () => patchView(view.id, { hiddenColumnIds: view.hiddenColumnIds }),
+      );
+    },
+
+    moveColumnTo: async (columnId, toIndex) => {
+      const board = currentBoard();
+      const view = activeView();
+      if (!board || !view) return;
+
+      const current =
+        view.columnOrder.length > 0
+          ? [...view.columnOrder]
+          : [...board.columns].sort((a, b) => a.position - b.position).map((column) => column.id);
+
+      const from = current.indexOf(columnId);
+      if (from < 0) return;
+
+      const target = Math.min(Math.max(toIndex, 0), current.length - 1);
+      const [moved] = current.splice(from, 1);
+      if (!moved) return;
+      current.splice(target, 0, moved);
+
+      patchView(view.id, { columnOrder: current });
+
+      await write(
+        () => boardService.updateView(board.id, view.id, { columnOrder: current }),
+        () => patchView(view.id, { columnOrder: view.columnOrder }),
+      );
+    },
+  };
+});
+
+/* -------------------------------------------------------------- selectors */
+
+export const selectBoard = (state: BoardStore) => state.board;
+export const selectRowOrder = (state: BoardStore) => state.rowOrder;
+
+/** One row, by id. Cells subscribe through their row, never through the map. */
+export const selectRow = (rowId: string) => (state: BoardStore) => state.rowsById[rowId];
+
+export function selectActiveView(state: BoardStore): SavedView | null {
+  const { board, activeViewId } = state;
+  return board?.views.find((view) => view.id === activeViewId) ?? board?.views[0] ?? null;
+}
+
+/** Display id for a row that the server has not answered for yet. */
+export function pendingDisplayId(prefix: string): string {
+  return formatRowId(prefix, 0).replace("000", "…");
+}
+
+export type { CellValue };

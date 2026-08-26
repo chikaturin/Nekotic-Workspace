@@ -1,0 +1,314 @@
+import type { AppError } from "./async";
+import type { DirectoryUser } from "./user";
+
+/* ------------------------------------------------------------------ schema */
+
+/** The seven cell types the table engine understands. */
+export type ColumnType =
+  | "text"
+  | "longText"
+  | "select"
+  | "date"
+  | "user"
+  | "attachment"
+  | "relation";
+
+export type SelectColor = "gray" | "blue" | "green" | "amber" | "red" | "violet" | "cyan" | "pink";
+
+export interface SelectOption {
+  readonly id: string;
+  readonly label: string;
+  readonly color: SelectColor;
+}
+
+export interface TextConfig {
+  readonly placeholder?: string;
+}
+
+export interface LongTextConfig {
+  /** Preferred editor height in text rows. */
+  readonly rows: number;
+}
+
+export interface SelectConfig {
+  readonly options: readonly SelectOption[];
+  readonly isMulti: boolean;
+}
+
+export interface DateConfig {
+  readonly includesTime: boolean;
+}
+
+export interface UserConfig {
+  readonly isMulti: boolean;
+}
+
+export interface AttachmentConfig {
+  readonly maxFiles: number;
+}
+
+/**
+ * Relation is wired for the module that lands later: the column already points
+ * at a target board and the column whose value labels each chip.
+ */
+export interface RelationConfig {
+  readonly boardId: string | null;
+  readonly displayColumnId: string | null;
+  readonly isMulti: boolean;
+}
+
+export interface ColumnConfigByType {
+  readonly text: TextConfig;
+  readonly longText: LongTextConfig;
+  readonly select: SelectConfig;
+  readonly date: DateConfig;
+  readonly user: UserConfig;
+  readonly attachment: AttachmentConfig;
+  readonly relation: RelationConfig;
+}
+
+interface ColumnBase {
+  readonly id: string;
+  readonly name: string;
+  readonly position: number;
+  readonly width: number;
+  readonly hidden: boolean;
+  /** The one column that titles a row. It can never be hidden or deleted. */
+  readonly isPrimary: boolean;
+}
+
+export type BoardColumnOf<T extends ColumnType> = ColumnBase & {
+  readonly type: T;
+  readonly config: ColumnConfigByType[T];
+};
+
+export type BoardColumn = { [T in ColumnType]: BoardColumnOf<T> }[ColumnType];
+
+/* ------------------------------------------------------------------ values */
+
+export interface CellAttachment {
+  readonly id: string;
+  readonly name: string;
+  readonly mimeType: string;
+  readonly sizeBytes: number;
+  /** Session URL for the real bytes; null once the session that made it ends. */
+  readonly url: string | null;
+  readonly thumbnailUrl: string | null;
+}
+
+/**
+ * Cell values are tagged with their own kind rather than inferred from the
+ * column. A converted column can therefore keep the text it could not parse
+ * (`text` on a date or select cell) instead of dropping the user's data.
+ */
+export type CellValue =
+  | { readonly kind: "text"; readonly value: string }
+  | { readonly kind: "longText"; readonly value: string }
+  | { readonly kind: "select"; readonly optionIds: readonly string[]; readonly text?: string }
+  | { readonly kind: "date"; readonly iso: string | null; readonly text?: string }
+  | { readonly kind: "user"; readonly userIds: readonly string[]; readonly text?: string }
+  | {
+      readonly kind: "attachment";
+      readonly attachments: readonly CellAttachment[];
+      readonly text?: string;
+    }
+  | { readonly kind: "relation"; readonly rowIds: readonly string[]; readonly text?: string };
+
+export type CellValueOf<T extends ColumnType> = Extract<CellValue, { kind: T }>;
+
+/* -------------------------------------------------------------------- rows */
+
+export interface BoardRow {
+  /** Server identity. Optimistic rows carry a `tmp_` id until the API answers. */
+  readonly id: string;
+  readonly boardId: string;
+  /** `TASK-001` — assigned by the backend, never derived on the client. */
+  readonly displayId: string;
+  /** Numeric part of the display id; monotonic per board, never reused. */
+  readonly sequence: number;
+  readonly cells: Readonly<Record<string, CellValue>>;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly createdBy: string;
+  /** Bumped by the server on every write — the optimistic-concurrency token. */
+  readonly revision: number;
+  /** True while the row exists only optimistically. */
+  readonly isPending?: boolean;
+}
+
+/* ------------------------------------------------------------------- views */
+
+export type BoardViewType = "table" | "kanban" | "calendar" | "timeline";
+
+export type FilterOperator =
+  | "isNotEmpty"
+  | "isEmpty"
+  | "contains"
+  | "notContains"
+  | "is"
+  | "isNot"
+  | "before"
+  | "after"
+  | "onOrBefore"
+  | "onOrAfter";
+
+/**
+ * One condition. `value` is interpreted by the column's type: an option id or
+ * label for select, a user id or name for user, `YYYY-MM-DD` for date, free
+ * text otherwise.
+ */
+export interface ViewFilter {
+  readonly id: string;
+  readonly columnId: string;
+  readonly operator: FilterOperator;
+  readonly value: string;
+}
+
+/** How the conditions combine — "all of" or "any of". */
+export type FilterConjunction = "and" | "or";
+
+export interface ViewSort {
+  readonly columnId: string;
+  readonly direction: "asc" | "desc";
+}
+
+export type RowHeight = "short" | "medium" | "tall";
+
+/**
+ * Presentation only. Records and schema live on the board, so switching views
+ * never copies data — a view just describes how to read it.
+ */
+export interface SavedView {
+  readonly id: string;
+  readonly boardId: string;
+  readonly name: string;
+  readonly type: BoardViewType;
+  readonly filters: readonly ViewFilter[];
+  readonly filterConjunction: FilterConjunction;
+  /** Multi-level: earlier entries win, later ones break ties. */
+  readonly sorts: readonly ViewSort[];
+  readonly hiddenColumnIds: readonly string[];
+  /** Per-view column order; ids missing from it fall back to schema position. */
+  readonly columnOrder: readonly string[];
+  readonly columnWidths: Readonly<Record<string, number>>;
+  readonly rowHeight: RowHeight;
+  /** Grouping column for the table and Kanban. */
+  readonly groupByColumnId: string | null;
+  /** Drop groups that hold no records instead of showing an empty one. */
+  readonly hideEmptyGroups: boolean;
+  /** Calendar and timeline anchor on these date columns. */
+  readonly dateColumnId: string | null;
+  readonly endDateColumnId: string | null;
+}
+
+/* --------------------------------------------------------------- templates */
+
+export type BoardTemplateId = "task" | "bug" | "qa" | "apiDocs";
+
+/** A view as a template declares it — ids are minted when it is instantiated. */
+export interface TemplateView {
+  readonly name: string;
+  readonly type: BoardViewType;
+  readonly groupByColumnId?: string;
+  readonly dateColumnId?: string;
+  readonly endDateColumnId?: string;
+  readonly hiddenColumnIds?: readonly string[];
+  readonly sorts?: readonly ViewSort[];
+  readonly filters?: readonly ViewFilter[];
+}
+
+/**
+ * A board blueprint. Templates are read-only data: instantiating one deep-copies
+ * its schema, so editing the board it produced can never reach back.
+ */
+export interface BoardTemplate {
+  readonly id: BoardTemplateId;
+  readonly name: string;
+  readonly description: string;
+  readonly rowIdPrefix: string;
+  readonly primaryColumnId: string;
+  readonly columns: readonly BoardColumn[];
+  readonly views: readonly TemplateView[];
+}
+
+/* ------------------------------------------------------------------- board */
+
+export interface Board {
+  readonly id: string;
+  /** Template the board was generated from, for reference only. */
+  readonly templateId?: BoardTemplateId;
+  /** Drive node the board is addressed by. */
+  readonly nodeId: string;
+  readonly workspaceId: string;
+  readonly name: string;
+  /** `TASK`, `BUG`, `QA` — the row id prefix configured for this board. */
+  readonly rowIdPrefix: string;
+  readonly primaryColumnId: string;
+  readonly columns: readonly BoardColumn[];
+  readonly views: readonly SavedView[];
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+/** Everything one board needs before its first paint. */
+export interface BoardSnapshot {
+  readonly board: Board;
+  readonly rows: readonly BoardRow[];
+  readonly people: readonly DirectoryUser[];
+  /** Null when the whole record set arrived in one page. */
+  readonly nextCursor: string | null;
+}
+
+/* --------------------------------------------------------------- mutations */
+
+export interface CellEdit {
+  readonly rowId: string;
+  readonly columnId: string;
+  readonly value: CellValue;
+}
+
+export interface ColumnPatch {
+  readonly name?: string;
+  readonly width?: number;
+  readonly hidden?: boolean;
+  readonly config?: Partial<ColumnConfigByType[ColumnType]>;
+}
+
+/** What a conversion would do, shown before the user commits to it. */
+export interface ConversionPreview {
+  readonly total: number;
+  readonly converted: number;
+  /** Values kept as text with a warning because they could not be parsed. */
+  readonly preserved: number;
+  readonly samples: readonly string[];
+}
+
+export interface ConflictNotice {
+  readonly id: string;
+  readonly rowId: string;
+  readonly columnId: string;
+  readonly message: string;
+}
+
+export interface BoardComment {
+  readonly id: string;
+  readonly rowId: string;
+  readonly author: DirectoryUser;
+  readonly body: string;
+  readonly createdAt: string;
+}
+
+export type ActivityKind = "created" | "updated" | "commented" | "attached";
+
+export interface ActivityEntry {
+  readonly id: string;
+  readonly rowId: string;
+  readonly kind: ActivityKind;
+  readonly actor: DirectoryUser;
+  readonly summary: string;
+  readonly createdAt: string;
+}
+
+export interface BoardError {
+  readonly error: AppError;
+}

@@ -1,0 +1,68 @@
+"use client";
+
+import { LogOut, Moon, Settings, Sun, UserRound, Users } from "lucide-react";
+import { UserAvatar } from "@/components/shared/user-avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useTheme } from "@/hooks/use-theme";
+import { CURRENT_USER } from "@/mock/users";
+import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspace-store";
+
+export function UserMenu() {
+  const { theme, toggleTheme } = useTheme();
+  const workspace = useWorkspaceStore(selectActiveWorkspace);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className="rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label="Account menu"
+      >
+        <UserAvatar user={CURRENT_USER} className="size-8" />
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent align="end" className="w-60">
+        <div className="flex items-center gap-2.5 px-2 py-2">
+          <UserAvatar user={CURRENT_USER} className="size-8" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">{CURRENT_USER.name}</p>
+            <p className="truncate text-[11px] text-faint-foreground">{CURRENT_USER.email}</p>
+          </div>
+        </div>
+
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>{workspace.name}</DropdownMenuLabel>
+        <DropdownMenuItem>
+          <UserRound />
+          Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Users />
+          Members
+          <DropdownMenuShortcut>{workspace.members.length}</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Settings />
+          Preferences
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={(event) => { event.preventDefault(); toggleTheme(); }}>
+          {theme === "dark" ? <Sun /> : <Moon />}
+          {theme === "dark" ? "Light theme" : "Dark theme"}
+        </DropdownMenuItem>
+        <DropdownMenuItem variant="danger">
+          <LogOut />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

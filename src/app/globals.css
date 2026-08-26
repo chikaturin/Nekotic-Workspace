@@ -1,0 +1,220 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------------------------------------------------------------
+ * NexDrop design tokens — "daylight blueprint"
+ * White paper surfaces, cool hairline rules, one signal blue.
+ * Light is the product default; dark is a deep navy, never pure black.
+ * ------------------------------------------------------------------------ */
+:root {
+  --radius: 0.625rem;
+
+  --background: oklch(0.988 0.004 250);
+  --canvas: oklch(0.966 0.009 248);
+  --surface: oklch(1 0 0);
+  --elevated: oklch(1 0 0);
+  --overlay: oklch(0.32 0.05 258 / 0.34);
+
+  --foreground: oklch(0.245 0.032 262);
+  --muted-foreground: oklch(0.505 0.03 258);
+  --faint-foreground: oklch(0.63 0.025 256);
+
+  --border: oklch(0.912 0.014 250);
+  --border-strong: oklch(0.845 0.024 250);
+  --hairline: oklch(0.938 0.011 250);
+
+  --accent: oklch(0.575 0.192 258);
+  --accent-hover: oklch(0.525 0.198 258);
+  --accent-foreground: oklch(0.995 0.004 250);
+  --accent-soft: oklch(0.575 0.192 258 / 0.1);
+  --ring: oklch(0.575 0.192 258 / 0.5);
+
+  --selection: oklch(0.575 0.192 258 / 0.14);
+  --hover: oklch(0.52 0.07 258 / 0.06);
+
+  --success: oklch(0.6 0.13 162);
+  --warning: oklch(0.7 0.15 72);
+  --danger: oklch(0.575 0.19 25);
+
+  --kind-folder: oklch(0.6 0.165 256);
+  --kind-board: oklch(0.575 0.16 292);
+  --kind-image: oklch(0.6 0.13 200);
+  --kind-document: oklch(0.55 0.155 266);
+  --kind-spreadsheet: oklch(0.58 0.13 162);
+  --kind-pdf: oklch(0.575 0.19 25);
+  --kind-video: oklch(0.6 0.17 340);
+  --kind-audio: oklch(0.6 0.14 312);
+  --kind-archive: oklch(0.62 0.1 86);
+  --kind-code: oklch(0.6 0.14 228);
+  --kind-other: oklch(0.585 0.03 258);
+}
+
+.dark {
+  --background: oklch(0.212 0.028 262);
+  --canvas: oklch(0.188 0.026 262);
+  --surface: oklch(0.248 0.03 263);
+  --elevated: oklch(0.285 0.032 263);
+  --overlay: oklch(0.13 0.03 263 / 0.7);
+
+  --foreground: oklch(0.965 0.008 250);
+  --muted-foreground: oklch(0.735 0.024 254);
+  --faint-foreground: oklch(0.605 0.026 256);
+
+  --border: oklch(0.335 0.03 263);
+  --border-strong: oklch(0.42 0.035 263);
+  --hairline: oklch(0.305 0.028 263);
+
+  --accent: oklch(0.71 0.155 256);
+  --accent-hover: oklch(0.765 0.14 256);
+  --accent-foreground: oklch(0.185 0.05 262);
+  --accent-soft: oklch(0.71 0.155 256 / 0.16);
+  --ring: oklch(0.71 0.155 256 / 0.6);
+
+  --selection: oklch(0.71 0.155 256 / 0.16);
+  --hover: oklch(0.86 0.04 256 / 0.08);
+
+  --success: oklch(0.74 0.14 162);
+  --warning: oklch(0.8 0.14 76);
+  --danger: oklch(0.68 0.18 25);
+
+  --kind-folder: oklch(0.74 0.14 256);
+  --kind-board: oklch(0.73 0.15 292);
+  --kind-image: oklch(0.75 0.12 200);
+  --kind-document: oklch(0.72 0.13 266);
+  --kind-spreadsheet: oklch(0.74 0.13 162);
+  --kind-pdf: oklch(0.7 0.17 25);
+  --kind-video: oklch(0.73 0.16 340);
+  --kind-audio: oklch(0.74 0.13 312);
+  --kind-archive: oklch(0.76 0.1 88);
+  --kind-code: oklch(0.74 0.12 228);
+  --kind-other: oklch(0.72 0.02 256);
+}
+
+
+@theme inline {
+  --color-background: var(--background);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-overlay: var(--overlay);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-faint-foreground: var(--faint-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-hairline: var(--hairline);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-ring: var(--ring);
+  --color-selection: var(--selection);
+  --color-hover: var(--hover);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --color-kind-folder: var(--kind-folder);
+  --color-kind-board: var(--kind-board);
+  --color-kind-image: var(--kind-image);
+  --color-kind-document: var(--kind-document);
+  --color-kind-spreadsheet: var(--kind-spreadsheet);
+  --color-kind-pdf: var(--kind-pdf);
+  --color-kind-video: var(--kind-video);
+  --color-kind-audio: var(--kind-audio);
+  --color-kind-archive: var(--kind-archive);
+  --color-kind-code: var(--kind-code);
+  --color-kind-other: var(--kind-other);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: ui-sans-serif, "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--accent-soft);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--border-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--faint-foreground);
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  /* Faint engineering grid behind the drive canvas. */
+  .canvas-grid {
+    background-image: radial-gradient(var(--hairline) 1px, transparent 1px);
+    background-size: 22px 22px;
+    background-position: -1px -1px;
+  }
+
+  .metric {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  .hairline-b {
+    box-shadow: inset 0 -1px 0 0 var(--hairline);
+  }
+
+  .focus-ring {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+
+  .focus-ring:focus-visible {
+    outline-color: var(--accent);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+}

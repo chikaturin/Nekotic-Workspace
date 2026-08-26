@@ -1,0 +1,17 @@
+import type { ComponentProps } from "react";
+import { cn } from "@/lib/utils";
+
+/** Keycap used in the search trigger, menus and the shortcut legend. */
+export function Kbd({ className, children, ...props }: ComponentProps<"kbd">) {
+  return (
+    <kbd
+      className={cn(
+        "metric inline-flex h-5 min-w-5 items-center justify-center rounded border border-border bg-surface px-1 text-[10px] text-muted-foreground",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </kbd>
+  );
+}
