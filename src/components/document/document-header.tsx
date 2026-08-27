@@ -1,7 +1,6 @@
 "use client";
 
 import { Archive, Lock, Maximize2, Minimize2, Pin } from "lucide-react";
-import { useEffect, useRef } from "react";
 import { WatchButton } from "@/components/collab/watch-button";
 import { DocumentActionsMenu } from "@/components/document/document-actions-menu";
 import { SaveIndicator } from "@/components/document/save-indicator";
@@ -17,8 +16,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { DocumentActions } from "@/hooks/use-document-actions";
+import { useTitleFocus } from "@/hooks/use-title-focus";
 import { countWords } from "@/lib/blocks";
-import { useWorkspaceStore } from "@/store/workspace-store";
 import { formatCount } from "@/lib/format";
 import type {
   CapabilitySet,
@@ -71,22 +70,7 @@ export function DocumentHeader({
   nodeId,
 }: DocumentHeaderProps) {
   const isEditable = capabilities.edit;
-  const titleRef = useRef<HTMLInputElement>(null);
-  const titleFocusNodeId = useWorkspaceStore((state) => state.titleFocusNodeId);
-  const clearTitleFocus = useWorkspaceStore((state) => state.clearTitleFocus);
-
-  /**
-   * A page that was just created opens with its title selected, so typing a
-   * name is the first thing that happens rather than a separate edit step.
-   * The request is consumed once — coming back later must not steal focus.
-   */
-  useEffect(() => {
-    if (titleFocusNodeId !== nodeId || !isEditable) return;
-
-    const frame = requestAnimationFrame(() => titleRef.current?.select());
-    clearTitleFocus();
-    return () => cancelAnimationFrame(frame);
-  }, [titleFocusNodeId, nodeId, isEditable, clearTitleFocus]);
+  const titleRef = useTitleFocus(nodeId, isEditable);
 
   return (
     <header className="border-b border-border bg-background/80 px-4 py-3 backdrop-blur">
