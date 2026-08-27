@@ -104,7 +104,11 @@ function findDuplicates(rows: readonly SecretDraftRow[]): readonly string[] {
  * clearing: a rejected save leaves the draft exactly as it was, so a network
  * error does not cost someone the credential they just pasted in.
  */
-export function useSecretEditor(document: SecretDocument | null): SecretEditor {
+export function useSecretEditor(
+  document: SecretDocument | null,
+  /** Hands the written document back, so the read view is never a save behind. */
+  onSaved: (next: SecretDocument) => void,
+): SecretEditor {
   const role = useWorkspaceRole();
   const pushFeedback = useWorkspaceStore((store) => store.pushFeedback);
 
@@ -220,11 +224,12 @@ export function useSecretEditor(document: SecretDocument | null): SecretEditor {
 
     setIsSaving(true);
     try {
-      await devtoolsService.saveSecrets({
+      const next = await devtoolsService.saveSecrets({
         nodeId: document.nodeId,
         entries: toDraft(rows),
         role,
       });
+      onSaved(next);
       setEdited(null);
       pushFeedback("Secrets saved", "success");
       return true;
@@ -236,7 +241,7 @@ export function useSecretEditor(document: SecretDocument | null): SecretEditor {
     } finally {
       setIsSaving(false);
     }
-  }, [document, rows, role, pushFeedback]);
+  }, [document, rows, role, onSaved, pushFeedback]);
 
   return {
     rows,

@@ -34,6 +34,14 @@ export interface SecretController {
    */
   readonly copyMany: (secretIds: readonly string[]) => Promise<void>;
   readonly isCopyingMany: boolean;
+  /**
+   * Take a document the caller has just written.
+   *
+   * It also forgets every revealed value, because it has to: a save can rename,
+   * replace or remove any of them, and a plaintext still on screen under a key
+   * that no longer holds it is worse than no plaintext at all.
+   */
+  readonly apply: (next: SecretDocument) => void;
   readonly reload: () => void;
 }
 
@@ -159,6 +167,16 @@ export function useSecretDocument(nodeId: string): SecretController {
    * The service writes one audit entry per key, and neither it nor this
    * records a value.
    */
+  const apply = useCallback(
+    (next: SecretDocument) => {
+      resource.setData(next);
+      setRevealed({});
+      for (const timer of timers.current.values()) window.clearTimeout(timer);
+      timers.current.clear();
+    },
+    [resource],
+  );
+
   const copyMany = useCallback(
     async (secretIds: readonly string[]) => {
       setIsCopyingMany(true);
@@ -189,6 +207,7 @@ export function useSecretDocument(nodeId: string): SecretController {
     copy,
     copyMany,
     isCopyingMany,
+    apply,
     reload: resource.reload,
   };
 }

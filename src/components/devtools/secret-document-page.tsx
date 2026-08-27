@@ -42,7 +42,7 @@ export function SecretDocumentPage({ node }: { node: DocumentNode }) {
   const role = useEffectiveRole(node);
   const controller = useSecretDocument(node.id);
   const secretDocument = controller.state.status === "success" ? controller.state.data : null;
-  const editor = useSecretEditor(secretDocument);
+  const editor = useSecretEditor(secretDocument, controller.apply);
 
   const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
