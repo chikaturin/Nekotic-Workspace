@@ -11,6 +11,8 @@ interface GanttToolbarProps {
   readonly onZoomChange: (zoom: GanttZoom) => void;
   readonly showDependencies: boolean;
   readonly onToggleDependencies: () => void;
+  /** How many blocked-by connectors the chart has to draw, shown or not. */
+  readonly linkCount: number;
   readonly onToday: () => void;
   readonly summary: string;
 }
@@ -26,6 +28,7 @@ export function GanttToolbar({
   onZoomChange,
   showDependencies,
   onToggleDependencies,
+  linkCount,
   onToday,
   summary,
 }: GanttToolbarProps) {
@@ -61,16 +64,25 @@ export function GanttToolbar({
         ))}
       </div>
 
+      {/* The count is the point: on a board where nothing is blocked by
+          anything there is nothing to draw, and a toggle that looks identical
+          either way reads as a button that does not work. */}
       <Button
         size="sm"
         variant={showDependencies ? "subtle" : "ghost"}
         aria-pressed={showDependencies}
+        disabled={linkCount === 0}
         className="gap-1.5"
-        title="Draw the blocked-by connectors"
+        title={
+          linkCount === 0
+            ? "Nothing on this board is blocked by another record yet — fill in a Blocked by field to see connectors"
+            : `Draw the ${linkCount} blocked-by connector${linkCount === 1 ? "" : "s"}`
+        }
         onClick={onToggleDependencies}
       >
         {showDependencies ? <GitBranch /> : <Link2Off />}
         <span className="hidden sm:inline">Dependencies</span>
+        <span className="metric text-[10px] text-faint-foreground">{linkCount}</span>
       </Button>
 
       <span className="metric ml-auto truncate text-[11px] text-faint-foreground">{summary}</span>

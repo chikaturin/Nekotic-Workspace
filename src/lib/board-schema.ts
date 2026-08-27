@@ -180,3 +180,38 @@ export const SELECT_COLOR_CLASSES: Readonly<Record<SelectColor, string>> = {
   cyan: "bg-kind-image/15 text-kind-image border-kind-image/30",
   pink: "bg-kind-video/15 text-kind-video border-kind-video/30",
 };
+
+/**
+ * The same tokens at full strength.
+ *
+ * A chip is a label and can afford to be faint; a bar has to carry a
+ * proportion on its own, so it takes the colour solid. The Gantt draws the
+ * finished part of a task with these and the rest with the track below, which
+ * is what makes "how far along" readable without a second colour.
+ */
+export const SELECT_SOLID_CLASSES: Readonly<Record<SelectColor, string>> = {
+  gray: "bg-kind-other",
+  blue: "bg-kind-folder",
+  green: "bg-kind-spreadsheet",
+  amber: "bg-kind-archive",
+  red: "bg-kind-pdf",
+  violet: "bg-kind-board",
+  cyan: "bg-kind-image",
+  pink: "bg-kind-video",
+};
+
+/**
+ * The unfinished part of a bar: filled, not outlined — solid enough to read as
+ * a block of colour, muted enough that the finished part drawn over it is
+ * visibly denser.
+ */
+export const SELECT_TRACK_CLASSES: Readonly<Record<SelectColor, string>> = {
+  gray: "bg-kind-other/40",
+  blue: "bg-kind-folder/40",
+  green: "bg-kind-spreadsheet/40",
+  amber: "bg-kind-archive/40",
+  red: "bg-kind-pdf/40",
+  violet: "bg-kind-board/40",
+  cyan: "bg-kind-image/40",
+  pink: "bg-kind-video/40",
+};

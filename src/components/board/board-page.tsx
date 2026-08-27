@@ -186,8 +186,9 @@ export function BoardPage({ node }: { node: BoardNode }) {
 
       {model.view?.type === "kanban" && <KanbanBoard model={model} canEdit={canEdit} />}
       {model.view?.type === "calendar" && <CalendarBoard model={model} canEdit={canEdit} />}
-      {/* The roadmap is read-only: dates change on the record, not by dragging. */}
-      {model.view?.type === "gantt" && <GanttBoard model={model} />}
+      {/* The roadmap is read-only: dates change on the record, not by dragging.
+          `canEdit` only unlocks filling in a date a record does not have. */}
+      {model.view?.type === "gantt" && <GanttBoard model={model} canEdit={canEdit} />}
       {(model.view?.type === "table" || !model.view) && (
         <TableGrid
           model={model}

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { BOARD_TEMPLATES } from "@/lib/board-templates";
 import { buildMonth, bucketByDay, moveToDay, shiftMonth } from "@/lib/board-calendar";
 import {
   addDays,
@@ -307,16 +308,21 @@ describe("gantt scale", () => {
     expect(bars[0]?.span).toBe(5);
     expect(bars[1]?.isPartial).toBe(true);
     expect(bars[1]?.span).toBe(1);
-    expect(bars[0]?.offset).toBe(3);
+
+    // The offset is whole days from wherever the window happens to start, so
+    // it is checked by reading it back rather than by pinning a number that
+    // moves with the zoom's horizon.
+    expect(offsetToIso(scale, bars[0]?.offset ?? -1)).toBe("2026-08-10T00:00:00.000Z");
   });
 
   test("the scale pads the window and locates today", () => {
     const scale = timelineScale(rowIds, index.rowsById, start, due, "day", "2026-08-12T00:00:00.000Z");
 
-    expect(scale.startIso).toBe("2026-08-07T00:00:00.000Z");
-    expect(scale.dayCount).toBe(17);
-    expect(scale.todayOffset).toBe(5);
-    expect(offsetToIso(scale, 5)).toBe("2026-08-12T00:00:00.000Z");
+    // Today, and every dated record, is somewhere inside the window.
+    expect(offsetToIso(scale, scale.todayOffset)).toBe("2026-08-12T00:00:00.000Z");
+    expect(daysBetween(scale.startIso, "2026-08-10T00:00:00.000Z")).toBeGreaterThan(0);
+    expect(daysBetween("2026-08-20T00:00:00.000Z", offsetToIso(scale, scale.dayCount - 1)))
+      .toBeGreaterThan(0);
   });
 
   test("an empty board still produces a usable window", () => {
@@ -327,12 +333,37 @@ describe("gantt scale", () => {
   });
 
   test("zoom changes pixels per day, never the day maths", () => {
-    const dayScale = timelineScale(rowIds, index.rowsById, start, due, "day", "2026-08-12T00:00:00.000Z");
-    const weekScale = timelineScale(rowIds, index.rowsById, start, due, "week", "2026-08-12T00:00:00.000Z");
+    const scales = TIMELINE_ZOOMS.map((zoom) =>
+      timelineScale(rowIds, index.rowsById, start, due, zoom, "2026-08-12T00:00:00.000Z"),
+    );
 
-    expect(dayScale.dayCount).toBe(weekScale.dayCount);
-    expect(dayScale.dayWidth).toBe(DAY_WIDTH.day);
-    expect(weekScale.dayWidth).toBe(DAY_WIDTH.week);
+    for (const [position, zoom] of TIMELINE_ZOOMS.entries()) {
+      const scale = scales[position];
+      expect(scale?.dayWidth).toBe(DAY_WIDTH[zoom]);
+      // A day is one unit at every scale, so the same offset is the same day.
+      expect(scale && offsetToIso(scale, scale.todayOffset)).toBe("2026-08-12T00:00:00.000Z");
+    }
+  });
+
+  /**
+   * Zooming out is a request to see more time, not the same fortnight drawn
+   * smaller. Quarter over a five-day board used to render a stub against an
+   * empty canvas, which is accurate about the data and useless to look at.
+   */
+  test("zooming out widens the horizon, so every scale fills the chart", () => {
+    const counts = TIMELINE_ZOOMS.map(
+      (zoom) =>
+        timelineScale(rowIds, index.rowsById, start, due, zoom, "2026-08-12T00:00:00.000Z")
+          .dayCount,
+    );
+
+    expect(counts).toEqual([...counts].sort((a, b) => a - b));
+    expect(counts.at(-1)).toBeGreaterThan(700);
+
+    // Wide enough that the chart is not a stub: every scale covers a viewport.
+    for (const [position, zoom] of TIMELINE_ZOOMS.entries()) {
+      expect((counts[position] ?? 0) * DAY_WIDTH[zoom]).toBeGreaterThan(1200);
+    }
   });
 
   /**
@@ -536,4 +567,31 @@ describe("saved views", () => {
   test("a view with nothing to prune keeps its identity", () => {
     expect(pruneView(VIEW, COLUMNS)).toBe(VIEW);
   });
+});
+
+/* ---------------------------------------------------------------- templates */
+
+/**
+ * Every board opens with a Gantt tab.
+ *
+ * A view type nobody can reach is a view type nobody uses, so each template
+ * ships one — and each one names a real pair of Date columns, because a Gantt
+ * pointed at a column that does not exist opens on its setup panel instead of
+ * on the schedule.
+ */
+describe("template Gantt views", () => {
+  for (const template of BOARD_TEMPLATES) {
+    test(`${template.id} ships a Gantt view over two real date columns`, () => {
+      const gantt = template.views.find((view) => view.type === "gantt");
+      expect(gantt).toBeDefined();
+
+      const dateColumnIds = template.columns
+        .filter((column) => column.type === "date")
+        .map((column) => column.id);
+
+      expect(dateColumnIds).toContain(gantt?.dateColumnId);
+      expect(dateColumnIds).toContain(gantt?.endDateColumnId);
+      expect(gantt?.dateColumnId).not.toBe(gantt?.endDateColumnId);
+    });
+  }
 });

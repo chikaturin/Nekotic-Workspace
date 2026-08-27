@@ -68,6 +68,23 @@ const MIN_BAR_DAYS = 1;
  */
 const MAX_RANGE_DAYS = 1100;
 
+/**
+ * The narrowest window each zoom will draw, in days.
+ *
+ * Zooming out is a request to see more time, not to see the same fortnight
+ * drawn smaller. Without a floor, Quarter renders a board that happens to span
+ * two months as a 180px stub against an empty canvas — accurate about the data
+ * and useless to look at, because the scale is chosen for the horizon it
+ * shows. Each figure is set so its column width fills a wide viewport:
+ * 32 days at 44px, 98 at 18px, 380 at 7px, 760 at 3px.
+ */
+const MIN_SPAN_DAYS: Readonly<Record<TimelineZoom, number>> = {
+  day: 32,
+  week: 98,
+  month: 380,
+  quarter: 760,
+};
+
 export interface TimelineTick {
   readonly iso: string;
   readonly offset: number;
@@ -210,6 +227,15 @@ export function timelineScale(
   // far end instead of pushing the present off the chart.
   min = Math.max(min, today - MAX_RANGE_DAYS);
   max = Math.min(max, today + MAX_RANGE_DAYS);
+
+  // Then widen to the zoom's own horizon, evenly on both sides so the data
+  // stays centred. Every floor is well inside the clamp above, so this can
+  // never reintroduce the outlier problem it sits below.
+  const shortfall = MIN_SPAN_DAYS[zoom] - (max - min + 1);
+  if (shortfall > 0) {
+    min -= Math.floor(shortfall / 2);
+    max += Math.ceil(shortfall / 2);
+  }
 
   const from = min - PADDING_DAYS;
   const startIso = startOfDay(isoFromDayIndex(from));

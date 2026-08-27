@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
   buildGanttLinks,
   buildGanttRows,
+  fillableRows,
+  fillScheduleEdits,
+  fillScheduleFor,
   relationColumnsOf,
   spanDays,
   type GanttRow,
@@ -31,6 +34,10 @@ const RANGE_START = "2026-08-24T00:00:00.000Z";
 
 function day(iso: string): string {
   return `${iso}T00:00:00.000Z`;
+}
+
+function dayIndexOf(iso: string): number {
+  return Math.floor(Date.parse(iso) / 86_400_000);
 }
 
 function row(
@@ -354,6 +361,160 @@ describe("bar geometry", () => {
   });
 });
 
+/* -------------------------------------------------------------- completion */
+
+const STATUS = "col_status";
+
+const STATUS_COLUMN: BoardColumnOf<"select"> = {
+  id: STATUS,
+  name: "Status",
+  position: 3,
+  width: 150,
+  hidden: false,
+  isPrimary: false,
+  type: "select",
+  config: {
+    isMulti: false,
+    options: [
+      { id: "todo", label: "To do", color: "gray" },
+      { id: "done", label: "Done", color: "green" },
+    ],
+    completedOptionIds: ["done"],
+  },
+};
+
+/** A record with a status, so completion has something configured to read. */
+function statusRow(
+  id: string,
+  optionId: string,
+  options: Parameters<typeof row>[1] = {},
+): BoardRow {
+  const base = row(id, options);
+  return { ...base, cells: { ...base.cells, [STATUS]: { kind: "select", optionIds: [optionId] } } };
+}
+
+/**
+ * How much of a bar is drawn at full strength.
+ *
+ * It is read off the completed options the board already declares — no new
+ * field, and nothing stored. A board that declares none has nothing denser to
+ * draw, which is a plain zero rather than a guess.
+ */
+describe("completion", () => {
+  test("a finished leaf is fully dense, an unfinished one is not", () => {
+    const done = build([statusRow("a", "done", { start: day("2026-08-26"), end: day("2026-08-28") })], STATUS_COLUMN);
+    const open = build([statusRow("b", "todo", { start: day("2026-08-26"), end: day("2026-08-28") })], STATUS_COLUMN);
+
+    expect(find(done.scheduled, "a").completionRatio).toBe(1);
+    expect(find(open.scheduled, "b").completionRatio).toBe(0);
+  });
+
+  test("a parent takes the share of its subtasks that are finished", () => {
+    const { scheduled } = build(
+      [
+        statusRow("parent", "todo", { start: day("2026-08-25"), end: day("2026-09-01") }),
+        statusRow("a", "done", {
+          start: day("2026-08-26"),
+          end: day("2026-08-28"),
+          parentRowId: "parent",
+        }),
+        statusRow("b", "todo", {
+          start: day("2026-08-27"),
+          end: day("2026-08-31"),
+          parentRowId: "parent",
+        }),
+      ],
+      STATUS_COLUMN,
+    );
+
+    expect(find(scheduled, "parent").completionRatio).toBe(0.5);
+    // The parent's own status is ignored — its progress belongs to its children.
+    expect(find(scheduled, "parent").progress?.completed).toBe(1);
+  });
+
+  test("a board with no completion column has nothing denser to draw", () => {
+    const { scheduled } = build([
+      row("a", { start: day("2026-08-26"), end: day("2026-08-28") }),
+    ]);
+
+    expect(find(scheduled, "a").completionRatio).toBe(0);
+  });
+});
+
+/* ----------------------------------------------------------- filling dates */
+
+/**
+ * Filling in an incomplete schedule.
+ *
+ * The rule throughout: a date the user typed is never moved. Only the missing
+ * half is written, and only when someone asks for it — the chart calculates
+ * this but never applies it on its own.
+ */
+describe("filling in missing dates", () => {
+  const TODAY = day("2026-08-24");
+
+  test("a lone start keeps its start and gains an end measured from it", () => {
+    expect(fillScheduleFor(day("2026-08-26"), null, TODAY)).toEqual({
+      startIso: day("2026-08-26"),
+      endIso: day("2026-08-28"),
+    });
+  });
+
+  test("a lone end keeps its end and gains a start before it", () => {
+    expect(fillScheduleFor(null, day("2026-08-26"), TODAY)).toEqual({
+      startIso: day("2026-08-24"),
+      endIso: day("2026-08-26"),
+    });
+  });
+
+  test("a record with no dates at all starts today", () => {
+    expect(fillScheduleFor(null, null, TODAY)).toEqual({
+      startIso: TODAY,
+      endIso: day("2026-08-26"),
+    });
+  });
+
+  test("a complete schedule is left alone", () => {
+    expect(fillScheduleFor(day("2026-08-26"), day("2026-08-30"), TODAY)).toBeNull();
+  });
+
+  test("only the missing column is written", () => {
+    const { rowsById, unscheduled } = build([row("a", { start: day("2026-08-26"), end: null })]);
+    const edits = fillScheduleEdits(unscheduled, rowsById, START_COLUMN, END_COLUMN, TODAY);
+
+    expect(edits).toHaveLength(1);
+    expect(edits[0]?.columnId).toBe(END);
+    expect(edits[0]?.value).toEqual({ kind: "date", iso: day("2026-08-28") });
+  });
+
+  test("both columns are written when neither is set", () => {
+    const { rowsById, unscheduled } = build([row("a", { start: null, end: null })]);
+    const edits = fillScheduleEdits(unscheduled, rowsById, START_COLUMN, END_COLUMN, TODAY);
+
+    expect(edits.map((edit) => edit.columnId)).toEqual([START, END]);
+  });
+
+  /**
+   * Which end was the typo is the author's to say, so the chart reports an
+   * inverted range and refuses to repair it.
+   */
+  test("an inverted range is not something the fill offers to fix", () => {
+    const { rowsById, unscheduled } = build([
+      row("a", { start: day("2026-08-30"), end: day("2026-08-26") }),
+    ]);
+
+    expect(find(unscheduled, "a").gap).toBe("inverted");
+    expect(fillableRows(unscheduled)).toHaveLength(0);
+    expect(fillScheduleEdits(unscheduled, rowsById, START_COLUMN, END_COLUMN, TODAY)).toHaveLength(0);
+  });
+
+  test("nothing is written when the view has not named both date columns", () => {
+    const { rowsById, unscheduled } = build([row("a", { start: null, end: null })]);
+
+    expect(fillScheduleEdits(unscheduled, rowsById, START_COLUMN, null, TODAY)).toHaveLength(0);
+  });
+});
+
 /* ------------------------------------------------------------- integration */
 
 describe("the chart writes through the board", () => {
@@ -379,6 +540,73 @@ describe("the chart writes through the board", () => {
     if (!record) throw new Error("board did not load");
     return record;
   }
+
+  /**
+   * A seeded board is a schedulable board.
+   *
+   * The fixtures used to hash each date independently, which produced records
+   * missing one of the two and records whose start fell after their end — and
+   * a chart of a full board that came up mostly empty. Every generated range
+   * now has both ends, in order.
+   */
+  test("every seeded record has a complete range, in order", () => {
+    const state = useBoardStore.getState();
+    const columns = state.board?.columns ?? [];
+    const start = columns.find((column) => column.id === "col_start");
+    const end = columns.find((column) => column.id === "col_due");
+    if (!start || !end) throw new Error("the task template lost its date columns");
+
+    expect(state.rowOrder.length).toBeGreaterThan(0);
+
+    for (const rowId of state.rowOrder) {
+      const cells = state.rowsById[rowId]?.cells;
+      const from = cells?.[start.id];
+      const to = cells?.[end.id];
+
+      expect(from?.kind === "date" && from.iso).toBeTruthy();
+      expect(to?.kind === "date" && to.iso).toBeTruthy();
+
+      if (from?.kind !== "date" || to?.kind !== "date" || !from.iso || !to.iso) continue;
+      expect(dayIndexOf(to.iso)).toBeGreaterThanOrEqual(dayIndexOf(from.iso));
+    }
+  });
+
+  /**
+   * The dependency toggle needs dependencies.
+   *
+   * Every relation cell used to be seeded empty, so `buildGanttLinks` always
+   * returned nothing and turning connectors on and off looked identical — a
+   * control that appears to do nothing at all.
+   */
+  test("the fixtures seed real blocked-by links for the chart to draw", () => {
+    const state = useBoardStore.getState();
+    const columns = state.board?.columns ?? [];
+    const rowsById = state.rowsById;
+
+    const rows = state.rowOrder.map((rowId) => ({
+      rowId,
+      depth: 0,
+      hasChildren: false,
+      childCount: 0,
+      isCollapsed: false,
+      schedule: { startIso: RANGE_START, endIso: RANGE_START, offset: 0, span: 1 },
+      kind: "task" as const,
+      isDerived: false,
+      gap: null,
+      progress: null,
+      completionRatio: 0,
+    }));
+
+    const links = buildGanttLinks(rows, rowsById, columns);
+
+    expect(links.length).toBeGreaterThan(0);
+    // A record never blocks itself, and both ends are records on this board.
+    for (const link of links) {
+      expect(link.fromRowId).not.toBe(link.toRowId);
+      expect(rowsById[link.fromRowId]).toBeDefined();
+      expect(rowsById[link.toRowId]).toBeDefined();
+    }
+  });
 
   /** Moving a bar is a cell edit, so the table has the new dates too. */
   test("a date edited on the record is what lengthens its bar", async () => {

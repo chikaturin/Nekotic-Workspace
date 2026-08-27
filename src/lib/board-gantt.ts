@@ -1,7 +1,8 @@
-import { dayIndex, daysBetween, startOfDay } from "@/lib/board-dates";
+import { addDays, dayIndex, daysBetween, startOfDay } from "@/lib/board-dates";
 import {
   childIdsOf,
   descendantIdsOf,
+  isRowCompleted,
   subtaskProgress,
   type HierarchyEntry,
   type HierarchyIndex,
@@ -9,7 +10,7 @@ import {
 } from "@/lib/board-hierarchy";
 import type { RowMap } from "@/lib/board-records";
 import { cellOf } from "@/lib/cell-values";
-import type { BoardColumn, BoardColumnOf } from "@/types";
+import type { BoardColumn, BoardColumnOf, CellEdit } from "@/types";
 
 /**
  * Gantt rows over the shared board records.
@@ -76,6 +77,15 @@ export interface GanttRow {
   /** Set only on unscheduled rows, saying which date is missing or wrong. */
   readonly gap: GanttGap | null;
   readonly progress: SubtaskProgress | null;
+  /**
+   * 0 – 1 of the bar drawn at full strength.
+   *
+   * A parent takes the share of its subtasks that are finished; a leaf is
+   * finished or it is not, so it is 1 or 0. Both read off the same completed
+   * options the board already declares — nothing new is stored, and a board
+   * with no completion column simply has no denser part to draw.
+   */
+  readonly completionRatio: number;
 }
 
 export interface GanttRowsInput {
@@ -164,13 +174,20 @@ export function buildGanttRows(input: GanttRowsInput): GanttRows {
         ? subtaskProgress(childIds, input.rowsById, input.completionColumn)
         : null;
 
+    const measured = progress && progress.isMeasurable ? progress : null;
+
     const base = {
       rowId,
       depth: entry.depth,
       hasChildren: entry.hasChildren,
       childCount: entry.childCount,
       isCollapsed: entry.isCollapsed,
-      progress: progress && progress.isMeasurable ? progress : null,
+      progress: measured,
+      completionRatio: measured
+        ? measured.ratio
+        : isRowCompleted(input.rowsById[rowId], input.completionColumn)
+          ? 1
+          : 0,
     };
 
     // A start after its end is a mistake in the data. It is reported, not
@@ -222,6 +239,92 @@ export function buildGanttRows(input: GanttRowsInput): GanttRows {
   }
 
   return { scheduled, unscheduled };
+}
+
+/* ------------------------------------------------------------ filling in */
+
+/** How long a filled-in schedule runs when the record only knows one end. */
+export const DEFAULT_SPAN_DAYS = 3;
+
+export interface ScheduleFill {
+  readonly startIso: string;
+  readonly endIso: string;
+}
+
+/**
+ * The dates an incomplete record *would* be given.
+ *
+ * The chart never applies this on its own. Writing dates onto records because
+ * they were missing would rewrite the plan the moment someone opened a view,
+ * and a chart is not entitled to do that — so this stays a pure calculation
+ * that the "Fill dates" action turns into an ordinary, undoable cell edit.
+ *
+ * What is known is kept: a record that already has a start keeps it and gains
+ * an end measured from it, so filling in never moves a date the user typed.
+ * Returns null when nothing is missing, and refuses an inverted range, whose
+ * correct repair is ambiguous — only the author knows which end was the typo.
+ */
+export function fillScheduleFor(
+  startIso: string | null,
+  endIso: string | null,
+  todayIso: string,
+): ScheduleFill | null {
+  if (startIso && endIso) return null;
+
+  const span = DEFAULT_SPAN_DAYS - 1;
+  if (startIso) return { startIso, endIso: addDays(startIso, span) };
+  if (endIso) return { startIso: addDays(endIso, -span), endIso };
+
+  const today = startOfDay(todayIso);
+  return { startIso: today, endIso: addDays(today, span) };
+}
+
+/**
+ * Cell edits that put every fillable row on the chart, as one write.
+ *
+ * Only the missing half of a range is written — the present one is read back
+ * and passed through untouched, so the edit is additive rather than a reset.
+ */
+export function fillScheduleEdits(
+  rows: readonly GanttRow[],
+  rowsById: RowMap,
+  startColumn: BoardColumn | null,
+  endColumn: BoardColumn | null,
+  todayIso: string,
+): readonly CellEdit[] {
+  if (!startColumn || !endColumn) return [];
+
+  const edits: CellEdit[] = [];
+
+  for (const row of rows) {
+    const start = readDate(row.rowId, rowsById, startColumn);
+    const end = readDate(row.rowId, rowsById, endColumn);
+
+    const fill = fillScheduleFor(start, end, todayIso);
+    if (!fill) continue;
+
+    if (!start) {
+      edits.push({
+        rowId: row.rowId,
+        columnId: startColumn.id,
+        value: { kind: "date", iso: fill.startIso },
+      });
+    }
+    if (!end) {
+      edits.push({
+        rowId: row.rowId,
+        columnId: endColumn.id,
+        value: { kind: "date", iso: fill.endIso },
+      });
+    }
+  }
+
+  return edits;
+}
+
+/** Rows the fill action can actually complete — an inverted range is not one. */
+export function fillableRows(rows: readonly GanttRow[]): readonly GanttRow[] {
+  return rows.filter((row) => row.gap === "none" || row.gap === "partial");
 }
 
 /* ------------------------------------------------------------ dependencies */

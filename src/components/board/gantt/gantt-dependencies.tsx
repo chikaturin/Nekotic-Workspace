@@ -3,14 +3,15 @@
 import type { GanttLink, GanttRow } from "@/lib/board-gantt";
 
 interface GanttDependenciesProps {
-  /** Only the rows currently mounted — offscreen links are not worth drawing. */
+  /** Every scheduled row, so a connector can reach a row that is off-screen. */
   readonly rows: readonly GanttRow[];
   readonly links: readonly GanttLink[];
   readonly dayWidth: number;
   readonly rowHeight: number;
   readonly width: number;
-  /** Index of the first mounted row, so y positions line up with the window. */
-  readonly firstIndex: number;
+  /** The mounted window, as indexes into `rows`. */
+  readonly windowStart: number;
+  readonly windowEnd: number;
 }
 
 /** How far a connector reaches out before it turns. */
@@ -25,8 +26,11 @@ const ELBOW = 10;
  * colour and nothing else happens: the chart reports the clash, it does not
  * reschedule anyone. Deciding what to move is the plan owner's job.
  *
- * Only links between two mounted rows are rendered, so a board with thousands
- * of dependencies costs whatever is on screen and no more.
+ * A link is drawn when *either* end is on screen. Requiring both meant that
+ * scrolling a blocker out of the window silently deleted the arrow pointing at
+ * it, which reads as the dependency having disappeared rather than as the row
+ * having. Positions come from each row's index in the whole chart, so the line
+ * leaves the viewport instead of stopping short of it.
  */
 export function GanttDependencies({
   rows,
@@ -34,24 +38,28 @@ export function GanttDependencies({
   dayWidth,
   rowHeight,
   width,
-  firstIndex,
+  windowStart,
+  windowEnd,
 }: GanttDependenciesProps) {
   const positions = new Map(rows.map((row, index) => [row.rowId, index]));
-  const visible = links.filter(
-    (link) => positions.has(link.fromRowId) && positions.has(link.toRowId),
-  );
+
+  const isMounted = (index: number) => index >= windowStart && index < windowEnd;
+
+  const visible = links.filter((link) => {
+    const from = positions.get(link.fromRowId);
+    const to = positions.get(link.toRowId);
+    if (from === undefined || to === undefined) return false;
+    return isMounted(from) || isMounted(to);
+  });
 
   if (visible.length === 0) return null;
-
-  const height = rows.length * rowHeight;
 
   return (
     <svg
       aria-hidden
       width={width}
-      height={height}
-      style={{ top: firstIndex * rowHeight }}
-      className="pointer-events-none absolute left-0 z-10 overflow-visible"
+      height={rows.length * rowHeight}
+      className="pointer-events-none absolute top-0 left-0 z-10 overflow-visible"
     >
       {visible.map((link) => {
         const fromIndex = positions.get(link.fromRowId);
@@ -78,13 +86,10 @@ export function GanttDependencies({
               d={`M ${x1} ${y1} H ${turn} V ${y2} H ${x2}`}
               fill="none"
               stroke={stroke}
-              strokeWidth={link.isConflict ? 1.5 : 1}
+              strokeWidth={link.isConflict ? 1.5 : 1.25}
               strokeDasharray={link.isConflict ? "3 2" : undefined}
             />
-            <path
-              d={`M ${x2} ${y2} l -4 -3 l 0 6 z`}
-              fill={stroke}
-            />
+            <path d={`M ${x2} ${y2} l -5 -3.5 l 0 7 z`} fill={stroke} />
           </g>
         );
       })}

@@ -14,7 +14,7 @@ import { StatePanel } from "@/components/shared/state-panels";
 import { MOCK_NOW } from "@/config/app";
 import type { BoardViewModel } from "@/hooks/use-board-view";
 import { useVirtualRows } from "@/hooks/use-virtual-rows";
-import { buildGanttLinks, buildGanttRows } from "@/lib/board-gantt";
+import { buildGanttLinks, buildGanttRows, fillScheduleEdits, type GanttRow } from "@/lib/board-gantt";
 import { layoutHierarchy } from "@/lib/board-hierarchy";
 import { timelineScale } from "@/lib/board-timeline";
 import { formatCount } from "@/lib/format";
@@ -22,7 +22,7 @@ import { selectCollapsedParents, useGridStore } from "@/store/grid-store";
 import { useBoardStore } from "@/store/board-store";
 import type { GanttZoom } from "@/types";
 
-const ROW_HEIGHT = 30;
+const ROW_HEIGHT = 44;
 const HEADER_HEIGHT = 44;
 const DEFAULT_PANEL_WIDTH = 280;
 const MIN_PANEL_WIDTH = 180;
@@ -30,6 +30,10 @@ const MAX_PANEL_WIDTH = 560;
 
 interface GanttBoardProps {
   readonly model: BoardViewModel;
+  /** Whether this person may write a record at all — `row.update`, nothing
+   *  Gantt-specific. Bars stay read-only either way; this gates the one action
+   *  that writes, which is filling in a missing date. */
+  readonly canEdit: boolean;
 }
 
 /**
@@ -55,10 +59,11 @@ interface GanttBoardProps {
  * height of the chart, and it keeps the background's cost tied to the width of
  * the window rather than to the number of records.
  */
-export function GanttBoard({ model }: GanttBoardProps) {
+export function GanttBoard({ model, canEdit }: GanttBoardProps) {
   const { board, view, columns, columnsShown, rowIds, dateColumn, endDateColumn, context } = model;
 
   const rowsById = useBoardStore((state) => state.rowsById);
+  const editCells = useBoardStore((state) => state.editCells);
   const setGanttZoom = useBoardStore((state) => state.setGanttZoom);
   const setShowDependencies = useBoardStore((state) => state.setShowDependencies);
 
@@ -106,9 +111,19 @@ export function GanttBoard({ model }: GanttBoardProps) {
     [entries, rowsById, model.hierarchy, dateColumn, endDateColumn, model.completionColumn, scale.startIso],
   );
 
+  /**
+   * Built whether or not they are shown, so the toolbar can say how many there
+   * are. A toggle that looks identical either way — which is what it does on a
+   * board where nothing is blocked by anything — reads as a broken button.
+   */
+  const allLinks = useMemo(
+    () => buildGanttLinks(scheduled, rowsById, columns),
+    [scheduled, rowsById, columns],
+  );
+
   const links = useMemo(
-    () => (showDependencies ? buildGanttLinks(scheduled, rowsById, columns) : []),
-    [showDependencies, scheduled, rowsById, columns],
+    () => (showDependencies ? allLinks : []),
+    [showDependencies, allLinks],
   );
 
   /** Rows whose start falls before something they are blocked by finishes. */
@@ -145,6 +160,22 @@ export function GanttBoard({ model }: GanttBoardProps) {
     hasCentred.current = true;
     scrollToToday();
   }, [scheduled.length, scrollToToday]);
+
+  /**
+   * Fill in the dates a record is missing.
+   *
+   * An ordinary cell edit on the same columns the view reads — optimistic,
+   * permission-checked and revertible like any other write, and visible in the
+   * table and the drawer the moment it lands. Nothing about it is special to
+   * the chart, which is exactly why the chart is allowed to offer it.
+   */
+  const fillDates = useCallback(
+    (targets: readonly GanttRow[]) => {
+      const edits = fillScheduleEdits(targets, rowsById, dateColumn, endDateColumn, MOCK_NOW);
+      if (edits.length > 0) void editCells(edits);
+    },
+    [rowsById, dateColumn, endDateColumn, editCells],
+  );
 
   /**
    * Zoom keeps its place. Without this, every scale change scrolls back to the
@@ -202,6 +233,7 @@ export function GanttBoard({ model }: GanttBoardProps) {
         onZoomChange={changeZoom}
         showDependencies={showDependencies}
         onToggleDependencies={() => void setShowDependencies(!showDependencies)}
+        linkCount={allLinks.length}
         onToday={scrollToToday}
         summary={summary}
       />
@@ -285,12 +317,13 @@ export function GanttBoard({ model }: GanttBoardProps) {
 
                 {showDependencies && (
                   <GanttDependencies
-                    rows={visible}
+                    rows={scheduled}
                     links={links}
                     dayWidth={scale.dayWidth}
                     rowHeight={ROW_HEIGHT}
                     width={chartWidth}
-                    firstIndex={range.start}
+                    windowStart={range.start}
+                    windowEnd={range.end}
                   />
                 )}
               </div>
@@ -299,7 +332,12 @@ export function GanttBoard({ model }: GanttBoardProps) {
         </div>
       )}
 
-      <GanttUnscheduled rows={unscheduled} primaryColumnId={primaryColumnId} />
+      <GanttUnscheduled
+        rows={unscheduled}
+        primaryColumnId={primaryColumnId}
+        canEdit={canEdit}
+        onFill={fillDates}
+      />
     </div>
   );
 }

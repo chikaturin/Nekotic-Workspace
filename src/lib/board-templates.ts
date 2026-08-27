@@ -260,6 +260,7 @@ const BUG: BoardTemplate = {
     { id: "col_reporter", name: "Reporter", type: "user", width: 180 },
     { id: "col_assignee", name: "Assignee", type: "user", width: 180 },
     { id: "col_found", name: "Found on", type: "date", width: 150 },
+    { id: "col_target", name: "Target fix", type: "date", width: 150 },
     { id: "col_description", name: "Steps to reproduce", type: "longText", width: 280 },
     { id: "col_evidence", name: "Evidence", type: "attachment", width: 180 },
     { id: "col_task", name: "Related task", type: "relation" },
@@ -268,6 +269,12 @@ const BUG: BoardTemplate = {
     { name: "All bugs", type: "table" },
     { name: "Triage", type: "kanban", groupByColumnId: "col_status" },
     { name: "By severity", type: "table", sorts: [{ columnId: "col_severity", direction: "asc" }] },
+    {
+      name: "Timeline",
+      type: "gantt",
+      dateColumnId: "col_found",
+      endDateColumnId: "col_target",
+    },
   ],
 };
 
@@ -312,6 +319,7 @@ const QA: BoardTemplate = {
     },
     { id: "col_env", name: "Environment", type: "select", width: 150, options: ENVIRONMENT_OPTIONS },
     { id: "col_tester", name: "Tester", type: "user", width: 180 },
+    { id: "col_planned", name: "Planned on", type: "date", width: 150 },
     { id: "col_executed", name: "Executed on", type: "date", width: 150 },
     { id: "col_description", name: "Expected result", type: "longText", width: 280 },
     { id: "col_evidence", name: "Evidence", type: "attachment", width: 180 },
@@ -321,6 +329,12 @@ const QA: BoardTemplate = {
     { name: "All cases", type: "table" },
     { name: "By result", type: "kanban", groupByColumnId: "col_result" },
     { name: "Execution", type: "calendar", dateColumnId: "col_executed" },
+    {
+      name: "Timeline",
+      type: "gantt",
+      dateColumnId: "col_planned",
+      endDateColumnId: "col_executed",
+    },
   ],
 };
 
@@ -375,11 +389,19 @@ const API_DOCS: BoardTemplate = {
     { id: "col_env", name: "Environment", type: "select", width: 150, options: ENVIRONMENT_OPTIONS },
     { id: "col_description", name: "Description", type: "longText", width: 300 },
     { id: "col_owner", name: "Owner", type: "user", width: 180 },
+    { id: "col_documented", name: "Documented on", type: "date", width: 160 },
+    { id: "col_review", name: "Review by", type: "date", width: 150 },
     { id: "col_task", name: "Related task", type: "relation" },
   ]),
   views: [
     { name: "Catalogue", type: "table" },
     { name: "By method", type: "kanban", groupByColumnId: "col_method" },
+    {
+      name: "Timeline",
+      type: "gantt",
+      dateColumnId: "col_documented",
+      endDateColumnId: "col_review",
+    },
   ],
 };
 

@@ -21,6 +21,23 @@ import type {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Date columns that open a range; every other date column closes one.
+ *
+ * The templates pair these as a Gantt view's start and end — `col_start` with
+ * `col_due`, `col_found` with `col_target`, and so on — so generating them as
+ * a pair is what keeps the fixtures schedulable.
+ */
+const RANGE_START_COLUMNS: ReadonlySet<string> = new Set([
+  "col_start",
+  "col_found",
+  "col_planned",
+  "col_documented",
+]);
+
+/** Relation columns that point at another record on the same board. */
+const BLOCKING_COLUMNS: ReadonlySet<string> = new Set(["col_blocks"]);
+
 function hash(seed: string): number {
   let value = 2_166_136_261;
   for (let index = 0; index < seed.length; index += 1) {
@@ -158,6 +175,7 @@ const DESCRIPTIONS = [
 ];
 
 interface RowContext {
+  readonly boardId: string;
   readonly template: BoardTemplate;
   /** Row-level hash — drives the title, the author and the timestamps. */
   readonly seed: number;
@@ -165,8 +183,9 @@ interface RowContext {
   readonly base: number;
   /**
    * Per-column hash. Deriving every cell from the row hash alone correlates
-   * the columns: with a 7-person directory and a 7-way "no date" test, the
-   * records assigned to one person were exactly the records with no deadline.
+   * the columns: with a 7-person directory and a 7-way test on any other
+   * field, the records assigned to one person were exactly the records that
+   * failed it.
    */
   readonly cellSeed: number;
 }
@@ -183,7 +202,7 @@ function primaryText({ template, seed, index }: RowContext): string {
 }
 
 function cellFor(column: BoardColumn, context: RowContext): CellValue {
-  const { cellSeed, index, base, template } = context;
+  const { boardId, cellSeed, index, base, template } = context;
 
   switch (column.type) {
     case "text":
@@ -212,17 +231,22 @@ function cellFor(column: BoardColumn, context: RowContext): CellValue {
       };
 
     case "date": {
-      const isEmpty = cellSeed % (column.id === "col_start" ? 5 : 11) === 0;
-      if (isEmpty) return { kind: "date", iso: null };
+      /**
+       * Both ends of a range are always generated, and the end is measured
+       * *from* the start rather than hashed on its own. Two independent days
+       * produced records whose start fell after their end, and records with
+       * only one of the two — neither of which is a duration, so the Gantt
+       * could place neither, and a chart of a full board came up mostly empty.
+       */
+      const start = -((cellSeed % 25) + 2);
+      if (RANGE_START_COLUMNS.has(column.id)) {
+        return { kind: "date", iso: new Date(base + start * DAY_MS).toISOString() };
+      }
 
       // Every ninth deadline lands on the reference day, so "Due today" and
-      // the calendar both have something real to show.
-      const offset =
-        column.id === "col_start"
-          ? -((cellSeed % 25) + 2)
-          : cellSeed % 9 === 0
-            ? 0
-            : (cellSeed % 40) - 12;
+      // the calendar both have something real to show. It is still after the
+      // start, which is always at least two days in the past.
+      const offset = cellSeed % 9 === 0 ? 0 : start + (cellSeed % 14) + 1;
 
       return { kind: "date", iso: new Date(base + offset * DAY_MS).toISOString() };
     }
@@ -230,8 +254,25 @@ function cellFor(column: BoardColumn, context: RowContext): CellValue {
     case "attachment":
       return { kind: "attachment", attachments: [] };
 
-    case "relation":
-      return { kind: "relation", rowIds: [] };
+    case "relation": {
+      /**
+       * "Blocked by" is the one relation that points inside the same board, so
+       * it is the only one seeded. The others name a record on another board,
+       * whose ids this generator has no business inventing.
+       *
+       * Every fourth record is blocked by one a little ahead of it, which gives
+       * the Gantt real connectors to draw and its conflict warning something to
+       * find — an empty relation column made the dependency toggle look broken.
+       */
+      if (!BLOCKING_COLUMNS.has(column.id) || cellSeed % 4 !== 0) {
+        return { kind: "relation", rowIds: [] };
+      }
+
+      const blockerIndex = index - ((cellSeed % 3) + 1);
+      if (blockerIndex < 0) return { kind: "relation", rowIds: [] };
+
+      return { kind: "relation", rowIds: [`${boardId}_row_${blockerIndex + 1}`] };
+    }
   }
 }
 
@@ -271,7 +312,7 @@ export function buildRows(
     const cells: Record<string, CellValue> = {};
     for (const column of columns) {
       const cellSeed = hash(`${boardId}:${index}:${column.id}`);
-      cells[column.id] = cellFor(column, { template, seed, cellSeed, index, base });
+      cells[column.id] = cellFor(column, { boardId, template, seed, cellSeed, index, base });
     }
 
     const parentIndex = parentIndexFor(template, index);

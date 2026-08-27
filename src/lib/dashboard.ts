@@ -1,4 +1,5 @@
 import { dayKey } from "@/lib/board-dates";
+import { SELECT_SOLID_CLASSES } from "@/lib/board-schema";
 import type { BoardLenses } from "@/lib/my-work";
 import type {
   DeadlineBucketId,
@@ -119,17 +120,7 @@ export function deadlineBucketOf(
 }
 
 /**
- * Solid fills for the distribution bar. The faint `SELECT_COLOR_CLASSES` chips
- * read as labels; a bar has to carry the proportion on its own, so it takes the
- * same tokens at full strength.
+ * Solid fills for the distribution bar — the same scale the Gantt bars use, so
+ * a status is one colour across the workspace rather than one per surface.
  */
-export const BUCKET_BAR_CLASSES: Readonly<Record<SelectColor, string>> = {
-  gray: "bg-kind-other",
-  blue: "bg-kind-folder",
-  green: "bg-kind-spreadsheet",
-  amber: "bg-kind-archive",
-  red: "bg-kind-pdf",
-  violet: "bg-kind-board",
-  cyan: "bg-kind-image",
-  pink: "bg-kind-video",
-};
+export const BUCKET_BAR_CLASSES = SELECT_SOLID_CLASSES;
