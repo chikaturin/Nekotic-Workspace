@@ -17,8 +17,9 @@ import type { BoardColumn, BoardColumnOf, CellEdit } from "@/types";
  *
  * There is no Gantt task list. Every line here is a board record read through
  * the same hierarchy the table nests with, scheduled by whichever two Date
- * columns the view names — so a date changed in the grid, the drawer or by
- * dragging a bar is the same write, and every view sees it on the next frame.
+ * columns the view names — so a date changed in the grid or the drawer is the
+ * same write, and every view sees it on the next frame. The chart itself only
+ * ever reads — see `gantt-board` for why it does not reschedule.
  *
  * Three things are *derived* and never written back:
  *

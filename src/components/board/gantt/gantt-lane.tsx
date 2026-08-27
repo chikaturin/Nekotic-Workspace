@@ -26,8 +26,8 @@ interface GanttLaneProps {
  * One record's lane on the chart.
  *
  * Like the task row beside it, it subscribes to its own record — so a date
- * edited in the table, the drawer or by dragging a different bar repaints one
- * lane rather than the whole chart.
+ * edited in the table or the drawer repaints one lane rather than the whole
+ * chart.
  */
 export const GanttLane = memo(function GanttLane({
   row,

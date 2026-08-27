@@ -174,7 +174,8 @@ function readDate(rowId: string, rows: RowMap, column: BoardColumn | null): stri
 
 /**
  * Bars for every row that has at least one of the two dates. A record with only
- * one end renders as a single day so it stays visible and draggable.
+ * one end renders as a single day so it stays visible rather than collapsing to
+ * nothing.
  */
 export function buildBars(
   rowIds: readonly string[],
