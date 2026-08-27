@@ -172,31 +172,32 @@ describe("reading a .env file", () => {
 /* --------------------------------------------------------------- formatter */
 
 describe("formatting a config document", () => {
-  test("only the languages with a real parser offer it", () => {
-    expect(canFormat("json")).toBe(true);
-    expect(canFormat("env")).toBe(true);
+  test("the languages with a real parser offer it, and the rest say so", async () => {
+    for (const format of ["json", "env", "javascript", "typescript", "tsx", "css", "yaml"] as const) {
+      expect(canFormat(format), format).toBe(true);
+    }
 
-    for (const format of ["typescript", "yaml", "sql", "css", "text"] as const) {
+    for (const format of ["sql", "shell", "dockerfile", "nginx", "xml", "text"] as const) {
       expect(canFormat(format), format).toBe(false);
-      expect(formatSource("anything", format)).toEqual({
+      await expect(formatSource("anything", format)).resolves.toEqual({
         ok: false,
         message: NO_FORMATTER_HINT,
       });
     }
   });
 
-  test("JSON is reprinted from its own parser", () => {
-    const result = formatSource('{"provider":"stripe","timeout":30000,"retry":3}', "json");
-
-    expect(result).toEqual({
+  test("JSON is reprinted from its own parser", async () => {
+    await expect(
+      formatSource('{"provider":"stripe","timeout":30000,"retry":3}', "json"),
+    ).resolves.toEqual({
       ok: true,
       text: '{\n  "provider": "stripe",\n  "timeout": 30000,\n  "retry": 3\n}\n',
     });
   });
 
   /** A formatter that half-rewrites an unparseable file is data loss. */
-  test("invalid JSON is refused, and no replacement text comes back", () => {
-    const result = formatSource('{\n  "port": 6868,\n}', "json");
+  test("invalid JSON is refused, and no replacement text comes back", async () => {
+    const result = await formatSource('{\n  "port": 6868,\n}', "json");
 
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("expected a refusal");
@@ -204,21 +205,53 @@ describe("formatting a config document", () => {
     expect(result).not.toHaveProperty("text");
   });
 
-  test("ENV tidies spacing without reordering, dropping or renaming anything", () => {
+  test("ENV tidies spacing without reordering, dropping or renaming anything", async () => {
     const source = "# payment\nZEBRA = 1\n\nALPHA=2\nexport GAMMA  =  3   \n";
-    const result = formatSource(source, "env");
 
-    expect(result).toEqual({
+    await expect(formatSource(source, "env")).resolves.toEqual({
       ok: true,
       text: "# payment\nZEBRA=1\n\nALPHA=2\nexport GAMMA  =  3\n",
     });
   });
 
-  test("formatting ENV twice changes nothing the second time", () => {
-    const once = formatSource("A = 1\nB=2\n", "env");
+  test("formatting ENV twice changes nothing the second time", async () => {
+    const once = await formatSource("A = 1\nB=2\n", "env");
     if (!once.ok) throw new Error("expected a format");
 
-    expect(formatSource(once.text, "env")).toEqual(once);
+    await expect(formatSource(once.text, "env")).resolves.toEqual(once);
+  });
+
+  /** The case that started this: a badly indented TSX file, straightened. */
+  test("TypeScript and TSX go through Prettier", async () => {
+    const messy = 'const a = cva("x", {\n  variants: {\nsize: { xs: "y" },\n  },\n});\n';
+    const result = await formatSource(messy, "tsx");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.message);
+    expect(result.text).toBe(
+      'const a = cva("x", {\n  variants: {\n    size: { xs: "y" },\n  },\n});\n',
+    );
+  });
+
+  test("a language keeps its own parser — JSX is not read as TypeScript", async () => {
+    const jsx = "const el = <div className={x}>{y}</div>;\n";
+
+    await expect(formatSource(jsx, "jsx")).resolves.toMatchObject({ ok: true });
+    await expect(formatSource("a { color : red }", "css")).resolves.toEqual({
+      ok: true,
+      text: "a {\n  color: red;\n}\n",
+    });
+  });
+
+  test("code Prettier cannot parse is refused with its own reason, not a stack", async () => {
+    const result = await formatSource("const a = (((;", "typescript");
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected a refusal");
+    expect(result.message).toMatch(/^Unable to format/);
+    // One line: the code frame Prettier appends is noise in a toast.
+    expect(result.message).not.toContain("\n");
+    expect(result).not.toHaveProperty("text");
   });
 });
 

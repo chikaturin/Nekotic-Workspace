@@ -12,6 +12,7 @@ import { NodeTitleInput } from "@/components/shared/node-title-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { useCapabilities, usePermissions } from "@/hooks/use-permissions";
 import { useConfigDocument } from "@/hooks/use-config-document";
 import { useHotkey } from "@/hooks/use-hotkey";
@@ -36,18 +37,27 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
   const controller = useConfigDocument(node.id, canEdit);
   const pushFeedback = useWorkspaceStore((state) => state.pushFeedback);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isFormatting, setIsFormatting] = useState(false);
 
   useHotkey("mod+s", () => controller.save(), { enableInInputs: true });
 
   /**
    * Reformat, or say why not — and on a refusal leave the source exactly as it
-   * was. A formatter that half-rewrites an unparseable file is a data loss with
-   * a friendly icon.
+   * was. A formatter that half-rewrites an unparseable file is data loss with a
+   * friendly icon.
+   *
+   * Asynchronous because the parser for this language is fetched the first time
+   * it is needed; the button reports that rather than looking dead for a beat.
    */
-  function reformat(format: Parameters<typeof formatSource>[1]) {
-    const result = formatSource(controller.draft, format);
-    if (result.ok) controller.setDraft(result.text);
-    else pushFeedback(result.message, "error");
+  async function reformat(format: ConfigFormat) {
+    setIsFormatting(true);
+    try {
+      const result = await formatSource(controller.draft, format);
+      if (result.ok) controller.setDraft(result.text);
+      else pushFeedback(result.message, "error");
+    } finally {
+      setIsFormatting(false);
+    }
   }
 
   return (
@@ -102,11 +112,13 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
                     size="sm"
                     variant="ghost"
                     className="gap-1.5"
-                    disabled={!canFormat(document.format) || controller.problem !== null}
+                    disabled={
+                      !canFormat(document.format) || controller.problem !== null || isFormatting
+                    }
                     title={formatHint(document.format, controller.problem !== null)}
-                    onClick={() => reformat(document.format)}
+                    onClick={() => void reformat(document.format)}
                   >
-                    <Wand2 />
+                    {isFormatting ? <Spinner /> : <Wand2 />}
                     Format
                   </Button>
                 )}
