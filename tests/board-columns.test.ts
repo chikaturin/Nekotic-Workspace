@@ -22,11 +22,14 @@ import {
   canFormatSteps,
   DEFAULT_STEP_NUMBERING,
   formatSteps,
+  INDENT,
+  indentSelection,
   lineAt,
   looksLikeSteps,
   nextStepInsertion,
   numberPastedLines,
   openingText,
+  outdentSelection,
   parseStepLine,
   spacesAfter,
   stepNumberingOf,
@@ -713,6 +716,100 @@ describe("numbering the steps in a cell", () => {
     expect(stepNumberingOf({}).enabled).toBe(false);
     expect(stepToken(B, 4)).toBe("B4: ");
     expect(stepToken({ ...B, separator: "" }, 4)).toBe("B4");
+  });
+});
+
+describe("Tab indents the step it is standing in", () => {
+  /**
+   * A step cell is written like a document, not filled in like a field: a
+   * sub-point lines up under the words above it. Tab leaving the field was
+   * doing the one thing nobody in a multi-line editor wants, and the only way
+   * to line anything up was to hold the spacebar.
+   */
+  test("a caret gets an indent typed at it", () => {
+    const edit = indentSelection("B2: shown", 9, 9);
+
+    expect(edit.text).toBe(`B2: shown${INDENT}`);
+    expect(edit.selectionStart).toBe(9 + INDENT.length);
+    expect(edit.selectionEnd).toBe(edit.selectionStart);
+  });
+
+  test("an indent is four spaces — the width of a step token", () => {
+    expect(INDENT).toBe("    ");
+    expect(INDENT.length).toBe("B1: ".length);
+    expect(INDENT).not.toContain("\t");
+  });
+
+  test("a selection inside one line is replaced, the way typing would", () => {
+    const edit = indentSelection("B1: one two", 4, 7);
+    expect(edit.text).toBe(`B1: ${INDENT} two`);
+  });
+
+  test("a selection across lines indents every line it touches", () => {
+    const text = "B1: one\nB2: two\nB3: three";
+    // From inside line 1 to inside line 2 — both lines move, line 3 does not.
+    const edit = indentSelection(text, 5, 12);
+
+    expect(edit.text).toBe(`${INDENT}B1: one\n${INDENT}B2: two\nB3: three`);
+  });
+
+  test("a block selection still covers the block afterwards", () => {
+    const text = "one\ntwo";
+    const edit = indentSelection(text, 0, 7);
+
+    expect(edit.text).toBe(`${INDENT}one\n${INDENT}two`);
+    expect(edit.selectionStart).toBe(INDENT.length);
+    expect(edit.selectionEnd).toBe(7 + INDENT.length * 2);
+    expect(edit.text.slice(edit.selectionStart, edit.selectionEnd)).toBe(`one\n${INDENT}two`);
+  });
+
+  test("Shift+Tab takes one level back off", () => {
+    const edit = outdentSelection(`${INDENT}B2: shown`, 13, 13);
+
+    expect(edit.text).toBe("B2: shown");
+    expect(edit.selectionStart).toBe(13 - INDENT.length);
+  });
+
+  test("outdent never takes more than one level, however deep the line is", () => {
+    const edit = outdentSelection(`${INDENT}${INDENT}deep`, 20, 20);
+    expect(edit.text).toBe(`${INDENT}deep`);
+  });
+
+  /** Otherwise holding Shift+Tab on a flush block quietly eats the text. */
+  test("a line with nothing to take off is left exactly as it is", () => {
+    const text = "B1: flush\nB2: also flush";
+    expect(outdentSelection(text, 0, text.length)).toEqual({
+      text,
+      selectionStart: 0,
+      selectionEnd: text.length,
+    });
+  });
+
+  test("a partly-indented block loses only what each line actually had", () => {
+    const text = `${INDENT}one\ntwo\n  three`;
+    const edit = outdentSelection(text, 0, text.length);
+
+    expect(edit.text).toBe("one\ntwo\nthree");
+  });
+
+  test("a tab someone pasted in counts as one level", () => {
+    expect(outdentSelection("\tone", 4, 4).text).toBe("one");
+  });
+
+  /** A caret sitting inside the whitespace being removed must stay on its line. */
+  test("outdent never drags the caret onto the line above", () => {
+    const edit = outdentSelection(`B1: one\n${INDENT}B2: two`, 9, 9);
+
+    expect(edit.text).toBe("B1: one\nB2: two");
+    expect(edit.selectionStart).toBe(8);
+  });
+
+  test("indent and outdent are inverses of each other", () => {
+    const text = "B1: one\nB2: two";
+    const indented = indentSelection(text, 0, text.length);
+    const back = outdentSelection(indented.text, indented.selectionStart, indented.selectionEnd);
+
+    expect(back.text).toBe(text);
   });
 });
 

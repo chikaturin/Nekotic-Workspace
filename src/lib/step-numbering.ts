@@ -143,6 +143,114 @@ export function lineAt(text: string, caret: number): string {
   return upto.slice(start);
 }
 
+/* ------------------------------------------------------------------ indent */
+
+/**
+ * One level of indent, in spaces.
+ *
+ * Spaces rather than a tab character, for two reasons. A `\t` in a textarea is
+ * laid out against the browser's default tab stops — eight columns wide, and
+ * not the same eight everywhere — so a step aligned on one machine is ragged on
+ * the next. And the text leaves here constantly: pasted into a ticket, exported
+ * to a spreadsheet, read back by an importer. Spaces mean the same thing in all
+ * of them.
+ *
+ * Four, because that is the width of a step token — `B1: ` — so a continuation
+ * line indented once lands under the words of the step above it rather than
+ * under its number.
+ */
+export const INDENT = "    ";
+
+/** A rewritten value and where the caret or selection should sit in it. */
+export interface TextEdit {
+  readonly text: string;
+  readonly selectionStart: number;
+  readonly selectionEnd: number;
+}
+
+/** The bounds of the whole lines a selection touches, even partly. */
+function lineSpan(text: string, start: number, end: number): { from: number; to: number } {
+  const from = text.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+  const after = text.indexOf("\n", end);
+  return { from, to: after === -1 ? text.length : after };
+}
+
+/** Whether a selection covers more than one line — the block-indent case. */
+function isMultiLine(text: string, start: number, end: number): boolean {
+  return start !== end && text.slice(start, end).includes("\n");
+}
+
+/**
+ * What Tab does.
+ *
+ * A caret, or a selection inside one line, gets an indent typed at it — the
+ * "a wider space" a writer is reaching for when they line up a sub-point under
+ * the one above. A selection spanning several lines indents every line it
+ * touches, and keeps covering them afterwards, which is the only way to move a
+ * block in one gesture.
+ */
+export function indentSelection(text: string, start: number, end: number): TextEdit {
+  if (!isMultiLine(text, start, end)) {
+    return {
+      text: `${text.slice(0, start)}${INDENT}${text.slice(end)}`,
+      selectionStart: start + INDENT.length,
+      selectionEnd: start + INDENT.length,
+    };
+  }
+
+  const { from, to } = lineSpan(text, start, end);
+  const lines = text.slice(from, to).split("\n");
+  const indented = lines.map((line) => `${INDENT}${line}`).join("\n");
+
+  return {
+    text: `${text.slice(0, from)}${indented}${text.slice(to)}`,
+    // The first line grew before the selection began, the rest grew inside it.
+    selectionStart: start + INDENT.length,
+    selectionEnd: end + INDENT.length * lines.length,
+  };
+}
+
+/** How much leading whitespace one outdent takes off a line: up to a level. */
+function outdentWidth(line: string): number {
+  if (line.startsWith("\t")) return 1;
+
+  const spaces = /^ {1,4}/.exec(line)?.[0].length ?? 0;
+  return spaces;
+}
+
+/**
+ * What Shift+Tab does: the inverse, and never more than one level.
+ *
+ * A line with nothing to take off is left exactly as it is rather than
+ * borrowing from the line above — so holding Shift+Tab on an already-flush
+ * block does nothing at all, instead of quietly eating the text.
+ */
+export function outdentSelection(text: string, start: number, end: number): TextEdit {
+  const { from, to } = lineSpan(text, start, end);
+  const lines = text.slice(from, to).split("\n");
+
+  let firstRemoved = 0;
+  let totalRemoved = 0;
+
+  const outdented = lines.map((line, index) => {
+    const width = outdentWidth(line);
+    if (index === 0) firstRemoved = width;
+    totalRemoved += width;
+    return line.slice(width);
+  });
+
+  if (totalRemoved === 0) return { text, selectionStart: start, selectionEnd: end };
+
+  // A caret sitting inside the whitespace being removed must not be dragged
+  // in front of the line it is on.
+  const lineStart = from;
+  return {
+    text: `${text.slice(0, from)}${outdented.join("\n")}${text.slice(to)}`,
+    selectionStart: Math.max(lineStart, start - firstRemoved),
+    selectionEnd: Math.max(lineStart, end - totalRemoved),
+  };
+}
+
 /* ------------------------------------------------------------------ paste */
 
 /**

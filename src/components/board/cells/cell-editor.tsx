@@ -57,6 +57,7 @@ export function CellEditor(props: CellEditorProps) {
           rows={column.config.rows}
           initialText={props.initialText}
           steps={stepNumberingOf(column.config)}
+          label={column.name}
           onCommit={onCommit}
           onCancel={onCancel}
         />

@@ -1,21 +1,20 @@
 "use client";
 
-import { ListOrdered } from "lucide-react";
-import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import { ListOrdered, Maximize2 } from "lucide-react";
+import { useRef, useState, type ReactNode } from "react";
 import { EditorSurface } from "@/components/board/cells/cell-frame";
 import { FlowedText } from "@/components/board/cells/flowed-text";
+import { StepHints, StepTextarea } from "@/components/board/cells/step-textarea";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Kbd } from "@/components/ui/kbd";
 import {
-  canFormatSteps,
-  formatSteps,
-  lineAt,
-  nextStepInsertion,
-  numberPastedLines,
-  openingText,
-  spacesAfter,
-} from "@/lib/step-numbering";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { canFormatSteps, formatSteps, openingText } from "@/lib/step-numbering";
 import type { CellDisplayMode, CellValue, StepNumbering } from "@/types";
 
 export function LongTextCellView({
@@ -46,6 +45,8 @@ interface LongTextEditorProps {
   readonly initialText?: string;
   /** Step numbering from the column, when the column has it switched on. */
   readonly steps?: StepNumbering;
+  /** The column's name — what the expanded editor is titled with. */
+  readonly label?: string;
   readonly onCommit: (value: CellValue) => void;
   readonly onCancel: () => void;
 }
@@ -59,20 +60,23 @@ interface LongTextEditorProps {
  *     case — one step, then the next — so it gets the unmodified key.
  *   - **Shift+Enter** is a plain newline, for a step that runs to two lines.
  *   - **⌘/Ctrl+Enter** saves, as everywhere else in the app.
+ *   - **Tab** indents, and Shift+Tab takes it back. See `StepTextarea`.
  *
  * With numbering off nothing changes: Enter is a newline, as it always was.
+ *
+ * The draft lives here rather than in the field, so opening the full-screen
+ * editor is a change of size and nothing else — the same text, the same keys,
+ * mid-sentence and uncommitted.
  */
 export function LongTextCellEditor({
   value,
   rows,
   initialText,
   steps,
+  label = "Edit long text",
   onCommit,
   onCancel,
 }: LongTextEditorProps) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const isCancelled = useRef(false);
-
   const isNumbering = steps?.enabled === true;
   const base = initialText ?? value.value;
 
@@ -81,6 +85,17 @@ export function LongTextCellEditor({
   const seed = opening.slice(0, opening.length - base.length);
 
   const [draft, setDraft] = useState(opening);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  /**
+   * True while the blur is somebody opening the big editor.
+   *
+   * The inline field commits when it loses focus, and moving focus into a
+   * dialog is losing focus — so without this, pressing Expand saved the cell
+   * and closed the editor, and the dialog opened over a cell that was no
+   * longer being edited.
+   */
+  const isHandingOver = useRef(false);
 
   /**
    * What a commit writes. A cell nobody typed into stays empty — the seed is an
@@ -89,139 +104,199 @@ export function LongTextCellEditor({
    */
   const committed = (): string => (seed.length > 0 && draft === seed ? "" : draft);
 
-  useEffect(() => {
-    const area = ref.current;
-    if (!area) return;
-    area.focus();
-    area.setSelectionRange(area.value.length, area.value.length);
-  }, []);
-
-  /**
-   * Replace the selection with `insertion`, caret after it.
-   *
-   * The insertion is done *by the textarea*, against its own live value, and
-   * React is told afterwards. Building the new string from the `draft` state
-   * and restoring the caret on the next frame raced the render: two Enters in
-   * quick succession both read the pre-render caret, and the token landed
-   * again inside the line it had just opened — one keypress producing several
-   * steps at once. The DOM is the only thing that knows where the caret is at
-   * the moment of the keystroke, so it is what this asks.
-   */
-  function insert(insertion: string, absorbSpaces = false) {
-    const area = ref.current;
-    if (!area) return;
-
-    const end =
-      absorbSpaces && area.selectionStart === area.selectionEnd
-        ? area.selectionEnd + spacesAfter(area.value, area.selectionEnd)
-        : area.selectionEnd;
-
-    area.setRangeText(insertion, area.selectionStart, end, "end");
-    setDraft(area.value);
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      isCancelled.current = true;
-      onCancel();
-      return;
-    }
-
-    if (event.key !== "Enter") return;
-
-    if (event.metaKey || event.ctrlKey) {
-      event.preventDefault();
-      onCommit({ kind: "longText", value: committed() });
-      return;
-    }
-
-    // Shift+Enter is the plain newline the textarea would give anyway.
-    if (event.shiftKey || !isNumbering || !steps) return;
-
-    event.preventDefault();
-
-    // Read the line under the caret off the field, not off the last render.
-    const area = event.currentTarget;
-    insert(nextStepInsertion(lineAt(area.value, area.selectionStart), steps), true);
-  }
-
-  /**
-   * A paste of several plainly unnumbered lines becomes numbered steps. A paste
-   * that already carries numbers is left exactly as it arrived — see
-   * `numberPastedLines`, which refuses rather than guessing.
-   */
-  function handlePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
-    if (!isNumbering || !steps) return;
-
-    const text = event.clipboardData.getData("text/plain");
-    const numbered = numberPastedLines(text, steps);
-    if (!numbered) return;
-
-    event.preventDefault();
-    insert(numbered);
-  }
-
+  const save = () => onCommit({ kind: "longText", value: committed() });
   const canFormat = isNumbering && steps ? canFormatSteps(draft, steps) : false;
+
+  const format = (
+    <FormatStepsButton
+      isOffered={isNumbering && steps !== undefined}
+      canFormat={canFormat}
+      onFormat={() => steps && setDraft(formatSteps(draft, steps))}
+    />
+  );
+
+  if (isExpanded) {
+    return (
+      <LongTextExpandedEditor
+        draft={draft}
+        onDraftChange={setDraft}
+        steps={steps}
+        label={label}
+        isNumbering={isNumbering}
+        format={format}
+        onSave={save}
+        onCancel={onCancel}
+      />
+    );
+  }
 
   return (
     <EditorSurface className="w-[26rem]">
-      {/* Ghost, because the editor surface around it already draws the border
-          and the focus ring. The editor is only mounted while a cell is being
-          edited, so nothing here is on the grid's render path. */}
-      <Textarea
-        ref={ref}
-        variant="ghost"
+      <StepTextarea
         value={draft}
+        onChange={setDraft}
+        steps={steps}
         rows={rows}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
+        autoFocus
+        label={label}
+        onSubmit={save}
+        onCancel={onCancel}
         onBlur={() => {
-          if (!isCancelled.current) onCommit({ kind: "longText", value: committed() });
+          if (!isHandingOver.current) save();
         }}
-        aria-label="Edit long text"
-        className="w-full p-2 text-lead leading-relaxed"
       />
 
       <div className="flex items-center gap-1.5 border-t border-border px-2 py-1 text-micro text-faint-foreground">
-        <Kbd>⌘</Kbd>
-        <Kbd>↵</Kbd>
-        to save
-        {isNumbering && (
-          <>
-            <span className="mx-0.5">·</span>
-            <Kbd>↵</Kbd>
-            next step
-            <span className="mx-0.5">·</span>
-            <Kbd>⇧</Kbd>
-            <Kbd>↵</Kbd>
-            new line
-          </>
-        )}
-        {isNumbering && steps && (
+        <StepHints isNumbering={isNumbering} />
+
+        <span className="ml-auto flex items-center gap-1">
+          {format}
           <Button
             size="xs"
             variant="ghost"
-            className="ml-auto gap-1"
-            disabled={!canFormat}
-            // Renumbering prose would destroy it, so the action is offered only
-            // for a block that already reads as steps and would actually change.
-            title={
-              canFormat
-                ? "Renumber these steps in sequence"
-                : "These lines are already numbered in sequence, or are not steps"
-            }
-            // The pointer must not leave the textarea: blurring it commits.
+            aria-label="Open the full editor"
+            title="Write this in a full-size editor"
+            // The pointer must not commit on its way to the button: a blur
+            // here saves, and saving closes the editor the dialog opens from.
             onMouseDown={(event) => event.preventDefault()}
-            onClick={() => setDraft(formatSteps(draft, steps))}
+            // The flag is set on the click, not on the press. Arming it on
+            // mousedown meant a press that slid off the button and never
+            // became a click left the field unable to commit at all — the
+            // next click anywhere would have thrown the edit away in silence.
+            onClick={() => {
+              isHandingOver.current = true;
+              setIsExpanded(true);
+            }}
           >
-            <ListOrdered />
-            Format steps
+            <Maximize2 />
           </Button>
-        )}
+        </span>
       </div>
     </EditorSurface>
+  );
+}
+
+/**
+ * Renumbering prose would destroy it, so the action is offered only for a block
+ * that already reads as steps and would actually change.
+ */
+function FormatStepsButton({
+  isOffered,
+  canFormat,
+  onFormat,
+}: {
+  readonly isOffered: boolean;
+  readonly canFormat: boolean;
+  readonly onFormat: () => void;
+}) {
+  if (!isOffered) return null;
+
+  return (
+    <Button
+      size="xs"
+      variant="ghost"
+      className="gap-1"
+      disabled={!canFormat}
+      title={
+        canFormat
+          ? "Renumber these steps in sequence"
+          : "These lines are already numbered in sequence, or are not steps"
+      }
+      // The pointer must not leave the textarea: blurring it commits.
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onFormat}
+    >
+      <ListOrdered />
+      Format steps
+    </Button>
+  );
+}
+
+interface ExpandedEditorProps {
+  readonly draft: string;
+  readonly onDraftChange: (next: string) => void;
+  readonly steps?: StepNumbering | undefined;
+  readonly label: string;
+  readonly isNumbering: boolean;
+  readonly format: ReactNode;
+  readonly onSave: () => void;
+  readonly onCancel: () => void;
+}
+
+/**
+ * The same editor, given the screen.
+ *
+ * A test case is a dozen numbered steps with wrapped sub-points hanging under
+ * them, and the panel over the cell shows four lines of it — you write the
+ * thing through a letterbox and scroll to check what you already said. This is
+ * the same field at a size you can see the whole procedure in.
+ *
+ * Deliberately not committing on blur, unlike the inline field: a dialog has
+ * its own buttons, and a click on Format steps or a drag of the scrollbar is
+ * not a decision to stop editing.
+ */
+function LongTextExpandedEditor({
+  draft,
+  onDraftChange,
+  steps,
+  label,
+  isNumbering,
+  format,
+  onSave,
+  onCancel,
+}: ExpandedEditorProps) {
+  return (
+    <Dialog open onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent
+        size="2xl"
+        className="flex max-h-[85dvh] flex-col"
+        // Radix would otherwise put focus on the close button. The field is
+        // the only thing anybody opened this for, and `StepTextarea` puts the
+        // caret at the end of what is already written.
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle className="truncate">{label}</DialogTitle>
+          <DialogDescription>
+            {isNumbering
+              ? "Enter opens the next step, Shift+Enter adds a line, Tab indents."
+              : "Tab indents; Shift+Tab takes it back."}
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* The field is the dialog's body rather than sitting inside one: it
+            has to take the height the card gives it, and a scrolling body
+            wrapped around a scrolling textarea is two scrollbars for one
+            piece of text. */}
+        <div className="min-h-0 flex-1 px-5 pb-2">
+          <StepTextarea
+            value={draft}
+            onChange={onDraftChange}
+            steps={steps}
+            autoFocus
+            label={label}
+            onSubmit={onSave}
+            onCancel={onCancel}
+            className="h-full min-h-[24rem] overflow-auto rounded-lg border border-border bg-surface p-3"
+          />
+        </div>
+
+        <DialogFooter align="start">
+          <span className="flex items-center gap-1.5 text-micro text-faint-foreground">
+            <StepHints isNumbering={isNumbering} />
+          </span>
+
+          <span className="ml-auto flex items-center gap-2">
+            {format}
+            <Button size="sm" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button size="sm" variant="default" onClick={onSave}>
+              Save
+            </Button>
+          </span>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
