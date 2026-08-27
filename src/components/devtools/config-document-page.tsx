@@ -4,31 +4,51 @@ import { Braces, History, TriangleAlert, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { CodeEditor } from "@/components/devtools/code-editor";
 import { EnvironmentPicker } from "@/components/devtools/environment-picker";
+import { LanguagePicker } from "@/components/devtools/language-picker";
 import { ConfigVersionsDialog } from "@/components/versions/version-dialogs";
 import { SaveIndicator } from "@/components/document/save-indicator";
 import { AsyncBoundary } from "@/components/shared/async-boundary";
+import { NodeTitleInput } from "@/components/shared/node-title-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCapabilities, usePermissions } from "@/hooks/use-permissions";
 import { useConfigDocument } from "@/hooks/use-config-document";
 import { useHotkey } from "@/hooks/use-hotkey";
-import { formatJson } from "@/lib/json-lint";
-import type { DocumentNode } from "@/types";
+import { canFormat, formatSource, NO_FORMATTER_HINT } from "@/lib/code-format";
+import { CONFIG_FORMAT_LABELS } from "@/lib/syntax";
+import { useWorkspaceStore } from "@/store/workspace-store";
+import type { ConfigFormat, DocumentNode } from "@/types";
 
 /**
- * DV-CFG-22 — configuration as raw text with syntax colour, JSON validation
- * and a version history that can be restored from.
+ * DV-CFG-22 — a config document, in whatever language it is actually written
+ * in: syntax colour, a formatter where a real parser exists, and a version
+ * history that can be restored from.
+ *
+ * The language is a property of the document rather than of its file name, so
+ * it is picked in the header and travels with the content. Changing it recolours
+ * and re-offers the formatter; it never rewrites a byte.
  */
 export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
   const capabilities = useCapabilities(node);
   const can = usePermissions(node);
-  const controller = useConfigDocument(node.id);
+  const canEdit = capabilities.edit;
+  const controller = useConfigDocument(node.id, canEdit);
+  const pushFeedback = useWorkspaceStore((state) => state.pushFeedback);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
-  useHotkey("mod+s", () => void controller.save(), { enableInInputs: true });
+  useHotkey("mod+s", () => controller.save(), { enableInInputs: true });
 
-  const canEdit = capabilities.edit;
+  /**
+   * Reformat, or say why not — and on a refusal leave the source exactly as it
+   * was. A formatter that half-rewrites an unparseable file is a data loss with
+   * a friendly icon.
+   */
+  function reformat(format: Parameters<typeof formatSource>[1]) {
+    const result = formatSource(controller.draft, format);
+    if (result.ok) controller.setDraft(result.text);
+    else pushFeedback(result.message, "error");
+  }
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -38,16 +58,26 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
             <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-3">
               <span className="text-xl">{node.icon}</span>
 
-              <div className="min-w-0">
-                <h1 className="truncate text-title font-semibold tracking-tight text-foreground">
-                  {document.name}
-                </h1>
-                <p className="metric truncate text-body text-faint-foreground">
-                  {document.format.toUpperCase()} · v{document.version} · {document.updatedBy.name}
+              <div className="min-w-0 flex-1">
+                {/* The name is edited here, on the surface the document is
+                    open on — not only from the tree it happens to live in. */}
+                <NodeTitleInput
+                  node={node}
+                  canRename={can("node.rename")}
+                  className="w-full px-1 py-0.5"
+                />
+                <p className="metric truncate px-1 text-body text-faint-foreground">
+                  {CONFIG_FORMAT_LABELS[document.format]} · v{document.version} ·{" "}
+                  {document.updatedBy.name}
                 </p>
               </div>
 
-              <div className="ml-2 flex items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <LanguagePicker
+                  value={document.format}
+                  canEdit={canEdit}
+                  onChange={(format) => void controller.setFormat(format)}
+                />
                 <EnvironmentPicker
                   optionId={document.environmentOptionId}
                   canEdit={canEdit}
@@ -57,20 +87,24 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
                 {!canEdit && <Badge variant="default">read only</Badge>}
               </div>
 
-              <div className="ml-auto flex items-center gap-1.5">
+              <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                 <SaveIndicator
                   state={controller.saveState}
-                  onRetry={() => void controller.save()}
+                  onRetry={controller.retry}
                   isReadOnly={!canEdit}
                 />
 
-                {document.format === "json" && canEdit && (
+                {/* Shown for every language, disabled where there is no real
+                    parser behind it, and saying so. Hiding it instead would
+                    leave the reader wondering whether they had missed a menu. */}
+                {canEdit && (
                   <Button
                     size="sm"
                     variant="ghost"
                     className="gap-1.5"
-                    disabled={controller.problem !== null}
-                    onClick={() => controller.setDraft(formatJson(controller.draft))}
+                    disabled={!canFormat(document.format) || controller.problem !== null}
+                    title={formatHint(document.format, controller.problem !== null)}
+                    onClick={() => reformat(document.format)}
                   >
                     <Wand2 />
                     Format
@@ -87,11 +121,14 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
                   History
                 </Button>
 
+                {/* Autosave carries the edit; this is the "now, please" that
+                    ⌘S also does, and the thing to reach for before closing a
+                    laptop mid-sentence. */}
                 <Button
                   size="sm"
                   variant="default"
                   disabled={!canEdit || !controller.isDirty || controller.saveState.status === "saving"}
-                  onClick={() => void controller.save()}
+                  onClick={controller.save}
                 >
                   Save
                 </Button>
@@ -141,6 +178,19 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
       </AsyncBoundary>
     </div>
   );
+}
+
+/**
+ * Why the Format button is off, in the words of the reason it is off.
+ *
+ * A disabled control that explains nothing reads as broken; one that explains
+ * the wrong thing is worse. There are two different reasons, and saying
+ * "Reformat this JSON document" while refusing to is neither of them.
+ */
+function formatHint(format: ConfigFormat, hasProblem: boolean): string {
+  if (!canFormat(format)) return NO_FORMATTER_HINT;
+  if (hasProblem) return "Fix the error above before formatting.";
+  return `Reformat this ${CONFIG_FORMAT_LABELS[format]} document`;
 }
 
 function ConfigSkeleton() {

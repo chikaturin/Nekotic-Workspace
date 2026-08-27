@@ -13,6 +13,7 @@ import {
 import { useCreateBoard } from "@/hooks/use-create-board";
 import { useCreateDocument } from "@/hooks/use-create-document";
 import { BOARD_TEMPLATES } from "@/lib/board-templates";
+import { CONFIG_FORMATS, CONFIG_FORMAT_LABELS } from "@/lib/syntax";
 import { useWorkspaceStore } from "@/store/workspace-store";
 
 interface CreateMenuItemsProps {
@@ -93,13 +94,35 @@ export function CreateMenuItems({
         </DropdownMenuSubContent>
       </DropdownMenuSub>
 
-      <DropdownMenuItem
-        disabled={isCreating}
-        onSelect={() => void createDocument(targetId, "Untitled config", "config")}
-      >
-        <SlidersHorizontal />
-        Config document
-      </DropdownMenuItem>
+      {/* The language is chosen here rather than in a dialog, for the same
+          reason a board's template is: the app creates and then renames
+          inline, and one modal on the path to one document would be the only
+          one in the menu. The language is changeable in the header afterwards. */}
+      <DropdownMenuSub>
+        <DropdownMenuSubTrigger disabled={isCreating}>
+          <SlidersHorizontal />
+          Config document
+        </DropdownMenuSubTrigger>
+        <DropdownMenuSubContent className="max-h-80 w-48 overflow-y-auto">
+          <DropdownMenuLabel>Language</DropdownMenuLabel>
+          {CONFIG_FORMATS.map((format) => (
+            <DropdownMenuItem
+              key={format}
+              disabled={isCreating}
+              onSelect={() =>
+                void createDocument(
+                  targetId,
+                  `Untitled ${CONFIG_FORMAT_LABELS[format]} config`,
+                  "config",
+                  format,
+                )
+              }
+            >
+              {CONFIG_FORMAT_LABELS[format]}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
 
       <DropdownMenuItem
         disabled={isCreating}

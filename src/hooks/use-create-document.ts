@@ -5,10 +5,11 @@ import { useOpenNode } from "@/hooks/use-open-node";
 import { emptyDocumentBlocks } from "@/lib/blocks";
 import { hrefForNode } from "@/lib/tree";
 import { CURRENT_USER } from "@/mock/users";
+import { devtoolsService } from "@/services/devtools-service";
 import { documentService } from "@/services/document-service";
 import { toAppError } from "@/services/errors";
 import { getActiveTree, useWorkspaceStore } from "@/store/workspace-store";
-import type { DocumentKind } from "@/types";
+import type { ConfigFormat, DocumentKind } from "@/types";
 
 const ICONS: Readonly<Record<DocumentKind, string>> = {
   page: "📄",
@@ -25,6 +26,8 @@ export function useCreateDocument(): {
     parentId: string | null,
     name?: string,
     kind?: DocumentKind,
+    /** Language for a config document. Ignored by every other kind. */
+    format?: ConfigFormat,
   ) => Promise<void>;
   isCreating: boolean;
 } {
@@ -35,7 +38,12 @@ export function useCreateDocument(): {
   const pushFeedback = useWorkspaceStore((state) => state.pushFeedback);
 
   const createDocument = useCallback(
-    async (parentId: string | null, name = "Untitled", kind: DocumentKind = "page") => {
+    async (
+      parentId: string | null,
+      name = "Untitled",
+      kind: DocumentKind = "page",
+      format?: ConfigFormat,
+    ) => {
       setIsCreating(true);
 
       try {
@@ -46,8 +54,13 @@ export function useCreateDocument(): {
         // caret already in its title, not with a Rename waiting to be found.
         requestTitleFocus(node.id);
 
-        // Config and secret documents are seeded by their own service.
+        // Config and secret documents are seeded by their own service. A
+        // config's language is the one thing worth telling it at creation:
+        // guessing from the name gets "Payment Service Config" wrong.
         if (kind !== "page") {
+          if (kind === "config" && format) {
+            await devtoolsService.createConfig({ nodeId: node.id, format });
+          }
           openNode(hrefForNode(getActiveTree(), node.id));
           return;
         }
