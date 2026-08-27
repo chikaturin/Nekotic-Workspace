@@ -26,11 +26,23 @@ export function SidebarSection({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   if (isCollapsed) {
-    return <div className={cn("flex flex-col items-center gap-0.5", className)}>{children}</div>;
+    return (
+      <div className={cn("flex shrink-0 flex-col items-center gap-0.5", className)}>{children}</div>
+    );
   }
 
   return (
-    <section className={cn("flex min-h-0 flex-col", className)}>
+    /**
+     * `shrink-0` is what makes the rail scroll.
+     *
+     * The sidebar's scroll area is a flex column, so a section left at the
+     * default `flex-shrink: 1` compresses to fit instead of overflowing — the
+     * container then never exceeds its height, never scrolls, and the inner
+     * `overflow-hidden` (which the collapse animation needs) quietly clips
+     * whatever was squeezed out. Keeping each section at its natural height
+     * lets the column overflow, which is what produces the scrollbar.
+     */
+    <section className={cn("flex shrink-0 flex-col", className)}>
       <div className="flex h-7 items-center gap-1 pl-1 pr-1.5">
         <button
           type="button"

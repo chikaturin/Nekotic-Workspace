@@ -70,17 +70,19 @@ export function AppSidebar() {
       className="relative z-20 flex h-full shrink-0 flex-col border-r border-border bg-surface"
       aria-label="Workspace navigation"
     >
-      <div className={cn("flex h-14 items-center px-2", isCollapsed && "justify-center px-1")}>
+      <div className={cn("flex h-14 shrink-0 items-center px-2", isCollapsed && "justify-center px-1")}>
         <WorkspaceSwitcher isCollapsed={isCollapsed} />
       </div>
 
-      <div className={cn("px-3 pb-3", isCollapsed && "px-2")}>
+      <div className={cn("shrink-0 px-3 pb-3", isCollapsed && "px-2")}>
         <NewItemMenu isCollapsed={isCollapsed} targetId={targetId} targetName={targetName} />
       </div>
 
+      {/* The one part of the rail that flexes: everything above and below it
+          keeps its natural height, so this is what overflows and scrolls. */}
       <div
         className={cn(
-          "no-scrollbar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-2 pb-3",
+          "no-scrollbar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-2 pb-3",
           isCollapsed && "items-center px-1.5",
         )}
       >
@@ -158,7 +160,7 @@ export function AppSidebar() {
         </SidebarSection>
       </div>
 
-      <div className={cn("border-t border-border p-2", isCollapsed && "px-1.5")}>
+      <div className={cn("shrink-0 border-t border-border p-2", isCollapsed && "px-1.5")}>
         <StorageMeter storage={workspace.storage} isCollapsed={isCollapsed} />
 
         <div className={cn("mt-1 flex items-center gap-1", isCollapsed && "flex-col")}>
