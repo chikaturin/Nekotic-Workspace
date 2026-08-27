@@ -117,7 +117,7 @@ export function useGridKeyboard({
       if (!isReadOnly && !isMod && !event.altKey && event.key.length === 1 && rowId && column) {
         if (!TYPEAHEAD_TYPES.has(column.type)) return;
         event.preventDefault();
-        grid.beginEdit(rowId, column.id, event.key);
+        grid.beginEdit(rowId, column.id, { initialText: event.key });
       }
     },
     [bounds, rowIds, columns, onClearSelection, onScrollToRow, isReadOnly],

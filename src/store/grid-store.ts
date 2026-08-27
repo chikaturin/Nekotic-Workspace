@@ -27,6 +27,18 @@ interface EditingCell {
   readonly columnId: string;
   /** Text typed to open the editor, so the first keystroke is not lost. */
   readonly initialText?: string;
+  /**
+   * A value inside the cell the editor should open *on* — the attachment whose
+   * thumbnail was clicked, so the click lands on that file's preview rather
+   * than on the field's uploader.
+   */
+  readonly focusId?: string;
+}
+
+/** What opening an editor was asked to carry into it. */
+export interface EditIntent {
+  readonly initialText?: string;
+  readonly focusId?: string;
 }
 
 interface GridState {
@@ -58,7 +70,7 @@ interface GridActions {
   beginDragSelect: (address: CellAddress) => void;
   dragSelectTo: (address: CellAddress) => void;
   endDragSelect: () => void;
-  beginEdit: (rowId: string, columnId: string, initialText?: string) => void;
+  beginEdit: (rowId: string, columnId: string, intent?: EditIntent) => void;
   endEdit: () => void;
   openDrawer: (rowId: string) => void;
   closeDrawer: () => void;
@@ -118,7 +130,7 @@ export const useGridStore = create<GridStore>()((set, get) => ({
 
   endDragSelect: () => set({ isDragSelecting: false }),
 
-  beginEdit: (rowId, columnId, initialText) => set({ editing: { rowId, columnId, initialText } }),
+  beginEdit: (rowId, columnId, intent) => set({ editing: { rowId, columnId, ...intent } }),
   endEdit: () => set({ editing: null }),
 
   openDrawer: (rowId) => set({ drawerRowId: rowId }),

@@ -3,10 +3,12 @@
 import { Download, Paperclip, RotateCcw, Upload, X } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
 import { AttachmentViewer } from "@/components/board/attachments/attachment-viewer";
+import { CellOverflowCount } from "@/components/board/cells/cell-frame";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import type { AttachmentField } from "@/hooks/use-attachment-field";
 import { attachmentKind, isImageAttachment, isReachable } from "@/lib/attachments";
+import { CELL_CHIP_LIMIT, splitForCell } from "@/lib/cell-overflow";
 import { hasExternalFiles, readDroppedFiles } from "@/lib/dnd";
 import { triggerDownload } from "@/lib/dom/download";
 import { formatBytes } from "@/lib/format";
@@ -23,6 +25,8 @@ interface AttachmentGalleryProps {
   /** `compact` is the popover in the grid; `full` is the drawer section. */
   readonly density?: "compact" | "full";
   readonly label: string;
+  /** Open straight onto this file's preview — a thumbnail in the cell was clicked. */
+  readonly initialOpenId?: string | null;
 }
 
 /**
@@ -38,10 +42,11 @@ export function AttachmentGallery({
   canEdit,
   density = "full",
   label,
+  initialOpenId = null,
 }: AttachmentGalleryProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isOver, setIsOver] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(initialOpenId);
   const pushFeedback = useWorkspaceStore((state) => state.pushFeedback);
 
   const { files, uploads } = field;
@@ -247,16 +252,28 @@ function Thumbnail({ file }: { file: CellAttachment }) {
   );
 }
 
-/** Compact read-only strip — what a table cell shows when it is not open. */
+/**
+ * Compact read-only strip — what a table cell shows when it is not open.
+ *
+ * `isInteractive` marks each thumbnail as the thing a click in the grid should
+ * open, carrying the file's own id so the editor lands on its preview. The
+ * markers are inert data attributes rather than handlers: the strip is drawn
+ * for every visible row, and giving each file a closure would put a callback
+ * per attachment on a path built to stay cheap.
+ */
 export function AttachmentStrip({
   files,
-  limit = 3,
+  limit = CELL_CHIP_LIMIT,
+  isInteractive = false,
 }: {
   readonly files: readonly CellAttachment[];
   readonly limit?: number;
+  readonly isInteractive?: boolean;
 }) {
-  const shown = files.slice(0, limit);
-  const overflow = files.length - shown.length;
+  const { shown, overflow } = splitForCell(files, limit);
+  const marks = isInteractive
+    ? (file: CellAttachment) => ({ "data-cell-expand": "", "data-cell-focus-id": file.id })
+    : () => ({});
 
   return (
     <>
@@ -265,13 +282,16 @@ export function AttachmentStrip({
           // eslint-disable-next-line @next/next/no-img-element -- session object URL
           <img
             key={file.id}
+            {...marks(file)}
             src={file.thumbnailUrl ?? file.url ?? ""}
             alt={file.name}
+            title={file.name}
             className="size-6 shrink-0 rounded border border-border object-cover"
           />
         ) : (
           <span
             key={file.id}
+            {...marks(file)}
             title={file.name}
             className="flex size-6 shrink-0 items-center justify-center rounded border border-border bg-surface"
           >
@@ -279,7 +299,9 @@ export function AttachmentStrip({
           </span>
         ),
       )}
-      {overflow > 0 && <span className="metric text-micro text-faint-foreground">+{overflow}</span>}
+      {overflow > 0 && (
+        <CellOverflowCount count={overflow} title={files.map((file) => file.name).join(", ")} />
+      )}
     </>
   );
 }

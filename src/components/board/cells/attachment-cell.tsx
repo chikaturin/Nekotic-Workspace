@@ -1,5 +1,6 @@
 "use client";
 
+import { Plus } from "lucide-react";
 import { AttachmentGallery, AttachmentStrip } from "@/components/board/attachments/attachment-gallery";
 import { CellShell, EditorSurface } from "@/components/board/cells/cell-frame";
 import { Button } from "@/components/ui/button";
@@ -8,10 +9,39 @@ import type { BoardColumnOf, CellValue } from "@/types";
 
 type AttachmentValue = Extract<CellValue, { kind: "attachment" }>;
 
+/**
+ * An attachment cell, read-only.
+ *
+ * Empty, it offers the only thing it can do. The hint stays invisible until
+ * the pointer is over the cell, so a column of empty cells reads as empty
+ * rather than as a column of buttons — but the click target is the whole cell,
+ * not the hint, so nobody has to aim at it. `GridCell` is what turns that click
+ * into the uploader; the marker here is what tells it to.
+ *
+ * With files in it the cell shows them, and a click on one opens *that* file —
+ * the editor is handed its id and opens on its preview. Reaching for a file
+ * and being given an upload dialog is the wrong answer to the question the
+ * click asked.
+ */
 export function AttachmentCellView({ value }: { value: AttachmentValue }) {
+  if (value.attachments.length === 0) {
+    return (
+      <CellShell>
+        <span
+          data-cell-expand=""
+          title="Add attachment"
+          className="flex items-center gap-1 text-micro text-faint-foreground opacity-0 transition-opacity group-hover/cell:opacity-100"
+        >
+          <Plus className="size-3" />
+          Add file
+        </span>
+      </CellShell>
+    );
+  }
+
   return (
     <CellShell>
-      <AttachmentStrip files={value.attachments} />
+      <AttachmentStrip files={value.attachments} isInteractive />
     </CellShell>
   );
 }
@@ -20,6 +50,8 @@ interface AttachmentEditorProps {
   readonly column: BoardColumnOf<"attachment">;
   readonly rowId: string;
   readonly folderId: string | null;
+  /** Attachment the cell was opened on, if a particular file was clicked. */
+  readonly focusId?: string | undefined;
   readonly onCancel: () => void;
 }
 
@@ -39,6 +71,7 @@ export function AttachmentCellEditor({
   column,
   rowId,
   folderId,
+  focusId,
   onCancel,
 }: AttachmentEditorProps) {
   const field = useAttachmentField(rowId, column.id, column.config.maxFiles, folderId);
@@ -51,6 +84,7 @@ export function AttachmentCellEditor({
         canEdit
         density="compact"
         label={column.name}
+        initialOpenId={focusId ?? null}
       />
 
       <div className="flex justify-end border-t border-border p-1.5">

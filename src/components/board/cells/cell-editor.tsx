@@ -23,6 +23,8 @@ export interface CellEditorProps {
   readonly columns: readonly BoardColumn[];
   readonly context: CellContext;
   readonly initialText?: string;
+  /** A value inside the cell the editor should open on — see `EditIntent`. */
+  readonly focusId?: string | undefined;
   readonly onCommit: (value: CellValue, move?: "down" | "none") => void;
   readonly onCancel: () => void;
   readonly onCreateOption: (label: string) => Promise<SelectOption | null>;
@@ -96,6 +98,7 @@ export function CellEditor(props: CellEditorProps) {
           column={column}
           rowId={props.rowId}
           folderId={props.folderId}
+          focusId={props.focusId}
           onCancel={onCancel}
         />
       );

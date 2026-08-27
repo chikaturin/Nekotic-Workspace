@@ -80,7 +80,7 @@ describe("grid interaction state", () => {
 
   test("editing and the drawer are independent of the selection", () => {
     const grid = useGridStore.getState();
-    grid.beginEdit("r1", "c1", "x");
+    grid.beginEdit("r1", "c1", { initialText: "x" });
 
     expect(selectIsEditing("r1", "c1")(useGridStore.getState())).toBe(true);
     expect(useGridStore.getState().editing?.initialText).toBe("x");
