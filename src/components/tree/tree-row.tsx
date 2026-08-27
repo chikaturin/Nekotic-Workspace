@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { MouseEvent } from "react";
 import { TREE_INDENT } from "@/config/app";
 import { useDragSource, useDropTarget } from "@/hooks/use-node-dnd";
+import { routableHref } from "@/lib/exported-routes";
 import { nodeVisual } from "@/lib/node-visuals";
 import { AccessBadge } from "@/components/shared/access-badge";
 import { cn } from "@/lib/utils";
@@ -85,8 +86,17 @@ export function TreeRow({ node, depth, href, isExpanded, isActive, onToggle }: T
     );
   }
 
+  // `routableHref` because a folder created or renamed since the build has an
+  // address the static export has never written a file for; a plain link to it
+  // is a hard navigation into the host's 404.
   return (
-    <Link href={href} className={className} {...dragProps} {...dropProps} data-node-id={node.id}>
+    <Link
+      href={routableHref(href)}
+      className={className}
+      {...dragProps}
+      {...dropProps}
+      data-node-id={node.id}
+    >
       {content}
     </Link>
   );
