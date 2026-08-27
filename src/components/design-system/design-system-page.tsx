@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Chip, ChipDot } from "@/components/ui/chip";
 import { Combobox } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogBody,
@@ -100,6 +101,8 @@ export function DesignSystemPage() {
   const [tab, setTab] = useState("overview");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [name, setName] = useState("");
+  const [due, setDue] = useState<string | null>("2026-08-27");
+  const [start, setStart] = useState<string | null>(null);
 
   return (
     <div className="h-full overflow-y-auto bg-canvas">
@@ -353,6 +356,62 @@ export function DesignSystemPage() {
           </Row>
         </Section>
 
+        {/* ---------------------------------------------------- date picker */}
+        <Section
+          id="date"
+          title="Date picker"
+          summary="One date, one click — no Apply button, because there is nothing to confirm when the only decision is which square. The value is a day key (2026-08-27) rather than a timestamp: a due date is a square on a calendar, and the zone it gets turned into an instant in is what decides whether the 27th survives being read back. Range, time and multi-select are deliberately absent."
+        >
+          <Row label="Value" note="controlled" isColumn>
+            <DatePicker value={due} onChange={setDue} clearable />
+            <DatePicker value={start} onChange={setStart} clearable />
+          </Row>
+
+          <Row label="Size" note="the shared control ladder">
+            <DatePicker size="xs" value={due} onChange={setDue} className="w-40" />
+            <DatePicker size="sm" value={due} onChange={setDue} className="w-40" />
+            <DatePicker size="md" value={due} onChange={setDue} className="w-40" />
+          </Row>
+
+          <Row label="State" isColumn>
+            <DatePicker value={due} onChange={setDue} aria-invalid />
+            <DatePicker value={due} onChange={setDue} disabled />
+            <DatePicker
+              variant="ghost"
+              value={due}
+              onChange={setDue}
+              placeholder="Ghost — the surface already draws a border"
+            />
+          </Row>
+
+          <Row label="Bounds" note="the rule is the caller's" isColumn>
+            <DatePicker
+              value={start}
+              onChange={setStart}
+              minDate="2026-08-24"
+              maxDate="2026-09-11"
+              placeholder="Inside a window"
+              clearable
+            />
+            <DatePicker
+              value={start}
+              onChange={setStart}
+              isDateDisabled={isWeekendDay}
+              placeholder="Weekdays only"
+              clearable
+            />
+          </Row>
+
+          <Row label="FormField" isColumn>
+            <FormField label="Due date" description="Shown on the timeline and in My work." isRequired>
+              {(field) => <DatePicker {...field} value={due} onChange={setDue} clearable />}
+            </FormField>
+            <FormField label="Due date" error="End date must be after the start date." isRequired>
+              {(field) => <DatePicker {...field} value={due} onChange={setDue} clearable />}
+            </FormField>
+          </Row>
+        </Section>
+
         {/* -------------------------------------------------------- toggles */}
         <Section
           id="toggles"
@@ -545,4 +604,13 @@ export function DesignSystemPage() {
       </div>
     </div>
   );
+}
+
+/**
+ * A sample business rule for the gallery — the kind of predicate a screen
+ * passes in. The picker itself never knows what a weekend is.
+ */
+function isWeekendDay(day: string): boolean {
+  const weekday = new Date(`${day}T00:00:00.000Z`).getUTCDay();
+  return weekday === 0 || weekday === 6;
 }

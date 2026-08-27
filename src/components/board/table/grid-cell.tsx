@@ -32,26 +32,30 @@ interface GridCellProps {
   readonly disclosure?: ReactNode;
 }
 
-/**
- * The one cell type a *single* click opens.
- *
- * Everything else in the grid opens on double-click, and that is right: a
- * single click is how you select, and a cell full of data has something to
- * select. An empty Attachment cell has nothing — there is no value to pick, no
- * text to range over, and the only thing anyone wants from it is the uploader.
- * Making them find the second click, or a menu, to reach the only action the
- * cell offers is a step that exists for the grid's convenience rather than
- * theirs.
- *
- * A cell that already holds files is *not* included: there, a click has to
- * reach the file, not the uploader.
- */
 /** The reader marker owns its own click; the cell's gestures must let it past. */
 function isReaderMarker(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest("[data-cell-detail]") != null;
 }
 
+/**
+ * The cell types a *single* click opens.
+ *
+ * Most of the grid opens on double-click, and that is right: a single click is
+ * how you select, and a cell full of text has something to select.
+ *
+ * Two types have nothing to select. An empty Attachment cell holds no value to
+ * pick and no text to range over — the only thing anyone wants from it is the
+ * uploader. A Date cell holds one atomic value that cannot be part-selected,
+ * typed into or extended; every interaction with it is "open the calendar", so
+ * making people find the second click is a step that exists for the grid's
+ * convenience rather than theirs.
+ *
+ * A cell that already holds files is *not* included: there, a click has to
+ * reach the file, not the uploader.
+ */
 function opensOnSingleClick(column: BoardColumn, value: CellValue): boolean {
+  if (column.type === "date") return true;
+
   return (
     column.type === "attachment" && value.kind === "attachment" && value.attachments.length === 0
   );
@@ -170,6 +174,11 @@ export const GridCell = memo(function GridCell({
       }
 
       if (isReadOnly) return;
+
+      // A modified click is a selection gesture — Shift extends the range,
+      // Cmd/Ctrl is the platform's add-to-selection. Opening an editor on one
+      // would take a cell type out of range selection altogether.
+      if (event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return;
 
       const isExpand = target?.closest?.("[data-cell-expand]") != null;
       if (!isExpand && !opensOnSingleClick(column, value)) return;

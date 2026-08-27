@@ -3,6 +3,7 @@
 import { Plus, X } from "lucide-react";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import type { ListboxOption } from "@/components/ui/listbox";
 import { MultiSelect, Select } from "@/components/ui/select";
@@ -354,9 +355,25 @@ function ConditionValue({ condition, column, people, onChange }: ConditionValueP
     );
   }
 
+  if (column.type === "date") {
+    // A rule stores the bound as `YYYY-MM-DD` and `matchesDate` compares whole
+    // days, so the picker's day key goes in untouched.
+    return (
+      <DatePicker
+        aria-label="Value"
+        size={CONTROL_SIZE}
+        value={condition.value === "" ? null : condition.value}
+        onChange={(day) => onChange({ value: day ?? "" })}
+        placeholder="Pick a date"
+        clearable
+        className="min-w-0 flex-1"
+      />
+    );
+  }
+
   return (
     <Input
-      type={column.type === "date" ? "date" : "text"}
+      type="text"
       aria-label="Value"
       size={CONTROL_SIZE}
       value={condition.value}

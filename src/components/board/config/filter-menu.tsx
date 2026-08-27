@@ -4,6 +4,7 @@ import { Filter, Plus, X } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { CountBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import type { ListboxOption } from "@/components/ui/listbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -269,9 +270,26 @@ function FilterValue({ filter, column, people, onChange }: FilterValueProps) {
     );
   }
 
+  if (kind === "date") {
+    // The filter already stores `YYYY-MM-DD`, which is exactly what the picker
+    // speaks, so nothing is converted on the way in or out — and the day the
+    // rule compares against is the day that was clicked, in every timezone.
+    return (
+      <DatePicker
+        aria-label="Value"
+        size={CONTROL_SIZE}
+        value={filter.value === "" ? null : filter.value}
+        onChange={(day) => onChange(day ?? "")}
+        placeholder="Pick a date"
+        clearable
+        className="min-w-0 flex-1"
+      />
+    );
+  }
+
   return (
     <Input
-      type={kind === "date" ? "date" : "text"}
+      type="text"
       aria-label="Value"
       size={CONTROL_SIZE}
       value={filter.value}

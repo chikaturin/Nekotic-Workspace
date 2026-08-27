@@ -80,6 +80,21 @@ const config = [
             "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='radio']",
           message: "Use <RadioGroup> / <RadioCard> from @/components/ui/radio-group.",
         },
+        {
+          /**
+           * Four surfaces reached for the browser's own date field, and it is
+           * a different control in every browser — Chrome draws a dropdown
+           * calendar, Safari draws a stepper, Firefox draws neither at the
+           * size the rest of the row is. None of them can be themed, so a
+           * date field was the one control in a form that did not belong to
+           * this app. The type is matched by value and by expression, because
+           * three of the four wrote `type={isDate ? "date" : "text"}`.
+           */
+          selector:
+            "JSXAttribute[name.name='type'] :matches(Literal[value='date'], Literal[value='datetime-local'])",
+          message:
+            "Use <DatePicker> from @/components/ui/date-picker — one day, one click, and a value that is a day key rather than a timestamp. A native date input cannot be themed and is a different control in every browser.",
+        },
       ],
     },
   },

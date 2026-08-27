@@ -4,10 +4,12 @@ import { Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import type { ListboxOption } from "@/components/ui/listbox";
 import { Select } from "@/components/ui/select";
 import { SelectField } from "@/components/ui/select-field";
+import { isoOfDayKey } from "@/lib/calendar";
 import { resolveOptionAvailability } from "@/lib/select-availability";
 import type { BoardColumn, CellValue, DirectoryUser } from "@/types";
 
@@ -98,9 +100,9 @@ export function SubtaskComposer({
 
     if (statusColumn && optionId) values[statusColumn.id] = { kind: "select", optionIds: [optionId] };
     if (userColumn && assigneeId) values[userColumn.id] = { kind: "user", userIds: [assigneeId] };
-    if (dateColumn && due) {
-      values[dateColumn.id] = { kind: "date", iso: new Date(`${due}T00:00:00.000Z`).toISOString() };
-    }
+    // `due` is a day key, so the stored instant is midnight UTC on exactly the
+    // day that was clicked — never the day before it in a western timezone.
+    if (dateColumn && due) values[dateColumn.id] = { kind: "date", iso: isoOfDayKey(due) };
 
     setIsSaving(true);
     try {
@@ -178,14 +180,13 @@ export function SubtaskComposer({
         )}
 
         {dateColumn && (
-          /* Native on purpose: no date library is installed, and the platform
-             picker is better than a text field pretending to be one. */
-          <Input
-            type="date"
+          <DatePicker
             size="sm"
             aria-label={dateColumn.name}
-            value={due}
-            onChange={(event) => setDue(event.target.value)}
+            placeholder={`${dateColumn.name}…`}
+            value={due === "" ? null : due}
+            onChange={(day) => setDue(day ?? "")}
+            clearable
             className="min-w-0 flex-1"
           />
         )}
