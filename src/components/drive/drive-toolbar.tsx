@@ -4,7 +4,6 @@ import {
   ArrowDownUp,
   Check,
   FilePlus2,
-  FileText,
   FolderPlus,
   HardDrive,
   LayoutGrid,
@@ -16,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { CreateMenuItems } from "@/components/shared/create-menu-items";
 import { UploadDialog } from "@/components/files/upload-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCapabilities } from "@/hooks/use-permissions";
-import { useCreateDocument } from "@/hooks/use-create-document";
 import { findNodeById } from "@/lib/tree";
 import { cn } from "@/lib/utils";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
@@ -52,7 +51,6 @@ interface DriveToolbarProps {
 /** View controls, sorting, create/upload and the bulk-selection bar. */
 export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveToolbarProps) {
   const [isUploaderOpen, setUploaderOpen] = useState(false);
-  const { createDocument, isCreating } = useCreateDocument();
 
   const tree = useWorkspaceStore(selectTree);
   const targetNode = useMemo(
@@ -156,25 +154,19 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  aria-label="New page"
-                  disabled={isCreating}
-                >
+                <Button size="icon" variant="outline" aria-label="Create here">
                   <FilePlus2 />
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent>New page here</TooltipContent>
+            <TooltipContent>Create here</TooltipContent>
           </Tooltip>
 
           <DropdownMenuContent align="end" className="w-60">
-            <DropdownMenuLabel>Create in {title}</DropdownMenuLabel>
-            <DropdownMenuItem disabled={isCreating} onSelect={() => void createDocument(targetId)}>
-              <FileText />
-              Page
-            </DropdownMenuItem>
+            {/* The folder button sits right beside this menu, so the shared
+                list drops its own Folder entry here rather than offering the
+                same action twice in a row. */}
+            <CreateMenuItems targetId={targetId} targetName={title} includeFolder={false} />
           </DropdownMenuContent>
         </DropdownMenu>
 
