@@ -13,6 +13,7 @@ import {
   retypeColumn,
   uniqueColumnName,
 } from "@/lib/board-schema";
+import { reorderViews } from "@/lib/board-view";
 import { formatRowId, matchesRowId } from "@/lib/row-id";
 import { buildBoard, prefixForBoard } from "@/mock/board";
 import { CURRENT_USER, DIRECTORY } from "@/mock/users";
@@ -847,6 +848,33 @@ async function createView(
   return view;
 }
 
+/**
+ * Move a view along the tab strip.
+ *
+ * The order is the board's, not the reader's: a saved view is shared, and so
+ * is where it sits. Which is why this takes `board.view.manage` — the same key
+ * that guards creating and deleting one — rather than being a free read-side
+ * preference.
+ */
+async function reorderView(
+  boardId: string,
+  viewId: string,
+  toIndex: number,
+  signal?: AbortSignal,
+): Promise<readonly SavedView[]> {
+  requirePermission(nodeIdFromBoardId(boardId), "board.view.manage", "reorder views");
+
+  await writeDelay(signal);
+  const record = recordByBoardId(boardId);
+  assertWritable(record, "the view");
+
+  const views = reorderViews(record.board.views, viewId, toIndex);
+  if (views === record.board.views) return views;
+
+  record.board = { ...record.board, views, updatedAt: nowIso() };
+  return views;
+}
+
 async function deleteView(
   boardId: string,
   viewId: string,
@@ -1379,6 +1407,7 @@ export const boardService = {
   listBacklinks,
   updateView,
   createView,
+  reorderView,
   deleteView,
   noteActivity,
   listActivity,

@@ -19,7 +19,7 @@ import { bulkTone, describeBulkResult } from "@/lib/bulk";
 import { emptyCellFor } from "@/lib/cell-values";
 import { wouldCreateCycle } from "@/lib/board-hierarchy";
 import { guardCellEdits } from "@/lib/board-write-rules";
-import { pruneView } from "@/lib/board-view";
+import { pruneView, reorderViews } from "@/lib/board-view";
 import type { CellContext } from "@/lib/cell-values";
 import { boardService } from "@/services/board-service";
 import { isCancellation, toAppError } from "@/services/errors";
@@ -146,6 +146,8 @@ interface BoardActions {
   createView: (name: string, type: BoardViewType) => Promise<string | null>;
   duplicateView: (viewId: string) => Promise<string | null>;
   renameView: (viewId: string, name: string) => Promise<void>;
+  /** Where a view sits in the tab strip. Shared, like the view itself. */
+  moveViewTo: (viewId: string, toIndex: number) => Promise<void>;
   deleteView: (viewId: string) => Promise<void>;
 
   /** Presentation lives on the view, so these never touch the schema. */
@@ -990,6 +992,32 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
       await write(
         () => boardService.updateView(board.id, viewId, { name }),
         () => patchView(viewId, { name: previous }),
+      );
+    },
+
+    moveViewTo: async (viewId, toIndex) => {
+      const board = currentBoard();
+      if (!board) return;
+
+      const before = board.views;
+      const views = reorderViews(before, viewId, toIndex);
+      // A drop back where it started: nothing moved, so nothing is written.
+      if (views === before) return;
+
+      const from = before.findIndex((view) => view.id === viewId);
+      set((state) => ({ board: state.board ? { ...state.board, views } : state.board }));
+
+      await write(
+        () => boardService.reorderView(board.id, viewId, toIndex),
+        // Put it back by moving it, not by restoring the array we snapshotted:
+        // a rename that landed while this was in flight lives in that array too,
+        // and undoing the move should not undo somebody else's edit with it.
+        () =>
+          set((state) => ({
+            board: state.board
+              ? { ...state.board, views: reorderViews(state.board.views, viewId, from) }
+              : state.board,
+          })),
       );
     },
 

@@ -248,6 +248,37 @@ function rowMatchesSearch(
   );
 }
 
+/**
+ * Move a saved view to a position in the tab strip.
+ *
+ * A view has no `position` field the way a column does — the array *is* the
+ * order — so this is a splice on a copy rather than a renumbering, and it
+ * returns the original array untouched when nothing would move. That identity
+ * check is what lets a caller skip the round trip for a drop that landed back
+ * where it started.
+ *
+ * `toIndex` is clamped rather than validated: a drop past the last tab means
+ * "last", which is what the gesture looked like.
+ */
+export function reorderViews(
+  views: readonly SavedView[],
+  viewId: string,
+  toIndex: number,
+): readonly SavedView[] {
+  const from = views.findIndex((view) => view.id === viewId);
+  if (from < 0) return views;
+
+  const target = Math.min(Math.max(Math.trunc(toIndex), 0), views.length - 1);
+  if (from === target) return views;
+
+  const next = [...views];
+  const [moved] = next.splice(from, 1);
+  if (!moved) return views;
+
+  next.splice(target, 0, moved);
+  return next;
+}
+
 /** Drop filters and sorts that point at a column the schema no longer has. */
 /**
  * Drop every reference to a column the schema no longer has — filters, sorts,

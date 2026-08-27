@@ -1,7 +1,15 @@
 "use client";
 
-import { Copy, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import { useState, type DragEvent } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +32,15 @@ import { cn } from "@/lib/utils";
 import type { BoardViewType, PermissionResolver, SavedView } from "@/types";
 
 const VIEW_TYPES: readonly BoardViewType[] = ["table", "kanban", "calendar", "gantt"];
+
+/**
+ * The drag's own type, so the strip only accepts a tab from this strip.
+ *
+ * The same shape the column headers use: a private MIME type carrying the id,
+ * which is what lets `dragover` decide whether to accept a drop *before* the
+ * payload is readable — browsers hide the data until the drop itself.
+ */
+const VIEW_MIME = "application/x-nexdrop-view";
 
 /**
  * Saved views as tabs.
@@ -50,7 +67,19 @@ export function ViewTabs({ model, can }: { model: BoardViewModel; can: Permissio
   const canManage = can("board.view.manage");
   const setActiveView = useBoardStore((state) => state.setActiveView);
   const createView = useBoardStore((state) => state.createView);
+  const moveViewTo = useBoardStore((state) => state.moveViewTo);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  /** The tab a drop would land on, so the strip can show where it would go. */
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  function handleDrop(event: DragEvent<HTMLDivElement>, toIndex: number) {
+    const viewId = event.dataTransfer.getData(VIEW_MIME);
+    setDragOverId(null);
+    if (!viewId) return;
+
+    event.preventDefault();
+    void moveViewTo(viewId, toIndex);
+  }
 
   return (
     <div className="flex items-center gap-1 overflow-x-auto px-3">
@@ -66,16 +95,22 @@ export function ViewTabs({ model, can }: { model: BoardViewModel; can: Permissio
         buttons with no roles before.
       */}
       <div role="toolbar" aria-label="Saved views" className="flex shrink-0 items-center gap-1">
-        {board?.views.map((saved) => (
+        {board?.views.map((saved, index) => (
           <ViewTab
             key={saved.id}
             view={saved}
+            index={index}
+            count={board.views.length}
             isActive={saved.id === view?.id}
             isRenaming={renamingId === saved.id}
+            isDragOver={dragOverId === saved.id}
             canManage={canManage}
             onSelect={() => setActiveView(saved.id)}
             onRenameStart={() => setRenamingId(saved.id)}
             onRenameEnd={() => setRenamingId(null)}
+            onDragStateChange={setDragOverId}
+            onDrop={handleDrop}
+            onMove={(toIndex) => void moveViewTo(saved.id, toIndex)}
           />
         ))}
       </div>
@@ -115,22 +150,35 @@ export function ViewTabs({ model, can }: { model: BoardViewModel; can: Permissio
 
 interface ViewTabProps {
   readonly view: SavedView;
+  readonly index: number;
+  readonly count: number;
   readonly isActive: boolean;
   readonly isRenaming: boolean;
+  readonly isDragOver: boolean;
   readonly canManage: boolean;
   readonly onSelect: () => void;
   readonly onRenameStart: () => void;
   readonly onRenameEnd: () => void;
+  readonly onDragStateChange: (viewId: string | null) => void;
+  readonly onDrop: (event: DragEvent<HTMLDivElement>, index: number) => void;
+  /** Reorder without a pointer — what the menu's Move left/right call. */
+  readonly onMove: (toIndex: number) => void;
 }
 
 function ViewTab({
   view,
+  index,
+  count,
   isActive,
   isRenaming,
+  isDragOver,
   canManage,
   onSelect,
   onRenameStart,
   onRenameEnd,
+  onDragStateChange,
+  onDrop,
+  onMove,
 }: ViewTabProps) {
   const renameView = useBoardStore((state) => state.renameView);
   const duplicateView = useBoardStore((state) => state.duplicateView);
@@ -149,14 +197,42 @@ function ViewTab({
     .join(" · ");
 
   return (
-    // `presentation` makes this wrapper transparent to the tablist above, so
     // The box holds the switch control, the menu trigger, and — while a rename
     // is in flight — a text field, so it is a group of controls rather than
-    // any one of them.
+    // any one of them. It is also the drag handle: the whole tab moves, which
+    // is the target anybody is aiming at anyway.
     <div
+      // Never draggable while the field is open: a drag started on a text
+      // selection inside it would take the tab with it.
+      draggable={canManage && !isRenaming}
+      onDragStart={(event) => {
+        if (isRenaming) {
+          event.preventDefault();
+          return;
+        }
+        event.dataTransfer.setData(VIEW_MIME, view.id);
+        event.dataTransfer.effectAllowed = "move";
+      }}
+      onDragOver={(event) => {
+        if (!event.dataTransfer.types.includes(VIEW_MIME)) return;
+        event.preventDefault();
+        onDragStateChange(view.id);
+      }}
+      onDragLeave={(event) => {
+        // `dragleave` also fires on the way *into* a child — the label, the
+        // icon, the options button — so clearing it unconditionally makes the
+        // drop target blink off and on as the pointer crosses the tab it is
+        // hovering. Only a leave that lands outside the tab is a real one.
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        onDragStateChange(null);
+      }}
+      onDragEnd={() => onDragStateChange(null)}
+      onDrop={(event) => onDrop(event, index)}
       className={cn(
         "flex shrink-0 items-center gap-1 rounded-t-md border-b-2 px-2 py-1.5 transition-colors",
         isActive ? "border-accent" : "border-transparent hover:bg-hover",
+        canManage && !isRenaming && "cursor-grab active:cursor-grabbing",
+        isDragOver && "bg-accent-soft",
       )}
     >
       <visual.Icon
@@ -263,6 +339,23 @@ function ViewTab({
               })}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
+
+          <DropdownMenuSeparator />
+
+          {/* The same reorder the drag does, reachable without a pointer. A
+              tab strip whose only ordering gesture is drag-and-drop is a tab
+              strip somebody on a keyboard cannot reorder at all. */}
+          <DropdownMenuItem disabled={!canManage || index === 0} onSelect={() => onMove(index - 1)}>
+            <ChevronLeft />
+            Move left
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={!canManage || index === count - 1}
+            onSelect={() => onMove(index + 1)}
+          >
+            <ChevronRight />
+            Move right
+          </DropdownMenuItem>
 
           <DropdownMenuSeparator />
           <DropdownMenuItem

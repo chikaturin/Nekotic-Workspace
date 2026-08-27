@@ -8,14 +8,16 @@ import {
   startOfDay,
 } from "@/lib/board-dates";
 import { describeFilter, OPERATOR_LABELS } from "@/lib/board-filters";
-import { matchesFilter } from "@/lib/board-view";
+import { matchesFilter, reorderViews } from "@/lib/board-view";
 import { makeColumn } from "@/lib/board-schema";
+import { MEMBERS } from "@/mock/users";
+import { ServiceError } from "@/services/errors";
 import { boardService } from "@/services/board-service";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useBoardStore, selectActiveView } from "@/store/board-store";
 import { selectCollapsedGroups, useGridStore } from "@/store/grid-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
-import type { BoardColumnOf, BoardRow } from "@/types";
+import type { BoardColumnOf, BoardRow, SavedView, WorkspaceRole } from "@/types";
 import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 
 const WORKSPACE_ID = "ws_test";
@@ -218,6 +220,163 @@ describe("saved views", () => {
     expect(await store.createView("x", "table")).toBeNull();
     expect(await store.duplicateView("v")).toBeNull();
 
+    expect(useBoardStore.getState().board).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------- tab order */
+
+/**
+ * Which tab comes first.
+ *
+ * The order is the board's rather than the reader's — a saved view is shared,
+ * and so is where it sits — so moving one is a write that takes the same
+ * permission as renaming or deleting it, and it has to survive a failed save
+ * by going back where it was.
+ */
+
+/** Enough of a view to be reordered; nothing here reads the rest of it. */
+const stub = (id: string): SavedView => ({ id, name: id }) as SavedView;
+
+function signedInAs(role: WorkspaceRole) {
+  useWorkspaceStore.setState({
+    workspaces: [
+      {
+        ...TEST_WORKSPACE,
+        members: MEMBERS.map((member, index) => (index === 0 ? { ...member, role } : member)),
+      },
+    ],
+    activeWorkspaceId: WORKSPACE_ID,
+    treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
+    feedback: null,
+    seed: 0,
+  });
+}
+
+describe("moving a view along the strip", () => {
+  const ids = (views: readonly SavedView[]) => views.map((view) => view.id);
+  const three = [stub("a"), stub("b"), stub("c")] as const;
+
+  test("a view lands exactly where it was dropped", () => {
+    expect(ids(reorderViews(three, "c", 0))).toEqual(["c", "a", "b"]);
+    expect(ids(reorderViews(three, "a", 2))).toEqual(["b", "c", "a"]);
+    expect(ids(reorderViews(three, "a", 1))).toEqual(["b", "a", "c"]);
+  });
+
+  /** Identity, not equality: it is what lets a caller skip the round trip. */
+  test("a drop back where it started returns the same array", () => {
+    expect(reorderViews(three, "b", 1)).toBe(three);
+    expect(reorderViews(three, "missing", 0)).toBe(three);
+  });
+
+  test("a drop past either end means that end", () => {
+    expect(ids(reorderViews(three, "a", 99))).toEqual(["b", "c", "a"]);
+    expect(ids(reorderViews(three, "c", -5))).toEqual(["c", "a", "b"]);
+  });
+
+  test("nothing but the order changes — the views are the same objects", () => {
+    const moved = reorderViews(three, "c", 0);
+    expect(moved[0]).toBe(three[2]);
+    expect(moved).toHaveLength(three.length);
+  });
+
+  test("the new order persists, so a reload opens on the same first tab", async () => {
+    const board = await load();
+    const last = board.views.at(-1)!.id;
+
+    await useBoardStore.getState().moveViewTo(last, 0);
+    expect(useBoardStore.getState().board?.views[0]?.id).toBe(last);
+
+    await useBoardStore.getState().load(ID.roadmap);
+    expect(useBoardStore.getState().board?.views[0]?.id).toBe(last);
+  });
+
+  test("switching tabs is untouched by the move — the active view stays active", async () => {
+    const board = await load();
+    const active = activeView().id;
+    const last = board.views.at(-1)!.id;
+
+    await useBoardStore.getState().moveViewTo(last, 0);
+
+    expect(useBoardStore.getState().activeViewId).toBe(active);
+    expect(activeView().id).toBe(active);
+  });
+
+  test("records are never touched by a reorder", async () => {
+    const board = await load();
+    const rowsBefore = useBoardStore.getState().rowsById;
+
+    await useBoardStore.getState().moveViewTo(board.views.at(-1)!.id, 0);
+
+    expect(useBoardStore.getState().rowsById).toBe(rowsBefore);
+  });
+
+  test("a failed save puts the tab back where it was", async () => {
+    const board = await load();
+    const before = board.views.map((view) => view.id);
+    const last = before.at(-1)!;
+
+    setSimulation({ failSaves: true });
+    await useBoardStore.getState().moveViewTo(last, 0);
+
+    expect(useBoardStore.getState().board?.views.map((view) => view.id)).toEqual(before);
+    expect(useWorkspaceStore.getState().feedback?.tone).toBe("error");
+  });
+
+  /**
+   * A rename that lands while the move is in flight has to survive the
+   * rollback. Undoing a move by restoring a snapshot of the array would take
+   * the rename with it, which is the reason the rollback moves the view back
+   * rather than putting the old array on.
+   */
+  test("rolling back a move does not undo an edit that landed beside it", async () => {
+    const board = await load();
+    const last = board.views.at(-1)!.id;
+    const other = board.views[0]!.id;
+
+    setSimulation({ failSaves: true });
+    const inFlight = useBoardStore.getState().moveViewTo(last, 0);
+    useBoardStore.setState((state) => ({
+      board: state.board
+        ? {
+            ...state.board,
+            views: state.board.views.map((view) =>
+              view.id === other ? { ...view, name: "Renamed mid-flight" } : view,
+            ),
+          }
+        : state.board,
+    }));
+    await inFlight;
+
+    const views = useBoardStore.getState().board!.views;
+    expect(views.map((view) => view.id)).toEqual(board.views.map((view) => view.id));
+    expect(views.find((view) => view.id === other)?.name).toBe("Renamed mid-flight");
+  });
+
+  test("a member is refused by the service, not merely by the UI", async () => {
+    const board = await load();
+    const last = board.views.at(-1)!.id;
+
+    signedInAs("member");
+    await expect(boardService.reorderView(board.id, last, 0)).rejects.toBeInstanceOf(ServiceError);
+
+    signedInAs("manager");
+    await expect(boardService.reorderView(board.id, last, 0)).resolves.toBeDefined();
+  });
+
+  test("a drop back on the same tab writes nothing at all", async () => {
+    const board = await load();
+    const first = board.views[0]!.id;
+
+    await useBoardStore.getState().moveViewTo(first, 0);
+
+    // The board object itself is untouched, which is what tells us no write
+    // was attempted rather than one that happened to land on the same order.
+    expect(useBoardStore.getState().board).toBe(board);
+  });
+
+  test("moving before a board is loaded does nothing", async () => {
+    await useBoardStore.getState().moveViewTo("v", 0);
     expect(useBoardStore.getState().board).toBeNull();
   });
 });
