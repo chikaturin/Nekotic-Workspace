@@ -65,7 +65,8 @@ interface AttachmentEditorProps {
  * are looking at one value rather than two copies of it.
  *
  * That is also why the popover has a Close and not a Save: every upload and
- * every removal has already been committed to the board record.
+ * every removal has already been committed to the board record — and why
+ * clicking away closes it rather than asking. There is nothing to lose.
  */
 export function AttachmentCellEditor({
   column,
@@ -77,7 +78,7 @@ export function AttachmentCellEditor({
   const field = useAttachmentField(rowId, column.id, column.config.maxFiles, folderId);
 
   return (
-    <EditorSurface className="w-72">
+    <EditorSurface className="w-72" onDismiss={onCancel}>
       <AttachmentGallery
         field={field}
         maxFiles={column.config.maxFiles}

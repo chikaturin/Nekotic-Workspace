@@ -128,7 +128,11 @@ export const GridCell = memo(function GridCell({
    */
   const handleClick = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
-      if (isReadOnly) return;
+      // A click *inside* an open editor is the editor's. Without this, an
+      // empty attachment cell — the one type that opens on a single click —
+      // re-opened itself from every click in its own panel, so pressing Close
+      // shut it and re-opened it in the same gesture.
+      if (isReadOnly || isEditing) return;
 
       const target = event.target as Element | null;
       const isExpand = target?.closest?.("[data-cell-expand]") != null;
@@ -137,7 +141,7 @@ export const GridCell = memo(function GridCell({
       const openId = target?.closest?.<HTMLElement>("[data-cell-focus-id]")?.dataset.cellFocusId;
       useGridStore.getState().beginEdit(row.id, column.id, openId ? { focusId: openId } : undefined);
     },
-    [isReadOnly, column, value, row.id],
+    [isReadOnly, isEditing, column, value, row.id],
   );
 
   const commit = useCallback(
@@ -167,7 +171,7 @@ export const GridCell = memo(function GridCell({
       onMouseEnter={handleMouseEnter}
       onClick={handleClick}
       onDoubleClick={() => {
-        if (!isReadOnly) useGridStore.getState().beginEdit(row.id, column.id);
+        if (!isReadOnly && !isEditing) useGridStore.getState().beginEdit(row.id, column.id);
       }}
       style={widthStyle(column.id, column.isPrimary)}
       className={cn(

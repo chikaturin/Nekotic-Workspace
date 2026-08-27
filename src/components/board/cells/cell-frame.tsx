@@ -1,7 +1,8 @@
 "use client";
 
 import { TriangleAlert } from "lucide-react";
-import type { ReactNode } from "react";
+import { useCallback, useRef, type ReactNode } from "react";
+import { useDismissOnOutside } from "@/hooks/use-dismiss-on-outside";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -102,12 +103,26 @@ export function UnparsedBadge({ text }: { text: string }) {
 export function EditorSurface({
   children,
   className,
+  onDismiss,
 }: {
   children: ReactNode;
   className?: string;
+  /**
+   * Close on a click outside or on Escape. For the editors that hold no
+   * focused field of their own — an attachment panel is a grid of thumbnails,
+   * not an input — where blur would otherwise never fire and the only way out
+   * is a button the user has to find.
+   */
+  onDismiss?: () => void;
 }) {
+  const surface = useRef<HTMLDivElement>(null);
+  const dismiss = useCallback(() => onDismiss?.(), [onDismiss]);
+
+  useDismissOnOutside(surface, onDismiss ? dismiss : NO_DISMISS);
+
   return (
     <div
+      ref={surface}
       className={cn(
         "absolute left-0 top-0 z-raised min-w-full rounded-md border border-accent bg-elevated shadow-float",
         className,
@@ -117,3 +132,6 @@ export function EditorSurface({
     </div>
   );
 }
+
+/** Stable no-op, so a surface without `onDismiss` never re-subscribes. */
+const NO_DISMISS = () => undefined;
