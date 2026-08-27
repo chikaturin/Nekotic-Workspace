@@ -19,6 +19,21 @@ export interface SecretController {
   readonly reveal: (secretId: string) => Promise<void>;
   readonly hide: (secretId: string) => void;
   readonly copy: (secretId: string) => Promise<void>;
+  /**
+   * Hand one plaintext value to the caller so it can be edited.
+   *
+   * Deliberately separate from `reveal`: this one does not put the value into
+   * `revealed`, does not start an auto-hide timer, and does not show it on the
+   * read view — the caller owns it for exactly as long as the form it is
+   * typing into exists. Null on refusal, which is already reported.
+   */
+  readonly take: (secretId: string) => Promise<string | null>;
+  /**
+   * Several at once, as an `.env` block. An empty list means the whole
+   * document — "Copy all" and "Copy selected" are the same call.
+   */
+  readonly copyMany: (secretIds: readonly string[]) => Promise<void>;
+  readonly isCopyingMany: boolean;
   readonly reload: () => void;
 }
 
@@ -42,6 +57,7 @@ export function useSecretDocument(nodeId: string): SecretController {
   const resource = useAsyncResource<SecretDocument>(loader);
   const [revealed, setRevealed] = useState<Readonly<Record<string, string>>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [isCopyingMany, setIsCopyingMany] = useState(false);
   const timers = useRef(new Map<string, number>());
 
   const hide = useCallback((secretId: string) => {
@@ -95,6 +111,18 @@ export function useSecretDocument(nodeId: string): SecretController {
     [nodeId, role, hide, pushFeedback],
   );
 
+  const take = useCallback(
+    async (secretId: string): Promise<string | null> => {
+      try {
+        return await devtoolsService.revealSecret({ nodeId, secretId, role, action: "reveal" });
+      } catch (error) {
+        pushFeedback(toAppError(error).message, "error");
+        return null;
+      }
+    },
+    [nodeId, role, pushFeedback],
+  );
+
   const copy = useCallback(
     async (secretId: string) => {
       setBusyId(secretId);
@@ -119,13 +147,48 @@ export function useSecretDocument(nodeId: string): SecretController {
     [nodeId, role, pushFeedback],
   );
 
+  /**
+   * Copy a set of secrets without revealing any of them.
+   *
+   * The values go from the service straight to the clipboard; none of them
+   * enters `revealed`, so the screen stays masked throughout. That separation
+   * is the point of having a bulk copy at all — the alternative, revealing
+   * everything and letting the user select the text, puts a whole credential
+   * file on a screen in an office.
+   *
+   * The service writes one audit entry per key, and neither it nor this
+   * records a value.
+   */
+  const copyMany = useCallback(
+    async (secretIds: readonly string[]) => {
+      setIsCopyingMany(true);
+
+      try {
+        const { text, keys } = await devtoolsService.copySecrets({ nodeId, secretIds, role });
+        await navigator.clipboard.writeText(text);
+        pushFeedback(
+          `Copied ${keys.length} secret${keys.length === 1 ? "" : "s"} — the values were not stored`,
+          "success",
+        );
+      } catch (error) {
+        pushFeedback(toAppError(error).message, "error");
+      } finally {
+        setIsCopyingMany(false);
+      }
+    },
+    [nodeId, role, pushFeedback],
+  );
+
   return {
     state: resource.state,
     revealed,
     busyId,
     reveal,
     hide,
+    take,
     copy,
+    copyMany,
+    isCopyingMany,
     reload: resource.reload,
   };
 }

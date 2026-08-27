@@ -1,81 +1,145 @@
 "use client";
 
-import { Copy, Eye, EyeOff, History, Loader2, Lock, ShieldCheck } from "lucide-react";
-import { useCallback, useState } from "react";
-import { environmentOption } from "@/components/devtools/environment-picker";
+import { History, Lock, Pencil, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import { SecretAuditPanel } from "@/components/devtools/secret-audit-panel";
+import { SecretEditorPanel } from "@/components/devtools/secret-editor-panel";
+import { SecretList } from "@/components/devtools/secret-list";
 import { SecretVersionsDialog } from "@/components/versions/version-dialogs";
-import { SelectChip } from "@/components/board/cells/select-cell";
 import { AsyncBoundary } from "@/components/shared/async-boundary";
-import { UserAvatar } from "@/components/shared/user-avatar";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { NodeTitleInput } from "@/components/shared/node-title-input";
+import { ListLoadingState } from "@/components/shared/state-panels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ListLoadingState } from "@/components/shared/state-panels";
-import { useAsyncResource } from "@/hooks/use-async-resource";
-import { useCapabilities, useEffectiveRole, usePermissions } from "@/hooks/use-permissions";
-import { ROLE_LABELS } from "@/lib/permissions";
+import { useEffectiveRole, usePermissions } from "@/hooks/use-permissions";
 import { useSecretDocument } from "@/hooks/use-secret-document";
-import { formatRelativeTime } from "@/lib/format";
-import { devtoolsService } from "@/services/devtools-service";
-import { cn } from "@/lib/utils";
-import type { DocumentNode, SecretAuditEntry, SecretEntry } from "@/types";
+import { useSecretEditor } from "@/hooks/use-secret-editor";
+import { useUnsavedWarning } from "@/hooks/use-unsaved-warning";
+import { ROLE_LABELS } from "@/lib/permissions";
+import type { DocumentNode } from "@/types";
 
 /**
- * DV-SEC-23 — secrets shown as masks by default.
+ * DV-SEC-23 — secrets shown as masks by default, with an editor.
  *
  * The page never receives plaintext with the document: values arrive one at a
  * time from a permission-checked call, live in component state, and are dropped
  * on a timer. Nothing is persisted and nothing is logged.
+ *
+ * Two modes, and the split is deliberate. Reading is the common case and stays
+ * masked; writing is rarer, more consequential, and needs a different shape of
+ * control — so Edit is a mode rather than every row being a live input. It also
+ * means the read view can offer selection and bulk copy without any of it being
+ * one mis-click away from a rotation.
+ *
+ * This is not a code editor and must not become one. A raw text area holding a
+ * production credential file is exactly the screenshot nobody wants: every
+ * value visible at once, no per-key audit, and a save that reads as rotating
+ * everything. Config documents are the surface for text; this one is a list.
  */
 export function SecretDocumentPage({ node }: { node: DocumentNode }) {
-  const capabilities = useCapabilities(node);
   const can = usePermissions(node);
   const role = useEffectiveRole(node);
   const controller = useSecretDocument(node.id);
+  const secretDocument = controller.state.status === "success" ? controller.state.data : null;
+  const editor = useSecretEditor(secretDocument);
+
   const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const secretDocument = controller.state.status === "success" ? controller.state.data : null;
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
 
   const canReveal = can("secret.reveal");
+  const canRotate = can("secret.rotate");
+
+  useUnsavedWarning(isEditing && editor.isDirty);
+
+  /** Leaving edit mode never throws work away without asking. */
+  function leaveEditing() {
+    if (editor.isDirty) {
+      setIsDiscarding(true);
+      return;
+    }
+    setIsEditing(false);
+  }
 
   return (
     <div className="flex h-full flex-col bg-background">
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-3">
         <span className="text-xl">{node.icon}</span>
 
-        <div className="min-w-0">
-          <h1 className="truncate text-title font-semibold tracking-tight text-foreground">
-            {node.name}
-          </h1>
-          <p className="metric truncate text-body text-faint-foreground">
-            Encrypted at rest · every reveal is recorded
+        <div className="min-w-0 flex-1">
+          <NodeTitleInput
+            node={node}
+            canRename={can("node.rename")}
+            className="w-full px-1 py-0.5"
+          />
+          <p className="metric truncate px-1 text-body text-faint-foreground">
+            Encrypted at rest · every reveal, copy and rotation is recorded
           </p>
         </div>
 
-        <Badge variant={canReveal ? "success" : "default"} className="ml-2">
+        <Badge variant={canReveal ? "success" : "default"} className="shrink-0">
           {canReveal ? `${ROLE_LABELS[role]} access` : `${ROLE_LABELS[role]} — masked only`}
         </Badge>
 
-        <Button
-          size="sm"
-          variant="ghost"
-          className="ml-auto gap-1.5"
-          disabled={secretDocument === null}
-          onClick={() => setIsHistoryOpen(true)}
-        >
-          <History />
-          Rotation history
-        </Button>
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          {isEditing ? (
+            <>
+              <Button size="sm" variant="ghost" onClick={leaveEditing}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                variant="default"
+                disabled={!editor.canSave || editor.isSaving}
+                onClick={() => void editor.save().then((ok) => ok && setIsEditing(false))}
+              >
+                {editor.isSaving ? "Saving…" : "Save"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5"
+                disabled={!canRotate || secretDocument === null}
+                title={
+                  canRotate
+                    ? "Add, rename, replace or remove secrets"
+                    : "Changing secrets needs the Admin role"
+                }
+                onClick={() => setIsEditing(true)}
+              >
+                <Pencil />
+                Edit
+              </Button>
 
-        <Button
-          size="sm"
-          variant={isAuditOpen ? "subtle" : "ghost"}
-          className="gap-1.5"
-          aria-pressed={isAuditOpen}
-          onClick={() => setIsAuditOpen((open) => !open)}
-        >
-          <ShieldCheck />
-          Audit log
-        </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5"
+                disabled={secretDocument === null}
+                onClick={() => setIsHistoryOpen(true)}
+              >
+                <History />
+                Rotation history
+              </Button>
+            </>
+          )}
+
+          <Button
+            size="sm"
+            variant={isAuditOpen ? "subtle" : "ghost"}
+            className="gap-1.5"
+            aria-pressed={isAuditOpen}
+            onClick={() => setIsAuditOpen((open) => !open)}
+          >
+            <ShieldCheck />
+            Audit log
+          </Button>
+        </div>
       </header>
 
       {secretDocument && (
@@ -88,7 +152,7 @@ export function SecretDocumentPage({ node }: { node: DocumentNode }) {
 
       {!canReveal && (
         <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-4 py-2">
-          <Lock className="size-3.5 shrink-0 text-faint-foreground" />
+          <Lock aria-hidden="true" className="size-3.5 shrink-0 text-faint-foreground" />
           <p className="text-ui text-muted-foreground">
             Only owners and admins can reveal or copy these values. Asking anyway is refused by the
             server and still recorded.
@@ -103,151 +167,36 @@ export function SecretDocumentPage({ node }: { node: DocumentNode }) {
             onRetry={controller.reload}
             loading={<ListLoadingState />}
           >
-            {(document) => (
-              <ul className="space-y-1.5">
-                {document.entries.map((entry) => (
-                  <SecretRow
-                    key={entry.id}
-                    entry={entry}
-                    value={controller.revealed[entry.id]}
-                    isBusy={controller.busyId === entry.id}
-                    canReveal={canReveal}
-                    canCopy={capabilities.view && canReveal}
-                    onReveal={() => void controller.reveal(entry.id)}
-                    onHide={() => controller.hide(entry.id)}
-                    onCopy={() => void controller.copy(entry.id)}
-                  />
-                ))}
-              </ul>
-            )}
+            {(document) =>
+              isEditing ? (
+                <SecretEditorPanel
+                  editor={editor}
+                  canReveal={canReveal}
+                  onReveal={controller.take}
+                />
+              ) : (
+                <SecretList document={document} controller={controller} canReveal={canReveal} />
+              )
+            }
           </AsyncBoundary>
         </div>
 
-        {isAuditOpen && <AuditPanel nodeId={node.id} />}
+        {isAuditOpen && <SecretAuditPanel nodeId={node.id} />}
       </div>
+
+      <ConfirmDialog
+        isOpen={isDiscarding}
+        title="Discard your changes?"
+        description="You have unsaved changes to these secrets. Discarding leaves the stored values exactly as they are."
+        confirmLabel="Discard changes"
+        isDestructive
+        onClose={() => setIsDiscarding(false)}
+        onConfirm={() => {
+          setIsDiscarding(false);
+          editor.reset();
+          setIsEditing(false);
+        }}
+      />
     </div>
-  );
-}
-
-interface SecretRowProps {
-  readonly entry: SecretEntry;
-  readonly value: string | undefined;
-  readonly isBusy: boolean;
-  readonly canReveal: boolean;
-  readonly canCopy: boolean;
-  readonly onReveal: () => void;
-  readonly onHide: () => void;
-  readonly onCopy: () => void;
-}
-
-function SecretRow({
-  entry,
-  value,
-  isBusy,
-  canReveal,
-  canCopy,
-  onReveal,
-  onHide,
-  onCopy,
-}: SecretRowProps) {
-  const isRevealed = value !== undefined;
-
-  return (
-    <li className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2.5">
-      <span className="metric shrink-0 text-ui font-medium text-foreground">{entry.key}</span>
-      <span className="metric shrink-0 text-ui text-faint-foreground">=</span>
-
-      <span
-        className={cn(
-          "metric min-w-0 flex-1 truncate text-ui",
-          isRevealed ? "text-foreground" : "tracking-widest text-faint-foreground",
-        )}
-      >
-        {isRevealed ? value : entry.maskedValue}
-      </span>
-
-      <SelectChip option={environmentOption(entry.environmentOptionId)} />
-
-      <span className="metric hidden shrink-0 items-center gap-1.5 text-micro text-faint-foreground sm:flex">
-        <UserAvatar user={entry.rotatedBy} className="size-4" />
-        {formatRelativeTime(entry.updatedAt)}
-      </span>
-
-      <div className="flex shrink-0 items-center gap-1">
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          disabled={!canReveal || isBusy}
-          aria-label={isRevealed ? `Hide ${entry.key}` : `Reveal ${entry.key}`}
-          onClick={isRevealed ? onHide : onReveal}
-        >
-          {isBusy ? <Loader2 className="animate-spin" /> : isRevealed ? <EyeOff /> : <Eye />}
-        </Button>
-
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          disabled={!canCopy || isBusy}
-          aria-label={`Copy ${entry.key}`}
-          onClick={onCopy}
-        >
-          <Copy />
-        </Button>
-      </div>
-
-      {entry.note && (
-        <p className="w-full text-body text-faint-foreground">{entry.note}</p>
-      )}
-    </li>
-  );
-}
-
-function AuditPanel({ nodeId }: { nodeId: string }) {
-  const loader = useCallback(
-    (signal: AbortSignal) => devtoolsService.listSecretAudit(nodeId, signal),
-    [nodeId],
-  );
-
-  const { state } = useAsyncResource<readonly SecretAuditEntry[]>(loader, {
-    keepPreviousData: true,
-  });
-
-  const entries = state.status === "success" ? state.data : [];
-
-  return (
-    <aside
-      aria-label="Secret audit log"
-      className="flex w-80 shrink-0 flex-col border-l border-border bg-background"
-    >
-      <header className="flex shrink-0 items-center gap-1.5 border-b border-hairline px-3 py-2.5">
-        <ShieldCheck className="size-3.5 text-faint-foreground" />
-        <h2 className="text-ui font-medium text-foreground">Audit log</h2>
-        <span className="metric ml-auto text-micro text-faint-foreground">{entries.length}</span>
-      </header>
-
-      <ol className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
-        {entries.map((entry) => (
-          <li key={entry.id} className="rounded-lg border border-border bg-surface px-2.5 py-2">
-            <div className="flex items-baseline gap-1.5">
-              <Badge variant={entry.action === "reveal" ? "accent" : "default"}>
-                {entry.action}
-              </Badge>
-              <span className="metric min-w-0 flex-1 truncate text-body text-foreground">
-                {entry.key}
-              </span>
-            </div>
-            <p className="metric mt-1 truncate text-micro text-faint-foreground">
-              {entry.actor.name} · {entry.ip} · {formatRelativeTime(entry.at)}
-            </p>
-          </li>
-        ))}
-
-        {entries.length === 0 && (
-          <li className="px-1 py-6 text-center text-body text-faint-foreground">
-            Nothing has been revealed in this session.
-          </li>
-        )}
-      </ol>
-    </aside>
   );
 }

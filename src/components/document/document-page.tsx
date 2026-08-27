@@ -1,7 +1,7 @@
 "use client";
 
 import { FileText } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CommentPanel } from "@/components/comments/comment-panel";
 import { BlockEditor } from "@/components/document/block-editor";
 import { DocumentHeader } from "@/components/document/document-header";
@@ -19,6 +19,7 @@ import { useDocument } from "@/hooks/use-document";
 import { useDocumentActions } from "@/hooks/use-document-actions";
 import { useHotkey } from "@/hooks/use-hotkey";
 import { useTrackRecent } from "@/hooks/use-recent";
+import { useUnsavedWarning } from "@/hooks/use-unsaved-warning";
 import { hasUnsavedWork } from "@/lib/autosave";
 import { nodeRef } from "@/lib/entity-ref";
 import { cn } from "@/lib/utils";
@@ -61,15 +62,7 @@ export function DocumentPage({ node }: DocumentPageProps) {
     enableInInputs: true,
   });
 
-  // Losing edits on navigation is worse than an extra browser prompt.
-  const isDirty = hasUnsavedWork(controller.saveState);
-  useEffect(() => {
-    if (!isDirty) return;
-
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [isDirty]);
+  useUnsavedWarning(hasUnsavedWork(controller.saveState));
 
   return (
     <div
