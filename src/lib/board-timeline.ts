@@ -22,33 +22,52 @@ import type { BoardColumn, GanttZoom } from "@/types";
  */
 
 /**
- * Four scales over the same unit.
+ * Three scales over the same unit.
  *
  * Zoom never changes the arithmetic — a day is always one unit — only how many
- * pixels that day is drawn as. Day reads a sprint, quarter reads a year, and
+ * pixels that day is drawn as. Week reads a sprint, quarter reads a year, and
  * every offset in between stays a whole number of days.
+ *
+ * There is no per-day scale. At 44px a day the viewport held a fortnight, so
+ * the scale that was meant to show detail was the one you had to scroll to
+ * read anything at all — and every other surface that answers "what is
+ * happening this week" (the calendar, My Work, the table sorted by date) does
+ * it better. Week is the floor.
  */
 export type TimelineZoom = GanttZoom;
 
-export const TIMELINE_ZOOMS: readonly GanttZoom[] = ["day", "week", "month", "quarter"];
+export const TIMELINE_ZOOMS: readonly GanttZoom[] = ["week", "month", "quarter"];
+
+/** What a view opens at, and what an unreadable stored value falls back to. */
+export const DEFAULT_GANTT_ZOOM: GanttZoom = "week";
 
 export const DAY_WIDTH: Readonly<Record<GanttZoom, number>> = {
-  day: 44,
   week: 18,
   month: 7,
   quarter: 3,
 };
 
 export const ZOOM_LABELS: Readonly<Record<GanttZoom, string>> = {
-  day: "Day",
   week: "Week",
   month: "Month",
   quarter: "Quarter",
 };
 
+/**
+ * A saved view's stored zoom, made safe to use.
+ *
+ * Views written before the per-day scale was removed still carry `"day"`, and
+ * a stored string is untrusted data either way. Rather than let an unknown
+ * value reach `DAY_WIDTH` and render a chart whose days are `undefined` pixels
+ * wide, anything the timeline does not recognise is read as Week — the nearest
+ * surviving scale, and the one a Day view was closest to.
+ */
+export function normalizeGanttZoom(value: unknown): GanttZoom {
+  return TIMELINE_ZOOMS.find((zoom) => zoom === value) ?? DEFAULT_GANTT_ZOOM;
+}
+
 /** Where a zoom stops labelling every day and starts labelling periods. */
-const TICK_STRIDE: Readonly<Record<GanttZoom, "day" | "week" | "month">> = {
-  day: "day",
+const TICK_STRIDE: Readonly<Record<GanttZoom, "week" | "month">> = {
   week: "week",
   month: "month",
   quarter: "month",
@@ -76,10 +95,9 @@ const MAX_RANGE_DAYS = 1100;
  * two months as a 180px stub against an empty canvas — accurate about the data
  * and useless to look at, because the scale is chosen for the horizon it
  * shows. Each figure is set so its column width fills a wide viewport:
- * 32 days at 44px, 98 at 18px, 380 at 7px, 760 at 3px.
+ * 98 days at 18px, 380 at 7px, 760 at 3px.
  */
 const MIN_SPAN_DAYS: Readonly<Record<TimelineZoom, number>> = {
-  day: 32,
   week: 98,
   month: 380,
   quarter: 760,
@@ -285,8 +303,8 @@ function buildBands(
 }
 
 /**
- * Labels at the density the scale can carry: every day up close, every Monday
- * a step out, every month once a day is only a few pixels wide.
+ * Labels at the density the scale can carry: every Monday up close, every
+ * month once a day is only a few pixels wide.
  */
 function buildTicks(startIso: string, dayCount: number, zoom: TimelineZoom): readonly TimelineTick[] {
   const ticks: TimelineTick[] = [];
@@ -294,11 +312,6 @@ function buildTicks(startIso: string, dayCount: number, zoom: TimelineZoom): rea
 
   for (let offset = 0; offset < dayCount; offset += 1) {
     const iso = addDays(startIso, offset);
-
-    if (stride === "day") {
-      ticks.push({ iso, offset, label: shortDayLabel(iso), isMajor: isFirstOfMonth(iso) });
-      continue;
-    }
 
     if (stride === "week") {
       if (weekdayIndex(iso) !== 0) continue;

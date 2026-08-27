@@ -24,6 +24,12 @@ interface GanttDependenciesProps {
  * colour and nothing else happens: the chart reports the clash, it does not
  * reschedule anyone. Deciding what to move is the plan owner's job.
  *
+ * This is a *layer*, not something a row or a bar draws for itself, and it sits
+ * below the bars rather than over them (`z-base`, against the bar layer's
+ * `z-raised`). A connector between distant rows has to cross the lanes between
+ * them; painting it underneath is what turns that crossing into the wire
+ * passing behind a task instead of a line drawn through its title.
+ *
  * Routing is in `gantt-connector`, which is where the backwards case is
  * handled: a conflict points leftwards, so the wire leaves the blocker's start
  * and drops down the left of both bars rather than setting off to the right
@@ -62,7 +68,7 @@ export function GanttDependencies({
       aria-hidden
       width={width}
       height={rows.length * rowHeight}
-      className="pointer-events-none absolute top-0 left-0 z-overlay overflow-visible"
+      className="pointer-events-none absolute top-0 left-0 z-base overflow-visible"
     >
       {visible.map((link) => {
         const fromIndex = positions.get(link.fromRowId);

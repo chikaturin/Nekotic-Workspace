@@ -29,8 +29,15 @@ function legsAt(points: readonly Point[], y: number): readonly (readonly [number
 }
 
 describe("routing a blocked-by connector", () => {
-  /** A schedule that holds together: the blocker finishes, then the work starts. */
-  test("forwards leaves the blocker's finish and lands on the target's start", () => {
+  /**
+   * A schedule that holds together: the blocker finishes, then the work starts.
+   *
+   * The wire turns down immediately behind the blocker rather than running on
+   * at the blocker's height and dropping just before the target. Both routes
+   * are elbows; only this one keeps the long leg in the target's own lane,
+   * where the only bar is the one being pointed at.
+   */
+  test("forwards drops into the gutter behind the blocker, then runs in", () => {
     const points = connectorPoints({
       fromStartX: 40,
       fromEndX: 100,
@@ -41,10 +48,28 @@ describe("routing a blocked-by connector", () => {
 
     expect(points).toEqual([
       { x: 100, y: 20 },
-      { x: 290, y: 20 },
-      { x: 290, y: 64 },
+      { x: 110, y: 20 },
+      { x: 110, y: 64 },
       { x: 300, y: 64 },
     ]);
+  });
+
+  /** Exactly one vertical run, so the wire never zig-zags across the chart. */
+  test("the route turns down exactly once", () => {
+    for (const toStartX of [40, 100, 111, 260, 800]) {
+      const points = connectorPoints({
+        fromStartX: 90,
+        fromEndX: 150,
+        fromY: 20,
+        toStartX,
+        toY: 64,
+      });
+
+      const verticals = points.filter(
+        (point, index) => index > 0 && points[index - 1]?.x === point.x,
+      );
+      expect(verticals).toHaveLength(1);
+    }
   });
 
   /**
@@ -69,17 +94,28 @@ describe("routing a blocked-by connector", () => {
     ]);
   });
 
-  test("neither horizontal leg touches the bar in its own lane", () => {
+  /**
+   * The property that matters, over both routes and every relative position:
+   * a horizontal leg in the blocker's lane stays clear of the blocker's bar,
+   * and one in the target's lane stops at the target's start. Everything a
+   * connector could draw across a task it has nothing to do with fails here.
+   */
+  test("no horizontal leg enters the bar in its own lane", () => {
     const blocker = { fromStartX: 340, fromEndX: 400, fromY: 22 };
-    const points = connectorPoints({ ...blocker, toStartX: 200, toY: 66 });
 
-    // Left of the blocker's own start, so it never crosses the blocker.
-    for (const [from, to] of legsAt(points, 22)) {
-      expect(Math.max(from, to)).toBeLessThanOrEqual(blocker.fromStartX);
-    }
-    // Left of the target's start, so it never crosses the target.
-    for (const [from, to] of legsAt(points, 66)) {
-      expect(Math.max(from, to)).toBeLessThanOrEqual(200);
+    for (const toStartX of [20, 200, 339, 405, 411, 900]) {
+      const points = connectorPoints({ ...blocker, toStartX, toY: 66 });
+
+      for (const [from, to] of legsAt(points, 22)) {
+        const entersBlocker =
+          Math.max(from, to) > blocker.fromStartX && Math.min(from, to) < blocker.fromEndX;
+        expect(entersBlocker).toBe(false);
+      }
+
+      // The arrow lands on the target's start from outside it, always.
+      for (const [from, to] of legsAt(points, 66)) {
+        expect(Math.max(from, to)).toBeLessThanOrEqual(toStartX);
+      }
     }
   });
 

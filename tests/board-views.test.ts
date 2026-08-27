@@ -33,6 +33,7 @@ import { makeColumn } from "@/lib/board-schema";
 import {
   buildBars,
   DAY_WIDTH,
+  normalizeGanttZoom,
   offsetToIso,
   orderRange,
   timelineScale,
@@ -316,7 +317,7 @@ describe("gantt scale", () => {
   });
 
   test("the scale pads the window and locates today", () => {
-    const scale = timelineScale(rowIds, index.rowsById, start, due, "day", "2026-08-12T00:00:00.000Z");
+    const scale = timelineScale(rowIds, index.rowsById, start, due, "week", "2026-08-12T00:00:00.000Z");
 
     // Today, and every dated record, is somewhere inside the window.
     expect(offsetToIso(scale, scale.todayOffset)).toBe("2026-08-12T00:00:00.000Z");
@@ -410,7 +411,7 @@ describe("gantt scale", () => {
   });
 
   test("the header bands name each month once, covering the whole window", () => {
-    const scale = timelineScale(rowIds, index.rowsById, start, due, "day", "2026-08-12T00:00:00.000Z");
+    const scale = timelineScale(rowIds, index.rowsById, start, due, "week", "2026-08-12T00:00:00.000Z");
     const keys = scale.bands.map((band) => band.key);
 
     expect(keys).toEqual([...new Set(keys)]);
@@ -418,12 +419,26 @@ describe("gantt scale", () => {
     expect(scale.bands[0]?.offset).toBe(0);
   });
 
-  test("the chart offers four scales, widest day to narrowest quarter", () => {
-    expect(TIMELINE_ZOOMS).toEqual(["day", "week", "month", "quarter"]);
+  test("the chart offers three scales, widest week to narrowest quarter", () => {
+    expect(TIMELINE_ZOOMS).toEqual(["week", "month", "quarter"]);
 
     // Each step out draws a day narrower — that is all zoom changes.
     const widths = TIMELINE_ZOOMS.map((zoom) => DAY_WIDTH[zoom]);
     expect(widths).toEqual([...widths].sort((a, b) => b - a));
+  });
+
+  /**
+   * The per-day scale is gone, but a view saved while it existed is still a
+   * legitimate thing to open. It has to land on a scale the chart can draw
+   * rather than reaching `DAY_WIDTH.day` and rendering an undefined width.
+   */
+  test("a view still holding the removed day scale opens on week", () => {
+    expect(normalizeGanttZoom("day")).toBe("week");
+    expect(normalizeGanttZoom(undefined)).toBe("week");
+    expect(normalizeGanttZoom("fortnight")).toBe("week");
+    expect(normalizeGanttZoom(null)).toBe("week");
+
+    for (const zoom of TIMELINE_ZOOMS) expect(normalizeGanttZoom(zoom)).toBe(zoom);
   });
 });
 

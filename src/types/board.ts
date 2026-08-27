@@ -251,10 +251,16 @@ export interface BoardRow {
 export type BoardViewType = "table" | "kanban" | "calendar" | "gantt";
 
 /**
- * How wide a day is drawn. Day reads a sprint, quarter reads a year — the
+ * How wide a day is drawn. Week reads a sprint, quarter reads a year — the
  * unit is always a whole day, only its pixel width changes.
+ *
+ * A per-day scale used to sit below Week and was removed: at 44px a day, a
+ * fortnight filled the viewport and reading a plan meant scrolling it, which
+ * is the one thing a roadmap exists to avoid. Week is the floor, and a saved
+ * view still holding `"day"` is read as Week rather than crashing — see
+ * `normalizeGanttZoom`.
  */
-export type GanttZoom = "day" | "week" | "month" | "quarter";
+export type GanttZoom = "week" | "month" | "quarter";
 
 export type FilterOperator =
   | "isNotEmpty"

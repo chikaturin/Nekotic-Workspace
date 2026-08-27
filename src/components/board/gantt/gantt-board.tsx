@@ -16,7 +16,7 @@ import type { BoardViewModel } from "@/hooks/use-board-view";
 import { useVirtualRows } from "@/hooks/use-virtual-rows";
 import { buildGanttLinks, buildGanttRows, fillScheduleEdits, type GanttRow } from "@/lib/board-gantt";
 import { layoutHierarchy } from "@/lib/board-hierarchy";
-import { timelineScale } from "@/lib/board-timeline";
+import { normalizeGanttZoom, timelineScale } from "@/lib/board-timeline";
 import { formatCount } from "@/lib/format";
 import { selectCollapsedParents, useGridStore } from "@/store/grid-store";
 import { useBoardStore } from "@/store/board-store";
@@ -75,7 +75,10 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
   /** The day to keep under the middle of the viewport across a zoom change. */
   const anchorDay = useRef<number | null>(null);
 
-  const zoom: GanttZoom = view?.ganttZoom ?? "week";
+  // A saved view may still hold a scale this chart no longer draws — "day" was
+  // removed — so the stored value is normalised on the way in rather than
+  // trusted straight into the pixel tables.
+  const zoom: GanttZoom = normalizeGanttZoom(view?.ganttZoom);
   const showDependencies = view?.showDependencies ?? true;
 
   const collapsedSet = useMemo(() => new Set(collapsed), [collapsed]);
@@ -294,26 +297,15 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
 
               <PanelResizer width={panelWidth} onResize={setPanelWidth} />
 
+              {/* Three layers, painted bottom to top: the background rules,
+                  the dependency wires, then the bars. The order is the whole
+                  point — a wire between distant rows has to cross the lanes in
+                  between, and it must read as passing *behind* those tasks
+                  rather than being drawn across their titles. */}
               <div style={{ width: chartWidth }} className="relative shrink-0">
                 {/* One background for the whole chart, so a rule runs its full
                     height instead of stopping at every row border. */}
                 <GanttGridLayer scale={scale} height={bodyHeight} />
-
-                <div style={{ height: range.paddingTop }} aria-hidden />
-                {visible.map((row) => (
-                  <GanttLane
-                    key={row.rowId}
-                    row={row}
-                    primaryColumnId={primaryColumnId}
-                    columns={columnsShown}
-                    statusColumn={model.completionColumn}
-                    context={context}
-                    dayWidth={scale.dayWidth}
-                    height={ROW_HEIGHT}
-                    hasConflict={conflicted.has(row.rowId)}
-                  />
-                ))}
-                <div style={{ height: range.paddingBottom }} aria-hidden />
 
                 {showDependencies && (
                   <GanttDependencies
@@ -326,6 +318,24 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
                     windowEnd={range.end}
                   />
                 )}
+
+                <div className="relative z-raised">
+                  <div style={{ height: range.paddingTop }} aria-hidden />
+                  {visible.map((row) => (
+                    <GanttLane
+                      key={row.rowId}
+                      row={row}
+                      primaryColumnId={primaryColumnId}
+                      columns={columnsShown}
+                      statusColumn={model.completionColumn}
+                      context={context}
+                      dayWidth={scale.dayWidth}
+                      height={ROW_HEIGHT}
+                      hasConflict={conflicted.has(row.rowId)}
+                    />
+                  ))}
+                  <div style={{ height: range.paddingBottom }} aria-hidden />
+                </div>
               </div>
             </div>
           </div>

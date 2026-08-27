@@ -83,7 +83,7 @@ function projections(harness: Harness) {
         state.rowsById,
         harness.start,
         harness.due,
-        "day",
+        "week",
         "2026-08-26T00:00:00.000Z",
       );
       return { scale, bars: buildBars(rowIds, state.rowsById, harness.start, harness.due, scale.startIso) };
