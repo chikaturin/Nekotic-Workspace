@@ -2,6 +2,7 @@
 
 import { CalendarDays, ChevronLeft, ChevronRight, Inbox } from "lucide-react";
 import { useCallback, useMemo, useState, type DragEvent } from "react";
+import { CalendarDayDialog } from "@/components/board/views/calendar-day-dialog";
 import { RecordCard } from "@/components/board/views/record-card";
 import { StatePanel } from "@/components/shared/state-panels";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,8 @@ export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
 
   const [monthIso, setMonthIso] = useState(MOCK_NOW);
   const [overKey, setOverKey] = useState<string | null>(null);
+  /** The day whose full record list is open — a cell only fits a couple. */
+  const [openDayKey, setOpenDayKey] = useState<string | null>(null);
 
   const month = useMemo(
     () => (dateColumn ? buildMonth(monthIso, rowIds, rowsById, dateColumn, MOCK_NOW) : null),
@@ -44,6 +47,12 @@ export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
   const cardFields = columnsShown.filter(
     (column) => !column.isPrimary && column.id !== dateColumn?.id,
   );
+
+  /** The day the reader asked to see in full, resolved against this month. */
+  const openDay = useMemo(() => {
+    if (!month || !openDayKey) return null;
+    return month.weeks.flat().find((day) => day.key === openDayKey) ?? null;
+  }, [month, openDayKey]);
 
   const drop = useCallback(
     (dayIso: string, rowId: string) => {
@@ -150,18 +159,23 @@ export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
               )}
             >
               <div className="flex shrink-0 items-center gap-1">
-                <span
+                {/* The date is the way into the day: it opens every record on
+                    it, not just the two the cell had room for. */}
+                <button
+                  type="button"
+                  aria-label={`Open ${day.iso.slice(0, 10)} — ${day.rowIds.length} records`}
+                  onClick={() => setOpenDayKey(day.key)}
                   className={cn(
-                    "metric flex size-5 items-center justify-center rounded-full text-[10px]",
+                    "metric flex size-5 items-center justify-center rounded-full text-[10px] transition-colors",
                     day.isToday
                       ? "bg-accent text-accent-foreground"
                       : day.isCurrentMonth
-                        ? "text-muted-foreground"
-                        : "text-faint-foreground",
+                        ? "text-muted-foreground hover:bg-hover hover:text-foreground"
+                        : "text-faint-foreground hover:bg-hover",
                   )}
                 >
                   {day.dayOfMonth}
-                </span>
+                </button>
               </div>
 
               <div className="min-h-0 flex-1 space-y-1 overflow-hidden">
@@ -180,9 +194,13 @@ export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
               </div>
 
               {day.rowIds.length > MAX_CARDS_PER_DAY && (
-                <p className="metric shrink-0 px-1 text-[10px] text-faint-foreground">
+                <button
+                  type="button"
+                  onClick={() => setOpenDayKey(day.key)}
+                  className="metric shrink-0 rounded px-1 text-left text-[10px] text-muted-foreground hover:bg-hover hover:text-foreground"
+                >
                   +{day.rowIds.length - MAX_CARDS_PER_DAY} more
-                </p>
+                </button>
               )}
             </div>
           ))}
@@ -220,6 +238,15 @@ export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
           )}
         </div>
       </aside>
+
+      <CalendarDayDialog
+        day={openDay}
+        primaryColumnId={board?.primaryColumnId ?? ""}
+        fields={cardFields}
+        context={context}
+        canDrag={false}
+        onClose={() => setOpenDayKey(null)}
+      />
     </div>
   );
 }

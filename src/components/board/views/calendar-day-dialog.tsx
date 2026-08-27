@@ -1,0 +1,76 @@
+"use client";
+
+import { RecordCard } from "@/components/board/views/record-card";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import type { CellContext } from "@/lib/cell-values";
+import { longDayLabel } from "@/lib/board-dates";
+import { formatCount } from "@/lib/format";
+import type { BoardColumn } from "@/types";
+
+interface CalendarDayDialogProps {
+  /** The day being inspected; null keeps the dialog closed. */
+  readonly day: { readonly iso: string; readonly rowIds: readonly string[] } | null;
+  readonly primaryColumnId: string;
+  readonly fields: readonly BoardColumn[];
+  readonly context: CellContext;
+  readonly canDrag: boolean;
+  readonly onClose: () => void;
+}
+
+/**
+ * Everything on one day.
+ *
+ * A month cell can only hold a couple of cards before it stops being a month,
+ * so the rest were summarised as "+3 more" — which named them without ever
+ * showing them. The count is now the way in: it opens the day and lists every
+ * record on it, as the same cards the grid renders, so opening one still goes
+ * to the same drawer.
+ */
+export function CalendarDayDialog({
+  day,
+  primaryColumnId,
+  fields,
+  context,
+  canDrag,
+  onClose,
+}: CalendarDayDialogProps) {
+  return (
+    <Dialog open={day !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="flex max-h-[80dvh] w-[26rem] max-w-[calc(100vw-2rem)] flex-col p-0">
+        {day && (
+          <>
+            <header className="shrink-0 border-b border-border px-4 py-3 pr-12">
+              <DialogTitle className="text-[14px] font-semibold text-foreground">
+                {longDayLabel(day.iso)}
+              </DialogTitle>
+              <DialogDescription className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                {formatCount(day.rowIds.length, "record")}
+                <Badge variant="default">{day.rowIds.length}</Badge>
+              </DialogDescription>
+            </header>
+
+            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4 py-3">
+              {day.rowIds.map((rowId) => (
+                <RecordCard
+                  key={rowId}
+                  rowId={rowId}
+                  primaryColumnId={primaryColumnId}
+                  fields={fields}
+                  context={context}
+                  canDrag={canDrag}
+                />
+              ))}
+
+              {day.rowIds.length === 0 && (
+                <p className="py-6 text-center text-[12px] text-faint-foreground">
+                  Nothing scheduled on this day.
+                </p>
+              )}
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
