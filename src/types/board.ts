@@ -100,9 +100,28 @@ export interface TextConfig {
   readonly placeholder?: string;
 }
 
+/**
+ * Turning a long-text column into a list of numbered steps.
+ *
+ * A QA case is written as `B1: …`, `B2: …`; a test plan as `T1:`, `T2:`. The
+ * shape is always the same — a prefix, a number, a separator — so it is three
+ * fields rather than a template language. Behaviour rather than presentation,
+ * so it belongs to the column and everyone reading the board gets it.
+ */
+export interface StepNumbering {
+  readonly enabled: boolean;
+  /** Letters in front of the number, e.g. `B`, `T`, `Step `. May be empty. */
+  readonly prefix: string;
+  /** The number the first step takes. */
+  readonly start: number;
+  /** What follows the number, e.g. `:` or `.`. */
+  readonly separator: string;
+}
+
 export interface LongTextConfig {
   /** Preferred editor height in text rows. */
   readonly rows: number;
+  readonly stepNumbering?: StepNumbering;
 }
 
 export interface SelectConfig {
@@ -294,6 +313,18 @@ export interface ViewSort {
   readonly direction: "asc" | "desc";
 }
 
+/**
+ * How much of a cell's content a view shows.
+ *
+ *   - `compact` — one line, clipped. Every row is the same height.
+ *   - `wrap`    — wraps to a few lines, then clips. Rows grow, within a bound.
+ *   - `full`    — the whole value, however many lines that takes.
+ *
+ * Rows stay uniform under `compact`, which is the default and what the grid
+ * has always done; the other two are what make a QA step readable in place.
+ */
+export type CellDisplayMode = "compact" | "wrap" | "full";
+
 export type RowHeight = "short" | "medium" | "tall";
 
 /**
@@ -313,6 +344,13 @@ export interface SavedView {
   /** Per-view column order; ids missing from it fall back to schema position. */
   readonly columnOrder: readonly string[];
   readonly columnWidths: Readonly<Record<string, number>>;
+  /**
+   * Per-column display mode. Presentation, so it sits beside `columnWidths`
+   * rather than on the schema: one saved view can read Step in full while
+   * another keeps it to a line, without either changing what the column *is*.
+   * A column missing from the map is `compact`.
+   */
+  readonly columnDisplay?: Readonly<Record<string, CellDisplayMode>>;
   readonly rowHeight: RowHeight;
   /** Grouping column for the table and Kanban. */
   readonly groupByColumnId: string | null;

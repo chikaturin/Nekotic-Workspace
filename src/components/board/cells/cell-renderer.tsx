@@ -9,12 +9,20 @@ import { SelectCellView } from "@/components/board/cells/select-cell";
 import { TextCellView } from "@/components/board/cells/text-cell";
 import { UserCellView } from "@/components/board/cells/user-cell";
 import type { CellContext } from "@/lib/cell-values";
-import type { BoardColumn, CellValue } from "@/types";
+import type { BoardColumn, CellDisplayMode, CellValue } from "@/types";
 
 interface CellRendererProps {
   readonly value: CellValue;
   readonly column: BoardColumn;
   readonly context: CellContext;
+  /**
+   * How much of the value this view shows. Only the text types can use it —
+   * chips, dates and avatars are laid out rather than flowed, so a second line
+   * would show nothing more of them.
+   */
+  readonly mode?: CellDisplayMode;
+  /** False on a frozen or read-only board, where no click opens an editor. */
+  readonly isInteractive?: boolean;
 }
 
 const EMPTY_PEOPLE = new Map();
@@ -29,15 +37,30 @@ export const CellRenderer = memo(function CellRenderer({
   value,
   column,
   context,
+  mode = "compact",
+  isInteractive = true,
 }: CellRendererProps) {
   switch (column.type) {
     case "text":
       return value.kind === "text" ? (
-        <TextCellView value={value} isPrimary={column.isPrimary} />
+        <TextCellView
+          value={value}
+          isPrimary={column.isPrimary}
+          mode={mode}
+          width={column.width}
+          isInteractive={isInteractive}
+        />
       ) : null;
 
     case "longText":
-      return value.kind === "longText" ? <LongTextCellView value={value} /> : null;
+      return value.kind === "longText" ? (
+        <LongTextCellView
+          value={value}
+          mode={mode}
+          width={column.width}
+          isInteractive={isInteractive}
+        />
+      ) : null;
 
     case "select":
       return value.kind === "select" ? <SelectCellView value={value} column={column} /> : null;

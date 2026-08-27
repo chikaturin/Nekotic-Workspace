@@ -103,14 +103,80 @@ export function patchColumn(
   });
 }
 
+/**
+ * Put a column at a position, renumbering the whole schema.
+ *
+ * Order is `position`, not the array's index, so "insert to the left of B"
+ * means "take B's position and push everything from there along" — expressed
+ * once here rather than as `index + 1` arithmetic at each call site.
+ */
+export function insertColumnAt(
+  columns: readonly BoardColumn[],
+  column: BoardColumn,
+  index: number,
+): readonly BoardColumn[] {
+  const ordered = [...columns].sort((a, b) => a.position - b.position);
+  const at = Math.min(Math.max(Math.trunc(index), 0), ordered.length);
+
+  return reposition([...ordered.slice(0, at), column, ...ordered.slice(at)]);
+}
+
+/**
+ * The only column the board refuses to delete.
+ *
+ * It is the one that titles a record — the row's identity — and nothing else is
+ * protected. A column is not made permanent by where it came from: one an
+ * import created is a column like any other, and there is no `system`,
+ * `locked` or `isImported` flag anywhere in the schema for it to be caught by.
+ */
+export function isProtectedColumn(column: BoardColumn): boolean {
+  return column.isPrimary;
+}
+
 export function removeColumn(
   columns: readonly BoardColumn[],
   columnId: string,
 ): readonly BoardColumn[] {
   const target = columns.find((column) => column.id === columnId);
-  if (!target || target.isPrimary) return columns;
+  if (!target || isProtectedColumn(target)) return columns;
 
   return reposition(columns.filter((column) => column.id !== columnId));
+}
+
+/* ------------------------------------------------------------------ names */
+
+const NAME_NOISE = /[^a-z0-9]/g;
+
+/** Two column names collide when they differ only in case and punctuation. */
+export function normalizeColumnName(name: string): string {
+  return name.trim().toLowerCase().replace(NAME_NOISE, "");
+}
+
+/** The column already wearing this name, ignoring the one being renamed. */
+export function findColumnByName(
+  columns: readonly BoardColumn[],
+  name: string,
+  exceptId?: string,
+): BoardColumn | undefined {
+  const needle = normalizeColumnName(name);
+  if (needle.length === 0) return undefined;
+
+  return columns.find(
+    (column) => column.id !== exceptId && normalizeColumnName(column.name) === needle,
+  );
+}
+
+/** `Notes`, then `Notes 2`, `Notes 3` — a name a new column can actually take. */
+export function uniqueColumnName(columns: readonly BoardColumn[], base: string): string {
+  const trimmed = base.trim() || "New column";
+  if (!findColumnByName(columns, trimmed)) return trimmed;
+
+  for (let suffix = 2; suffix < 1000; suffix += 1) {
+    const candidate = `${trimmed} ${suffix}`;
+    if (!findColumnByName(columns, candidate)) return candidate;
+  }
+
+  return trimmed;
 }
 
 /** Move a column to an index, renumbering `position` for the whole schema. */

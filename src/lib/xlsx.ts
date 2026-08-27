@@ -23,6 +23,13 @@ const ILLEGAL_SHEET_CHARS = /[:\\/?*[\]]/g;
 const MAX_SHEET_NAME = 31;
 
 /**
+ * Ceiling on how far a row reference may reach. A sheet addresses a million
+ * rows; the import writes five thousand. This only stops a malformed or hostile
+ * `r` from turning into a million-element array on the way in.
+ */
+const MAX_SHEET_ROWS = 100_000;
+
+/**
  * Excel refuses to open a workbook whose sheet name it considers invalid, so a
  * board called "Q3: Launch" has to be cleaned rather than passed through.
  */
@@ -31,9 +38,12 @@ export function safeSheetName(name: string): string {
   return cleaned.length > 0 ? cleaned : DEFAULT_SHEET_NAME;
 }
 
-const ROW_PATTERN = /<row[^>]*>([\s\S]*?)<\/row>/g;
+/** Matches `<row …/>` as well as `<row …>…</row>` — Excel writes both. */
+const ROW_PATTERN = /<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g;
 const CELL_PATTERN = /<c\b([^>]*)(?:\/>|>([\s\S]*?)<\/c>)/g;
 const REFERENCE_PATTERN = /r="([A-Z]+)\d+"/;
+/** `r` on a `<row>` is the sheet's own 1-based row number. */
+const ROW_NUMBER_PATTERN = /\br="(\d+)"/;
 const TYPE_PATTERN = /t="([^"]+)"/;
 const VALUE_PATTERN = /<v>([\s\S]*?)<\/v>/;
 const INLINE_PATTERN = /<t[^>]*>([\s\S]*?)<\/t>/g;
@@ -82,25 +92,57 @@ function readSharedStrings(entry: Uint8Array | undefined, decoder: TextDecoder):
   return [...xml.matchAll(SHARED_ITEM_PATTERN)].map((match) => textOf(match[1] ?? ""));
 }
 
+/**
+ * A sheet is *addressed*, not sequential.
+ *
+ * Excel writes no `<row>` at all for a row nobody has touched, and no `<c>` for
+ * an empty cell — a sheet whose rows 4 and 5 are blank jumps straight from
+ * `r="3"` to `r="6"`. Reading the elements in document order therefore pulls
+ * every later row up by the number of blank ones above it, which is how a value
+ * that belongs to source row 8 ends up against row 5. The `r` attribute is the
+ * only thing that says where a row really is, so it is what this reads; the
+ * gaps are filled with the empty rows the file is describing by leaving out.
+ *
+ * The same is true one level down: `r="C2"` is a cell's address, not its
+ * position among its siblings.
+ */
 function readSheet(xml: string, shared: readonly string[]): Grid {
   const rows: string[][] = [];
+  let cursor = 0;
 
   for (const rowMatch of xml.matchAll(ROW_PATTERN)) {
-    const cells: string[] = [];
+    const reference = ROW_NUMBER_PATTERN.exec(rowMatch[1] ?? "")?.[1];
+    const index = reference ? Number.parseInt(reference, 10) - 1 : cursor;
 
-    for (const cellMatch of (rowMatch[1] ?? "").matchAll(CELL_PATTERN)) {
-      const attributes = cellMatch[1] ?? "";
-      const body = cellMatch[2] ?? "";
-      const column = columnIndex(REFERENCE_PATTERN.exec(attributes)?.[1] ?? "");
+    // A generator that omits `r` addresses rows sequentially; one that writes a
+    // wild `r` must not be able to allocate the sheet's whole 1.048.576-row
+    // address space.
+    if (!Number.isFinite(index) || index < 0 || index >= MAX_SHEET_ROWS) continue;
 
-      while (cells.length < column) cells.push("");
-      cells[column] = readCell(attributes, body, shared);
-    }
-
-    rows.push(cells);
+    while (rows.length < index) rows.push([]);
+    rows[index] = readRow(rowMatch[2] ?? "", shared);
+    cursor = index + 1;
   }
 
   return normalizeGrid(rows);
+}
+
+/** One row's cells, each at the column its own reference names. */
+function readRow(body: string, shared: readonly string[]): string[] {
+  const cells: string[] = [];
+  let cursor = 0;
+
+  for (const cellMatch of body.matchAll(CELL_PATTERN)) {
+    const attributes = cellMatch[1] ?? "";
+    const reference = REFERENCE_PATTERN.exec(attributes)?.[1];
+    const index = reference ? columnIndex(reference) : cursor;
+
+    while (cells.length < index) cells.push("");
+    cells[index] = readCell(attributes, cellMatch[2] ?? "", shared);
+    cursor = index + 1;
+  }
+
+  return cells;
 }
 
 function readCell(attributes: string, body: string, shared: readonly string[]): string {

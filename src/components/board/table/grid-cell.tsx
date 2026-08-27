@@ -208,7 +208,13 @@ export const GridCell = memo(function GridCell({
           style={indent > 0 || disclosure ? { paddingLeft: indent + (disclosure ? 18 : 0) } : undefined}
           className="h-full"
         >
-          <CellRenderer value={value} column={column} context={shared.context} />
+          <CellRenderer
+            value={value}
+            column={column}
+            context={shared.context}
+            mode={shared.displayModes[column.id] ?? "compact"}
+            isInteractive={!isReadOnly}
+          />
         </div>
       )}
     </div>

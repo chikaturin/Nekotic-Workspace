@@ -1,12 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { scrollOffsetFor, windowRange, type WindowRange } from "@/lib/grid-geometry";
+import {
+  prefixOffsets,
+  scrollOffsetFor,
+  variableScrollOffsetFor,
+  variableWindowRange,
+  windowRange,
+  type WindowRange,
+} from "@/lib/grid-geometry";
 
 interface VirtualRowsInput {
   readonly count: number;
   readonly rowHeight: number;
   readonly overscan?: number;
+  /**
+   * Per-row heights, when the view has a column that wraps or shows in full.
+   * Omitted — the common case — the uniform arithmetic below is used unchanged,
+   * so a board nobody has configured that way pays nothing for the feature.
+   */
+  readonly heights?: readonly number[] | null;
 }
 
 export interface VirtualRows {
@@ -19,13 +32,18 @@ export interface VirtualRows {
 const DEFAULT_OVERSCAN = 8;
 
 /**
- * Fixed-height row virtualisation. Only the rows inside the viewport (plus an
- * overscan band) are mounted, so 5.000 records cost the same as 30.
+ * Row virtualisation. Only the rows inside the viewport (plus an overscan band)
+ * are mounted, so 5.000 records cost the same as 30.
+ *
+ * Uniform by default and variable when `heights` is supplied — the second path
+ * differs only in how a scroll position becomes an index, and it still never
+ * measures a row: the heights arrive already computed from the text.
  */
 export function useVirtualRows({
   count,
   rowHeight,
   overscan = DEFAULT_OVERSCAN,
+  heights = null,
 }: VirtualRowsInput): VirtualRows {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -49,9 +67,15 @@ export function useVirtualRows({
     if (element) setScrollTop(element.scrollTop);
   }, []);
 
+  // One pass over the list, and only when the heights themselves change.
+  const offsets = useMemo(() => (heights ? prefixOffsets(heights) : null), [heights]);
+
   const range = useMemo(
-    () => windowRange({ scrollTop, viewportHeight, rowHeight, count, overscan }),
-    [scrollTop, viewportHeight, rowHeight, count, overscan],
+    () =>
+      offsets
+        ? variableWindowRange({ scrollTop, viewportHeight, offsets, overscan })
+        : windowRange({ scrollTop, viewportHeight, rowHeight, count, overscan }),
+    [offsets, scrollTop, viewportHeight, rowHeight, count, overscan],
   );
 
   const scrollToIndex = useCallback(
@@ -59,10 +83,13 @@ export function useVirtualRows({
       const element = scrollRef.current;
       if (!element) return;
 
-      const offset = scrollOffsetFor(index, element.scrollTop, element.clientHeight, rowHeight);
+      const offset = offsets
+        ? variableScrollOffsetFor(index, element.scrollTop, element.clientHeight, offsets)
+        : scrollOffsetFor(index, element.scrollTop, element.clientHeight, rowHeight);
+
       if (offset !== null) element.scrollTop = offset;
     },
-    [rowHeight],
+    [offsets, rowHeight],
   );
 
   return { scrollRef, range, onScroll, scrollToIndex };

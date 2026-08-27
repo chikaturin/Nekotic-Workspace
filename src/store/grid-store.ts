@@ -61,6 +61,16 @@ interface GridState {
   readonly selectedRowIds: Readonly<Record<string, true>>;
   /** Anchor for a shift-click range. */
   readonly lastSelectedRowId: string | null;
+  /**
+   * The column whose header is being renamed in place.
+   *
+   * It lives here rather than inside the header cell because the *board* opens
+   * it: inserting a column and duplicating one both leave the new column's name
+   * ready to type over, and neither of them is the header's own doing. Keyed by
+   * column id, never by position — the whole point is that a column added at
+   * the far right is reached exactly like one added in the middle.
+   */
+  readonly renamingColumnId: string | null;
 }
 
 interface GridActions {
@@ -78,6 +88,10 @@ interface GridActions {
   setCollapsedGroups: (viewId: string, keys: readonly string[]) => void;
   toggleParent: (viewId: string, rowId: string) => void;
   setCollapsedParents: (viewId: string, rowIds: readonly string[]) => void;
+
+  /** Open the header's rename field on a column, or close whichever is open. */
+  beginColumnRename: (columnId: string) => void;
+  endColumnRename: () => void;
 
   toggleRowSelection: (rowId: string) => void;
   /** Shift-click: tick everything between the anchor and `rowId` in view order. */
@@ -99,6 +113,7 @@ const INITIAL: GridState = {
   collapsedParentsByView: {},
   selectedRowIds: {},
   lastSelectedRowId: null,
+  renamingColumnId: null,
 };
 
 export const useGridStore = create<GridStore>()((set, get) => ({
@@ -200,6 +215,10 @@ export const useGridStore = create<GridStore>()((set, get) => ({
 
   clearRowSelection: () => set({ selectedRowIds: {}, lastSelectedRowId: null }),
 
+  // Renaming and cell editing are two cursors; only one of them can be live.
+  beginColumnRename: (columnId) => set({ renamingColumnId: columnId, editing: null }),
+  endColumnRename: () => set({ renamingColumnId: null }),
+
   reset: () => set(INITIAL),
 }));
 
@@ -266,4 +285,9 @@ export const selectSelectionCount = (state: GridStore): number =>
 
 export function clampToBounds(address: CellAddress, bounds: GridBounds): CellAddress {
   return clampAddress(address, bounds);
+}
+
+/** True when this column's header is the one being renamed. */
+export function selectIsRenaming(columnId: string) {
+  return (state: GridStore): boolean => state.renamingColumnId === columnId;
 }

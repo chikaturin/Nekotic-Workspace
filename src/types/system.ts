@@ -1,4 +1,4 @@
-import type { BoardRow, CellValue } from "./board";
+import type { BoardRow, CellValue, ColumnType } from "./board";
 import type { Block } from "./document";
 import type { DriveNode } from "./node";
 import type { UserSummary } from "./user";
@@ -51,22 +51,55 @@ export interface BulkMoveResult extends BulkResult {
 
 /* ------------------------------------------------------- import (SY-IMP-35) */
 
+/**
+ * One row of the file, carrying the row number the *file* gives it.
+ *
+ * The number travels with the cells rather than beside them. Every findings
+ * list, preview and error message downstream quotes it, and a row number kept
+ * in a parallel array is one filter away from describing a different row than
+ * the one it is printed next to.
+ */
+export interface ImportSourceRow {
+  /** 1-based row in the sheet, counting the header — what Excel shows. */
+  readonly sourceRowNumber: number;
+  readonly cells: readonly string[];
+}
+
 /** A parsed spreadsheet, header row already split off from the data. */
 export interface ImportSource {
   readonly fileName: string;
   readonly sheetName: string | null;
   readonly headers: readonly string[];
-  readonly rows: readonly (readonly string[])[];
+  readonly rows: readonly ImportSourceRow[];
 }
 
-/** One source column pointed at a board column, or explicitly ignored. */
+/**
+ * Where one source column's values go.
+ *
+ * A tagged union rather than a bag of optional fields, so "ignored", "into an
+ * existing column" and "into a column this import creates" cannot overlap and
+ * a half-set target cannot exist. Each source column owns one of these
+ * outright — there is no shared draft for a type picker to write into, which
+ * is what kept one column's cell type from landing on the next one.
+ */
+export type MappingTarget =
+  | { readonly kind: "ignore" }
+  | { readonly kind: "existing"; readonly columnId: string }
+  | { readonly kind: "create"; readonly name: string; readonly type: ColumnType };
+
 export interface ColumnMapping {
   readonly sourceIndex: number;
-  readonly columnId: string | null;
+  readonly target: MappingTarget;
+}
+
+/** A mapping the import refuses to run with, named for the user to fix. */
+export interface MappingConflict {
+  readonly sourceIndex: number;
+  readonly message: string;
 }
 
 export interface ImportIssue {
-  /** 1-based position in the data rows — what the preview table numbers. */
+  /** Row number in the file, header included — what the sheet itself shows. */
   readonly rowNumber: number;
   readonly sourceHeader: string;
   readonly columnName: string;
@@ -75,6 +108,7 @@ export interface ImportIssue {
 }
 
 export interface ImportDraftRow {
+  /** The file's own row number, never the board's. */
   readonly rowNumber: number;
   readonly cells: Readonly<Record<string, CellValue>>;
   /** Columns whose source value the type could not parse. */
@@ -86,10 +120,14 @@ export interface ImportPlan {
   readonly drafts: readonly ImportDraftRow[];
   readonly issues: readonly ImportIssue[];
   readonly mappedColumnCount: number;
+  /** Columns this import would add to the board before writing any record. */
+  readonly newColumnCount: number;
   readonly validCount: number;
   readonly invalidCount: number;
-  /** Source rows with nothing in any mapped column — never imported. */
+  /** Source rows with nothing in *any* column — never imported. */
   readonly blankCount: number;
+  /** Empty when the mapping is runnable. */
+  readonly conflicts: readonly MappingConflict[];
 }
 
 /** What to do with rows that hold a value the column cannot parse. */
@@ -100,6 +138,8 @@ export interface ImportOutcome {
   readonly skipped: number;
   readonly issues: readonly ImportIssue[];
   readonly rowIds: readonly string[];
+  /** Columns the board had that the file did not, removed on the user's say-so. */
+  readonly removedColumns?: readonly string[];
 }
 
 export type ImportStep = "upload" | "mapping" | "validation" | "result";

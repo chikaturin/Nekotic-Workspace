@@ -70,3 +70,101 @@ export function scrollOffsetFor(
   if (bottom > scrollTop + viewportHeight) return bottom - viewportHeight;
   return null;
 }
+
+/* --------------------------------------------------- variable row heights */
+
+/**
+ * Rows of different heights, still without measuring one.
+ *
+ * Wrap and Full make a row as tall as its content, which breaks the arithmetic
+ * the uniform path relies on — `index * rowHeight` stops being where a row
+ * starts. The replacement is a running total: `offsets[i]` is the top of row
+ * `i`, `offsets[count]` is the height of the whole list, and both ends of the
+ * window come out of a binary search over it.
+ *
+ * The heights themselves are *computed* from the text (see `lib/cell-display`),
+ * never read back from the DOM. That is what keeps this compatible with
+ * virtualisation at all: a row's height has to be known before it is mounted,
+ * or the scrollbar is a guess and every scroll is a jump.
+ *
+ * Building the totals is one pass over the list. It happens when the rows, the
+ * columns or the display modes change — not on a render, and not per frame.
+ */
+export function prefixOffsets(heights: readonly number[]): readonly number[] {
+  const offsets = new Array<number>(heights.length + 1);
+  offsets[0] = 0;
+
+  for (let index = 0; index < heights.length; index += 1) {
+    offsets[index + 1] = (offsets[index] ?? 0) + (heights[index] ?? 0);
+  }
+
+  return offsets;
+}
+
+/** Last index whose top is at or before `position`. */
+function indexAt(offsets: readonly number[], position: number): number {
+  let low = 0;
+  let high = offsets.length - 1;
+
+  while (low < high) {
+    const middle = Math.floor((low + high + 1) / 2);
+    if ((offsets[middle] ?? 0) <= position) low = middle;
+    else high = middle - 1;
+  }
+
+  return low;
+}
+
+export interface VariableWindowInput {
+  readonly scrollTop: number;
+  readonly viewportHeight: number;
+  /** Running tops, `count + 1` long. */
+  readonly offsets: readonly number[];
+  readonly overscan: number;
+}
+
+/** The same window as `windowRange`, over rows that are not all one height. */
+export function variableWindowRange({
+  scrollTop,
+  viewportHeight,
+  offsets,
+  overscan,
+}: VariableWindowInput): WindowRange {
+  const count = Math.max(0, offsets.length - 1);
+  const totalHeight = offsets[count] ?? 0;
+
+  if (count === 0) {
+    return { start: 0, end: 0, paddingTop: 0, paddingBottom: 0, totalHeight: 0 };
+  }
+
+  const top = Math.max(0, scrollTop);
+  const first = indexAt(offsets, top);
+  const last = indexAt(offsets, top + Math.max(0, viewportHeight));
+
+  const start = Math.max(0, first - overscan);
+  const end = Math.min(count, last + overscan + 1);
+
+  return {
+    start,
+    end,
+    paddingTop: offsets[start] ?? 0,
+    paddingBottom: Math.max(0, totalHeight - (offsets[end] ?? totalHeight)),
+    totalHeight,
+  };
+}
+
+/** `scrollOffsetFor` over running tops. */
+export function variableScrollOffsetFor(
+  index: number,
+  scrollTop: number,
+  viewportHeight: number,
+  offsets: readonly number[],
+): number | null {
+  const top = offsets[index];
+  const bottom = offsets[index + 1];
+  if (top === undefined || bottom === undefined) return null;
+
+  if (top < scrollTop) return top;
+  if (bottom > scrollTop + viewportHeight) return bottom - viewportHeight;
+  return null;
+}

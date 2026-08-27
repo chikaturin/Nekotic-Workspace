@@ -8,6 +8,7 @@ import { SelectCellEditor } from "@/components/board/cells/select-cell";
 import { TextCellEditor } from "@/components/board/cells/text-cell";
 import { UserCellEditor } from "@/components/board/cells/user-cell";
 import { emptyCellFor, type CellContext } from "@/lib/cell-values";
+import { stepNumberingOf } from "@/lib/step-numbering";
 import type { BoardColumn, CellValue, DirectoryUser, SelectOption } from "@/types";
 
 export interface CellEditorProps {
@@ -55,6 +56,7 @@ export function CellEditor(props: CellEditorProps) {
           value={safe}
           rows={column.config.rows}
           initialText={props.initialText}
+          steps={stepNumberingOf(column.config)}
           onCommit={onCommit}
           onCancel={onCancel}
         />

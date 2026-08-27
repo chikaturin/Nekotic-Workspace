@@ -17,6 +17,12 @@ interface GridRowProps {
   readonly rowId: string;
   readonly rowIndex: number;
   readonly shared: GridShared;
+  /**
+   * This row's height. Usually the view's, but a row holding a wrapped or
+   * fully-shown cell is as tall as its content — computed by the grid, which
+   * has to know it before the row is mounted for the virtualiser to place it.
+   */
+  readonly height?: number;
   /** Hierarchy depth — 0 for a top-level record, 1 for a subtask, and so on. */
   readonly depth?: number;
   readonly hasChildren?: boolean;
@@ -40,6 +46,7 @@ export const GridRow = memo(function GridRow({
   rowId,
   rowIndex,
   shared,
+  height,
   depth = 0,
   hasChildren = false,
   childCount = 0,
@@ -68,7 +75,7 @@ export const GridRow = memo(function GridRow({
       role="row"
       aria-rowindex={rowIndex + 2}
       aria-selected={isSelected}
-      style={{ height: shared.rowHeight }}
+      style={{ height: height ?? shared.rowHeight }}
       className={cn(
         "group/row flex w-max",
         isOpen && "bg-accent-soft",

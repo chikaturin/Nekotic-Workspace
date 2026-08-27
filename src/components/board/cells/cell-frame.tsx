@@ -19,11 +19,28 @@ import { cn } from "@/lib/utils";
  * twenty values is exactly as tall as one with none — which is the contract the
  * virtualiser is measuring rows against.
  */
-export function CellShell({ children, className }: { children: ReactNode; className?: string }) {
+export function CellShell({
+  children,
+  className,
+  isFlowed = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  /**
+   * The cell wraps rather than sitting on one line. Its text starts at the top
+   * instead of being centred, because a five-line paragraph centred against a
+   * one-line neighbour reads as misaligned. The row has already been made tall
+   * enough by the grid, so nothing here has to grow — it only has to clip to
+   * the height it was given, which is what keeps the estimate and the render
+   * agreeing.
+   */
+  isFlowed?: boolean;
+}) {
   return (
     <div
       className={cn(
-        "flex h-full min-w-0 items-center gap-1.5 overflow-hidden px-2",
+        "flex h-full min-w-0 gap-1.5 overflow-hidden px-2",
+        isFlowed ? "items-start py-1.5" : "items-center",
         className,
       )}
     >

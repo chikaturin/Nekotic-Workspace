@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, type KeyboardEvent } from "react";
+import { isGridKeyTarget } from "@/lib/dom/typing-target";
 import { advanceAddress, retreatAddress, selectAll, type GridBounds } from "@/lib/grid-selection";
 import { useGridStore } from "@/store/grid-store";
 import type { BoardColumn } from "@/types";
@@ -21,6 +22,11 @@ const TYPEAHEAD_TYPES = new Set<BoardColumn["type"]>(["text", "longText"]);
 /**
  * Spreadsheet keyboard model: arrows move, Shift extends, Tab walks, Enter
  * edits, typing replaces, Delete clears, Space opens the record drawer.
+ *
+ * It is bound to the grid container, which also contains the column headers, so
+ * the first thing it does is check the key was actually meant for it. A field
+ * inside the grid — the header's rename input above all — keeps its own
+ * keystrokes; see `dom/typing-target`.
  */
 export function useGridKeyboard({
   bounds,
@@ -32,6 +38,10 @@ export function useGridKeyboard({
 }: GridKeyboardInput) {
   return useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
+      // A keystroke aimed at a field inside the grid is that field's, not the
+      // cursor's — even one the grid itself rendered.
+      if (!isGridKeyTarget(event.target)) return;
+
       const grid = useGridStore.getState();
       if (grid.editing) return;
 

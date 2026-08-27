@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { BoardViewModel } from "@/hooks/use-board-view";
-import { useImportWizard } from "@/hooks/use-import-wizard";
+import { useImportWizard, type ImportWizard } from "@/hooks/use-import-wizard";
 import { cn } from "@/lib/utils";
 import type { ImportStep } from "@/types";
 
@@ -43,6 +43,13 @@ const STEPS: readonly { readonly id: ImportStep; readonly label: string }[] = [
 export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
   const wizard = useImportWizard(model);
   const stepIndex = STEPS.findIndex((step) => step.id === wizard.step);
+
+  /**
+   * The import writes records in the file's order; the view decides the order
+   * they are *read* in. Saying so on the way out is what stops a sorted view
+   * from looking like an import that shuffled the file.
+   */
+  const isSorted = (model.view?.sorts.length ?? 0) > 0;
 
   function close() {
     onClose();
@@ -105,10 +112,14 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
               source={wizard.source}
               columns={model.columns}
               mappings={wizard.mappings}
+              conflicts={wizard.plan?.conflicts ?? []}
               hasHeaderRow={wizard.hasHeaderRow}
               wasTruncated={wizard.wasTruncated}
+              unmapped={wizard.unmapped}
+              isRemovingUnmapped={wizard.isRemovingUnmapped}
               onSetHeaderRow={wizard.setHasHeaderRow}
-              onSetMapping={wizard.setMapping}
+              onSetTarget={wizard.setTarget}
+              onSetRemovingUnmapped={wizard.setRemovingUnmapped}
             />
           )}
 
@@ -121,7 +132,7 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
           )}
 
           {wizard.step === "result" && wizard.outcome && (
-            <ImportResultStep outcome={wizard.outcome} />
+            <ImportResultStep outcome={wizard.outcome} isSorted={isSorted} />
           )}
         </DialogBody>
 
@@ -145,22 +156,7 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
               {wizard.step === "result" ? "Done" : "Cancel"}
             </Button>
 
-            {wizard.step === "mapping" && (
-              <Button
-                size="sm"
-                variant="default"
-                disabled={(wizard.plan?.mappedColumnCount ?? 0) === 0}
-                title={
-                  (wizard.plan?.mappedColumnCount ?? 0) === 0
-                    ? "Map at least one column first"
-                    : undefined
-                }
-                onClick={() => wizard.goTo("validation")}
-              >
-                Validate
-                <ArrowRight />
-              </Button>
-            )}
+            {wizard.step === "mapping" && <ValidateButton wizard={wizard} />}
 
             {wizard.step === "validation" && wizard.plan && (
               <Button
@@ -184,5 +180,39 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Validate is offered only for a mapping that can actually run.
+ *
+ * A conflict is a decision the user has to make — two source columns aimed at
+ * one board column, or a new column whose name is taken. Letting the step
+ * advance and failing later would put the error a page away from the control
+ * that causes it.
+ */
+function ValidateButton({ wizard }: { readonly wizard: ImportWizard }) {
+  const plan = wizard.plan;
+  const targets = (plan?.mappedColumnCount ?? 0) + (plan?.newColumnCount ?? 0);
+  const conflicts = plan?.conflicts.length ?? 0;
+
+  const reason =
+    conflicts > 0
+      ? `Resolve ${conflicts === 1 ? "the conflict" : `all ${conflicts} conflicts`} above first`
+      : targets === 0
+        ? "Map at least one column first"
+        : undefined;
+
+  return (
+    <Button
+      size="sm"
+      variant="default"
+      disabled={reason !== undefined}
+      title={reason}
+      onClick={() => wizard.goTo("validation")}
+    >
+      Validate
+      <ArrowRight />
+    </Button>
   );
 }

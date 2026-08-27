@@ -49,7 +49,17 @@ export interface SelectConfigDraft {
 }
 
 let seed = 0;
-const nextOptionId = (): string => `opt_local_${(seed += 1).toString(36)}`;
+
+/**
+ * A new option's id, scoped to the column it belongs to.
+ *
+ * The counter alone was not enough: it starts again at zero on every reload, so
+ * an option added to one column after a refresh could take an id an option on
+ * another column already had. Option ids key the completed set, the transition
+ * table and the conditions written against them, and two columns sharing one is
+ * a collision waiting for whichever of those looks an id up without its column.
+ */
+const nextOptionId = (columnId: string): string => `opt_${columnId}_${(seed += 1).toString(36)}`;
 
 /**
  * Everything a Select column can be configured to do, in one place.
@@ -76,7 +86,13 @@ export function SelectColumnDialog({
    * effect re-seeds anything, and half-typed edits are never clobbered.
    */
   const [edited, setEdited] = useState<{ columnId: string; draft: SelectConfigDraft } | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  /**
+   * Which option's rule builder is open — stored with its column for the same
+   * reason the draft is. Two columns can hold options at the same position, and
+   * an id remembered from one of them must not open a row on the other.
+   */
+  const [expanded, setExpanded] = useState<{ columnId: string; optionId: string } | null>(null);
 
   const draft: SelectConfigDraft | null =
     column === null
@@ -97,6 +113,21 @@ export function SelectColumnDialog({
       </Dialog>
     );
   }
+
+  const expandedId = expanded?.columnId === column.id ? expanded.optionId : null;
+
+  /**
+   * Leaving the dialog drops the draft.
+   *
+   * Reopening therefore always shows what the column actually stores, rather
+   * than an edit that was abandoned — including on a *different* column, where
+   * a leftover draft is indistinguishable from that column's own settings.
+   */
+  const close = () => {
+    setEdited(null);
+    setExpanded(null);
+    onClose();
+  };
 
   const patch = (changes: Partial<SelectConfigDraft>) =>
     setEdited({ columnId: column.id, draft: { ...draft, ...changes } });
@@ -121,12 +152,12 @@ export function SelectColumnDialog({
 
   const addOption = () => {
     const option: SelectOption = {
-      id: nextOptionId(),
+      id: nextOptionId(column.id),
       label: `Option ${draft.options.length + 1}`,
       color: SELECT_COLORS[draft.options.length % SELECT_COLORS.length] ?? "gray",
     };
     patch({ options: [...draft.options, option] });
-    setExpandedId(option.id);
+    setExpanded({ columnId: column.id, optionId: option.id });
   };
 
   const removeOption = (optionId: string) => {
@@ -151,7 +182,7 @@ export function SelectColumnDialog({
   };
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="flex max-h-[85dvh] w-[52rem] max-w-[calc(100vw-2rem)] flex-col p-0">
         <header className="shrink-0 border-b border-border px-5 py-4 pr-12">
           <DialogTitle className="flex items-center gap-2 text-title font-semibold text-foreground">
@@ -275,7 +306,11 @@ export function SelectColumnDialog({
                             size="sm"
                             variant={isExpanded ? "subtle" : "ghost"}
                             className="ml-auto h-6 gap-1 px-1.5 text-body"
-                            onClick={() => setExpandedId(isExpanded ? null : option.id)}
+                            onClick={() =>
+                              setExpanded(
+                                isExpanded ? null : { columnId: column.id, optionId: option.id },
+                              )
+                            }
                           >
                             <Settings2 />
                             {isConditionGroupEmpty(option.availability) ? "Add rule" : "Edit rule"}
@@ -367,10 +402,7 @@ export function SelectColumnDialog({
             size="sm"
             variant="ghost"
             className="ml-auto"
-            onClick={() => {
-              setEdited(null);
-              onClose();
-            }}
+            onClick={close}
           >
             {canEdit ? "Cancel" : "Close"}
           </Button>
@@ -385,8 +417,7 @@ export function SelectColumnDialog({
                   ...draft,
                   transitionRules: pruneTransitionRules(draft.transitionRules, draft.options),
                 });
-                setEdited(null);
-                onClose();
+                close();
               }}
             >
               Save changes

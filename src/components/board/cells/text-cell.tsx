@@ -1,27 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { CellShell } from "@/components/board/cells/cell-frame";
-import type { CellValue } from "@/types";
+import { FlowedText } from "@/components/board/cells/flowed-text";
+import type { CellDisplayMode, CellValue } from "@/types";
 
 interface TextViewProps {
   readonly value: Extract<CellValue, { kind: "text" }>;
   readonly isPrimary?: boolean;
+  readonly mode?: CellDisplayMode;
+  readonly isInteractive?: boolean;
+  readonly width: number;
 }
 
-export function TextCellView({ value, isPrimary = false }: TextViewProps) {
+export function TextCellView({
+  value,
+  isPrimary = false,
+  mode = "compact",
+  isInteractive = true,
+  width,
+}: TextViewProps) {
   return (
-    <CellShell>
-      <span
-        className={
-          isPrimary
-            ? "min-w-0 truncate text-lead font-medium text-foreground"
-            : "min-w-0 truncate text-lead text-muted-foreground"
-        }
-      >
-        {value.value}
-      </span>
-    </CellShell>
+    <FlowedText
+      text={value.value}
+      mode={mode}
+      width={width}
+      isInteractive={isInteractive}
+      className={
+        isPrimary ? "text-lead font-medium text-foreground" : "text-lead text-muted-foreground"
+      }
+    />
   );
 }
 

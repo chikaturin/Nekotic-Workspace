@@ -262,6 +262,15 @@ export function pruneView(view: SavedView, columns: readonly BoardColumn[]): Sav
   const sorts = view.sorts.filter((sort) => ids.has(sort.columnId));
   const columnOrder = view.columnOrder.filter((id) => ids.has(id));
   const hiddenColumnIds = view.hiddenColumnIds.filter((id) => ids.has(id));
+
+  // Presentation keyed by column id has to go the same way as the rest: a view
+  // that still names a deleted column is a view carrying a dead reference.
+  const columnDisplay = Object.fromEntries(
+    Object.entries(view.columnDisplay ?? {}).filter(([id]) => ids.has(id)),
+  );
+  const columnWidths = Object.fromEntries(
+    Object.entries(view.columnWidths).filter(([id]) => ids.has(id)),
+  );
   const groupByColumnId = keep(view.groupByColumnId);
   const dateColumnId = keep(view.dateColumnId);
   const endDateColumnId = keep(view.endDateColumnId);
@@ -271,6 +280,8 @@ export function pruneView(view: SavedView, columns: readonly BoardColumn[]): Sav
     sorts.length === view.sorts.length &&
     columnOrder.length === view.columnOrder.length &&
     hiddenColumnIds.length === view.hiddenColumnIds.length &&
+    Object.keys(columnDisplay).length === Object.keys(view.columnDisplay ?? {}).length &&
+    Object.keys(columnWidths).length === Object.keys(view.columnWidths).length &&
     groupByColumnId === view.groupByColumnId &&
     dateColumnId === view.dateColumnId &&
     endDateColumnId === view.endDateColumnId;
@@ -283,6 +294,8 @@ export function pruneView(view: SavedView, columns: readonly BoardColumn[]): Sav
         sorts,
         columnOrder,
         hiddenColumnIds,
+        columnDisplay,
+        columnWidths,
         groupByColumnId,
         dateColumnId,
         endDateColumnId,

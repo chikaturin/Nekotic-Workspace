@@ -48,7 +48,16 @@ export function ViewConfigBar({
   const updateColumnConfig = useBoardStore((state) => state.updateColumnConfig);
   const people = useBoardStore((state) => state.people);
 
-  const [isEditingRules, setIsEditingRules] = useState(false);
+  /**
+   * The column the rules dialog was opened *on*, held by id.
+   *
+   * Not a boolean beside `kanbanStatusColumn`: that is derived from the view's
+   * current grouping, so a boolean would let a draft edited against one column
+   * be saved onto whichever column the view was grouping by at the moment the
+   * user pressed Save. Naming the column at open time makes the two the same
+   * column by construction.
+   */
+  const [rulesColumnId, setRulesColumnId] = useState<string | null>(null);
 
   const needsDates = view?.type === "calendar" || view?.type === "gantt";
   const filters = view?.filters ?? [];
@@ -65,6 +74,9 @@ export function ViewConfigBar({
   // stays for everyone; what it opens is read-only below Manager.
   const canEditRules = can("board.column.update");
 
+  const opened = columns.find((column) => column.id === rulesColumnId);
+  const rulesColumn = opened?.type === "select" ? opened : null;
+
   return (
     <div className="flex flex-wrap items-center gap-1 border-t border-hairline px-3 py-1.5">
       <FilterMenu model={model} />
@@ -77,7 +89,7 @@ export function ViewConfigBar({
           size="sm"
           variant={kanbanStatusColumn.config.transitionRules?.enabled ? "subtle" : "ghost"}
           className="gap-1.5"
-          onClick={() => setIsEditingRules(true)}
+          onClick={() => setRulesColumnId(kanbanStatusColumn.id)}
         >
           <Workflow />
           Transition rules
@@ -150,13 +162,13 @@ export function ViewConfigBar({
       )}
 
       <SelectColumnDialog
-        column={isEditingRules ? kanbanStatusColumn : null}
+        column={rulesColumn}
         columns={columns}
         people={people}
         canEdit={canEditRules}
-        onClose={() => setIsEditingRules(false)}
+        onClose={() => setRulesColumnId(null)}
         onSave={(config) => {
-          if (kanbanStatusColumn) void updateColumnConfig(kanbanStatusColumn.id, { config });
+          if (rulesColumn) void updateColumnConfig(rulesColumn.id, { config });
         }}
       />
     </div>

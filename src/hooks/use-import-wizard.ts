@@ -8,10 +8,14 @@ import type { Grid } from "@/lib/grid";
 import {
   autoMapColumns,
   isTruncated,
+  newColumnDrafts,
   planImport,
+  unmappedBoardColumns,
   readImportSource,
+  resolveProvisionalIds,
   rowsToCreate,
-  setMapping as applyMapping,
+  setMappingTarget,
+  planColumns,
 } from "@/lib/import-mapping";
 import { extensionOf } from "@/lib/node-visuals";
 import { parseXlsx } from "@/lib/xlsx";
@@ -19,12 +23,14 @@ import { useBoardStore } from "@/store/board-store";
 import { appError, toAppError } from "@/services/errors";
 import type {
   AppError,
+  BoardColumn,
   ColumnMapping,
   ImportInvalidPolicy,
   ImportOutcome,
   ImportPlan,
   ImportSource,
   ImportStep,
+  MappingTarget,
 } from "@/types";
 
 /**
@@ -33,6 +39,11 @@ import type {
  * Everything before "confirm" is a computation over the parsed file: the board
  * is not touched until the user has seen exactly which rows would fail and
  * chosen what should happen to them.
+ *
+ * Confirm writes in two stages — the columns the mapping asks for, then the
+ * records — because a record cannot carry a value for a column that does not
+ * exist yet. The columns are created first, their real ids replace the
+ * provisional ones the plan was drafted against, and only then do the rows go.
  */
 
 export interface ImportWizard {
@@ -42,6 +53,10 @@ export interface ImportWizard {
   readonly hasHeaderRow: boolean;
   readonly plan: ImportPlan | null;
   readonly policy: ImportInvalidPolicy;
+  /** Board columns this import writes nothing into — offered for removal. */
+  readonly unmapped: readonly BoardColumn[];
+  readonly isRemovingUnmapped: boolean;
+  readonly setRemovingUnmapped: (remove: boolean) => void;
   readonly outcome: ImportOutcome | null;
   readonly error: AppError | null;
   readonly isBusy: boolean;
@@ -49,7 +64,7 @@ export interface ImportWizard {
   readonly wasTruncated: boolean;
   readonly selectFile: (file: File) => Promise<void>;
   readonly setHasHeaderRow: (hasHeaderRow: boolean) => void;
-  readonly setMapping: (sourceIndex: number, columnId: string | null) => void;
+  readonly setTarget: (sourceIndex: number, target: MappingTarget) => void;
   readonly setPolicy: (policy: ImportInvalidPolicy) => void;
   readonly goTo: (step: ImportStep) => void;
   readonly confirm: () => Promise<void>;
@@ -60,6 +75,8 @@ const SPREADSHEET_EXTENSIONS = new Set(["xlsx", "csv", "tsv"]);
 
 export function useImportWizard(model: BoardViewModel): ImportWizard {
   const importRows = useBoardStore((state) => state.importRows);
+  const addColumn = useBoardStore((state) => state.addColumn);
+  const deleteColumn = useBoardStore((state) => state.deleteColumn);
 
   const [step, setStep] = useState<ImportStep>("upload");
   const [grid, setGrid] = useState<Grid | null>(null);
@@ -68,6 +85,14 @@ export function useImportWizard(model: BoardViewModel): ImportWizard {
   const [hasHeaderRow, setHeaderRow] = useState(true);
   const [mappings, setMappings] = useState<readonly ColumnMapping[]>([]);
   const [policy, setPolicy] = useState<ImportInvalidPolicy>("skip");
+  /**
+   * Off by default, and deliberately.
+   *
+   * Dropping a column takes its value off every record already on the board.
+   * That is a reasonable thing to want when a file defines the real schema, and
+   * never a reasonable thing to do because nobody said otherwise.
+   */
+  const [isRemovingUnmapped, setRemovingUnmapped] = useState(false);
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
   const [error, setError] = useState<AppError | null>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -98,6 +123,7 @@ export function useImportWizard(model: BoardViewModel): ImportWizard {
     setHeaderRow(true);
     setMappings([]);
     setPolicy("skip");
+    setRemovingUnmapped(false);
     setOutcome(null);
     setError(null);
   }, []);
@@ -161,6 +187,9 @@ export function useImportWizard(model: BoardViewModel): ImportWizard {
     hasHeaderRow,
     plan,
     policy,
+    unmapped: unmappedBoardColumns(mappings, model.columns),
+    isRemovingUnmapped,
+    setRemovingUnmapped,
     outcome,
     error,
     isBusy,
@@ -183,9 +212,9 @@ export function useImportWizard(model: BoardViewModel): ImportWizard {
       [grid, fileName, model.columns],
     ),
 
-    setMapping: useCallback(
-      (sourceIndex: number, columnId: string | null) =>
-        setMappings((current) => applyMapping(current, sourceIndex, columnId)),
+    setTarget: useCallback(
+      (sourceIndex: number, target: MappingTarget) =>
+        setMappings((current) => setMappingTarget(current, sourceIndex, target)),
       [],
     ),
 
@@ -193,30 +222,72 @@ export function useImportWizard(model: BoardViewModel): ImportWizard {
     goTo: setStep,
 
     confirm: useCallback(async () => {
-      if (!plan) return;
-
-      const rows = rowsToCreate(plan, policy, model.columns);
-      if (rows.length === 0) {
-        setOutcome({ created: 0, skipped: plan.drafts.length, issues: plan.issues, rowIds: [] });
-        setStep("result");
-        return;
-      }
+      if (!plan || plan.conflicts.length > 0) return;
 
       setIsBusy(true);
+      setError(null);
+
+      /** Drop the board columns the file had nothing for, by name for the report. */
+      const removeColumns = async (): Promise<readonly string[]> => {
+        const doomed = unmappedBoardColumns(mappings, model.columns);
+        for (const column of doomed) await deleteColumn(column.id);
+        return doomed.map((column) => column.name);
+      };
 
       try {
+        // Columns first, in file order, so a new column lands where the file
+        // puts it rather than in whatever order the promises settle.
+        const realIdBySourceIndex = new Map<number, string>();
+
+        for (const draft of newColumnDrafts(mappings)) {
+          const created = await addColumn(draft.type, draft.name.trim());
+          if (!created) {
+            setError(
+              appError("conflict", `Could not create the “${draft.name.trim()}” column`, {
+                detail: "Nothing was imported. Map that column onto an existing one and try again.",
+                isRetryable: false,
+              }),
+            );
+            return;
+          }
+
+          realIdBySourceIndex.set(draft.sourceIndex, created.id);
+        }
+
+        const drafted = rowsToCreate(plan, policy, planColumns(mappings, model.columns));
+        const rows = resolveProvisionalIds(drafted, realIdBySourceIndex);
+
+        if (rows.length === 0) {
+          setOutcome({
+            created: 0,
+            skipped: plan.drafts.length,
+            issues: plan.issues,
+            rowIds: [],
+          });
+          setStep("result");
+          return;
+        }
+
         const created = await importRows(rows);
+
+        // Columns go last, and only once the records are safely in. A failed
+        // import must never be the thing that emptied the board's schema.
+        const removed = isRemovingUnmapped ? await removeColumns() : [];
+
         setOutcome({
           created: created?.length ?? 0,
           skipped: plan.drafts.length - rows.length,
           issues: plan.issues,
           rowIds: created?.map((row) => row.id) ?? [],
+          removedColumns: removed,
         });
         setStep("result");
+      } catch (caught) {
+        setError(toAppError(caught));
       } finally {
         setIsBusy(false);
       }
-    }, [plan, policy, model.columns, importRows]),
+    }, [plan, policy, mappings, model.columns, isRemovingUnmapped, addColumn, deleteColumn, importRows]),
 
     reset,
   };

@@ -14,6 +14,8 @@ import { useGridKeyboard } from "@/hooks/use-grid-keyboard";
 import { useVirtualRows } from "@/hooks/use-virtual-rows";
 import type { BoardViewModel } from "@/hooks/use-board-view";
 import { flattenGroups, flattenUngrouped, type RowExpander } from "@/lib/board-grouping";
+import { autoFitWidth, estimateLines, heightForLines, isFlexibleColumn } from "@/lib/cell-display";
+import { cellOf, cellText } from "@/lib/cell-values";
 import { GRID_SCROLLER_ATTR } from "@/lib/dom/grid-scroll";
 import { layoutHierarchy } from "@/lib/board-hierarchy";
 import { ROW_HEIGHTS } from "@/lib/grid-geometry";
@@ -24,7 +26,13 @@ import {
   selectSelectedRowIds,
   useGridStore,
 } from "@/store/grid-store";
-import type { BoardColumn, CellValue, ColumnType, PermissionResolver } from "@/types";
+import type {
+  BoardColumn,
+  CellDisplayMode,
+  CellValue,
+  ColumnType,
+  PermissionResolver,
+} from "@/types";
 
 interface TableGridProps {
   readonly model: BoardViewModel;
@@ -39,6 +47,7 @@ interface TableGridProps {
 }
 
 const NO_WARNINGS: ReadonlySet<string> = new Set();
+const EMPTY_DISPLAY: Readonly<Record<string, CellDisplayMode>> = {};
 
 /**
  * The table view.
@@ -59,6 +68,7 @@ export function TableGrid({
 
   const rowHeight = ROW_HEIGHTS[view?.rowHeight ?? "medium"];
   const editCells = useBoardStore((state) => state.editCells);
+  const setColumnDisplay = useBoardStore((state) => state.setColumnDisplay);
   const createOption = useBoardStore((state) => state.createOption);
   const addRow = useBoardStore((state) => state.addRow);
   const commitColumnWidth = useBoardStore((state) => state.commitColumnWidth);
@@ -114,9 +124,53 @@ export function TableGrid({
 
   const rowIds = flattened.rowIds;
 
+  const displayModes = useMemo(() => view?.columnDisplay ?? EMPTY_DISPLAY, [view?.columnDisplay]);
+
+  /**
+   * The columns that can make a row taller than one line. Almost always none,
+   * and when it is none the grid takes the uniform path it always has.
+   */
+  const flexible = useMemo(
+    () =>
+      columnsShown.filter(
+        (column) => isFlexibleColumn(column) && (displayModes[column.id] ?? "compact") !== "compact",
+      ),
+    [columnsShown, displayModes],
+  );
+
+  /**
+   * A height per rendered line, computed from the text rather than measured.
+   *
+   * Group headers keep the view's own height; a record takes the tallest of its
+   * flexible columns. This runs when the rows, the columns or the modes change
+   * — not per frame, and not per render — and it touches no DOM at all, which
+   * is what lets the virtualiser place a row it has never mounted.
+   */
+  const heights = useMemo(() => {
+    if (flexible.length === 0) return null;
+
+    return flattened.flat.map((entry) => {
+      if (entry.kind === "group") return rowHeight;
+
+      const row = rowsById[entry.rowId];
+      if (!row) return rowHeight;
+
+      let lines = 1;
+      for (const column of flexible) {
+        const mode = displayModes[column.id] ?? "compact";
+        const text = cellText(cellOf(row, column), column, context);
+        const needed = estimateLines(text, column.width, mode);
+        if (needed > lines) lines = needed;
+      }
+
+      return heightForLines(lines, rowHeight);
+    });
+  }, [flexible, flattened.flat, rowsById, displayModes, context, rowHeight]);
+
   const { scrollRef, range, onScroll, scrollToIndex } = useVirtualRows({
     count: flattened.flat.length,
     rowHeight,
+    heights,
   });
 
   /** Keyboard moves by record; the scroller works in flat positions. */
@@ -152,6 +206,7 @@ export function TableGrid({
       context,
       columns: columnsShown,
       rowHeight,
+      displayModes,
       warnedRowIds,
       can,
       isReadOnly,
@@ -166,6 +221,7 @@ export function TableGrid({
       context,
       columnsShown,
       rowHeight,
+      displayModes,
       warnedRowIds,
       can,
       isReadOnly,
@@ -206,6 +262,33 @@ export function TableGrid({
   const onConvert = useCallback(
     (column: BoardColumn, type: ColumnType) => setConversion({ column, type }),
     [],
+  );
+
+  const onSetDisplayMode = useCallback(
+    (columnId: string, mode: CellDisplayMode) => void setColumnDisplay(columnId, mode),
+    [setColumnDisplay],
+  );
+
+  /**
+   * Fit a column to what is in it.
+   *
+   * Measured over the records the view is showing, not the whole board: the
+   * width that suits what you are looking at is the useful answer, and it keeps
+   * the pass bounded by the filter rather than by the record count.
+   */
+  const onAutoFitWidth = useCallback(
+    (columnId: string) => {
+      const column = columnsShown.find((candidate) => candidate.id === columnId);
+      if (!column) return;
+
+      const texts = orderedRef.current.map((rowId) => {
+        const row = rowsById[rowId];
+        return row ? cellText(cellOf(row, column), column, context) : "";
+      });
+
+      void commitColumnWidth(columnId, autoFitWidth(texts, column.name));
+    },
+    [columnsShown, rowsById, context, commitColumnWidth],
   );
 
   const slice = useMemo(
@@ -268,6 +351,9 @@ export function TableGrid({
 
   const visible = flattened.flat.slice(range.start, range.end);
 
+  /** The height of one rendered line, by its position in the flat list. */
+  const heightAt = (index: number) => heights?.[index] ?? rowHeight;
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div
@@ -294,6 +380,9 @@ export function TableGrid({
             columns={columnsShown}
             selectionState={selectionState}
             can={can}
+            displayModes={displayModes}
+            onSetDisplayMode={onSetDisplayMode}
+            onAutoFitWidth={onAutoFitWidth}
             // A partial selection extends to everything on screen; only a full
             // one clears, because the bar already carries its own dismiss.
             onToggleAll={onToggleAll}
@@ -304,7 +393,7 @@ export function TableGrid({
 
           <div style={{ height: range.paddingTop }} aria-hidden />
 
-          {visible.map((entry) =>
+          {visible.map((entry, offset) =>
             entry.kind === "group" ? (
               <GroupHeader
                 key={`group_${entry.key}`}
@@ -313,7 +402,7 @@ export function TableGrid({
                 {...(entry.color ? { color: entry.color } : {})}
                 count={entry.count}
                 isCollapsed={entry.isCollapsed}
-                height={rowHeight}
+                height={heightAt(range.start + offset)}
                 groupColumnName={groupColumn?.name ?? ""}
                 onToggle={() => toggleGroup(view?.id ?? "", entry.key)}
               />
@@ -322,6 +411,7 @@ export function TableGrid({
                 key={entry.rowId}
                 rowId={entry.rowId}
                 rowIndex={entry.recordIndex}
+                height={heightAt(range.start + offset)}
                 depth={entry.depth}
                 hasChildren={entry.hasChildren}
                 childCount={entry.childCount}

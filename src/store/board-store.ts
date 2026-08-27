@@ -14,6 +14,7 @@ import {
   revertCellEdits,
   type RowMap,
 } from "@/lib/board-records";
+import { findColumnByName, insertColumnAt } from "@/lib/board-schema";
 import { bulkTone, describeBulkResult } from "@/lib/bulk";
 import { emptyCellFor } from "@/lib/cell-values";
 import { wouldCreateCycle } from "@/lib/board-hierarchy";
@@ -32,6 +33,7 @@ import type {
   BoardViewType,
   BulkMoveResult,
   BulkResult,
+  CellDisplayMode,
   CellEdit,
   CellValue,
   ColumnPatch,
@@ -108,8 +110,15 @@ interface BoardActions {
   ) => Promise<string | null>;
   setRowParent: (rowId: string, parentRowId: string | null) => Promise<boolean>;
 
-  addColumn: (type: ColumnType, name: string) => Promise<void>;
-  renameColumn: (columnId: string, name: string) => Promise<void>;
+  /**
+   * Add a column. `atIndex` is what Insert left / Insert right pass; without
+   * it the column goes at the end. Returns the column the board actually
+   * created — the import needs its id before it can write a single record
+   * against it.
+   */
+  addColumn: (type: ColumnType, name: string, atIndex?: number) => Promise<BoardColumn | null>;
+  duplicateColumn: (columnId: string) => Promise<BoardColumn | null>;
+  renameColumn: (columnId: string, name: string) => Promise<boolean>;
   updateColumnConfig: (columnId: string, patch: ColumnPatch) => Promise<void>;
   convertColumn: (columnId: string, type: ColumnType) => Promise<number>;
   deleteColumn: (columnId: string) => Promise<void>;
@@ -144,6 +153,8 @@ interface BoardActions {
   commitColumnWidth: (columnId: string, width: number) => Promise<void>;
   setColumnHidden: (columnId: string, hidden: boolean) => Promise<void>;
   moveColumnTo: (columnId: string, toIndex: number) => Promise<void>;
+  /** How much of a column's content this view shows. Presentation, per view. */
+  setColumnDisplay: (columnId: string, mode: CellDisplayMode) => Promise<void>;
 }
 
 export type BoardStore = BoardState & BoardActions;
@@ -659,25 +670,90 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
 
     /* ------------------------------------------------------------- schema */
 
-    addColumn: async (type, name) => {
+    addColumn: async (type, name, atIndex) => {
       const board = currentBoard();
-      if (!board) return;
+      if (!board) return null;
 
       const column = await write(
-        () => boardService.createColumn(board.id, type, name),
+        () => boardService.createColumn(board.id, type, name, atIndex),
         () => {},
       );
-      if (!column) return;
+      if (!column) return null;
 
+      // Positions shift for everything after an insert, so the schema is read
+      // back rather than patched by hand.
       set((state) =>
         state.board
-          ? { board: { ...state.board, columns: [...state.board.columns, column] } }
+          ? {
+              board: {
+                ...state.board,
+                columns:
+                  atIndex === undefined
+                    ? [...state.board.columns, column]
+                    : insertColumnAt(state.board.columns, column, atIndex),
+              },
+            }
           : state,
       );
+
+      return column;
     },
 
+    duplicateColumn: async (columnId) => {
+      const board = currentBoard();
+      if (!board) return null;
+
+      const result = await write(
+        () => boardService.duplicateColumn(board.id, columnId),
+        () => {},
+      );
+      if (!result) return null;
+
+      set((state) => ({
+        board: state.board
+          ? {
+              ...state.board,
+              columns: insertColumnAt(
+                state.board.columns,
+                result.column,
+                result.column.position,
+              ),
+            }
+          : state.board,
+        rowsById: reconcileRows(state.rowsById, result.rows),
+      }));
+
+      return result.column;
+    },
+
+    /**
+     * Rename a column, refusing a name another column already wears.
+     *
+     * The check reads the board's current schema, not anything a header input
+     * is holding: two columns with the same name make the board ambiguous to
+     * read and ambiguous to import into, since the importer pairs source
+     * columns to board columns by name.
+     */
     renameColumn: async (columnId, name) => {
-      await get().updateColumnConfig(columnId, { name });
+      const board = currentBoard();
+      if (!board) return false;
+
+      const trimmed = name.trim();
+      if (trimmed.length === 0) return false;
+
+      const current = board.columns.find((column) => column.id === columnId);
+      if (!current || current.name === trimmed) return false;
+
+      const clash = findColumnByName(board.columns, trimmed, columnId);
+      if (clash) {
+        useWorkspaceStore
+          .getState()
+          .pushFeedback(`This board already has a column called “${clash.name}”`, "error");
+        return false;
+      }
+
+      await get().updateColumnConfig(columnId, { name: trimmed });
+      return true;
     },
 
     updateColumnConfig: async (columnId, patch) => {
@@ -952,6 +1028,20 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
       await write(
         () => boardService.updateView(board.id, view.id, { columnWidths }),
         () => patchView(view.id, { columnWidths: view.columnWidths }),
+      );
+    },
+
+    setColumnDisplay: async (columnId, mode) => {
+      const board = currentBoard();
+      const view = activeView();
+      if (!board || !view) return;
+
+      const columnDisplay = { ...(view.columnDisplay ?? {}), [columnId]: mode };
+      patchView(view.id, { columnDisplay });
+
+      await write(
+        () => boardService.updateView(board.id, view.id, { columnDisplay }),
+        () => patchView(view.id, { columnDisplay: view.columnDisplay ?? {} }),
       );
     },
 

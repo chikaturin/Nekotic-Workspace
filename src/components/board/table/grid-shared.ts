@@ -1,6 +1,7 @@
 import type { CellContext } from "@/lib/cell-values";
 import type {
   BoardColumn,
+  CellDisplayMode,
   CellValue,
   DirectoryUser,
   PermissionResolver,
@@ -19,6 +20,11 @@ export interface GridShared {
   readonly context: CellContext;
   readonly columns: readonly BoardColumn[];
   readonly rowHeight: number;
+  /**
+   * Per-column display mode for this view. A column missing from the map is
+   * `compact`, which is what every column was before the setting existed.
+   */
+  readonly displayModes: Readonly<Record<string, CellDisplayMode>>;
   /** Rows flagged by a board-level validation, e.g. duplicate API endpoints. */
   readonly warnedRowIds: ReadonlySet<string>;
   /**

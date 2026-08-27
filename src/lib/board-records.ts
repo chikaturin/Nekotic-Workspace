@@ -1,4 +1,4 @@
-import { cellEquals } from "@/lib/cell-values";
+import { cellEquals, isCellEmpty } from "@/lib/cell-values";
 import type { BoardRow, CellEdit, CellValue } from "@/types";
 
 /**
@@ -211,4 +211,27 @@ export function appendRows(index: RowIndex, rows: readonly BoardRow[]): RowIndex
 /** Cells for a duplicate: attachments and relations are copied by reference. */
 export function copyCells(row: BoardRow): Readonly<Record<string, CellValue>> {
   return { ...row.cells };
+}
+
+/**
+ * How many records hold something in one column.
+ *
+ * Asked once, when somebody chooses Delete column, so the confirmation can say
+ * what is actually about to be lost instead of warning about data that may not
+ * exist. It is a pass over every record, which is why nothing calls it on a
+ * render path.
+ */
+export function countFilledCells(
+  rows: RowMap,
+  order: readonly string[],
+  columnId: string,
+): number {
+  let filled = 0;
+
+  for (const rowId of order) {
+    const value = rows[rowId]?.cells[columnId];
+    if (value && !isCellEmpty(value)) filled += 1;
+  }
+
+  return filled;
 }

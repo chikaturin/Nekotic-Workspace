@@ -4,11 +4,14 @@ import { convertCell } from "@/lib/cell-conversion";
 import { cellText, emptyCellFor, type CellContext } from "@/lib/cell-values";
 import {
   defaultConfigFor,
+  insertColumnAt,
+  isProtectedColumn,
   makeColumn,
   moveColumn,
   patchColumn,
   removeColumn,
   retypeColumn,
+  uniqueColumnName,
 } from "@/lib/board-schema";
 import { formatRowId, matchesRowId } from "@/lib/row-id";
 import { buildBoard, prefixForBoard } from "@/mock/board";
@@ -536,20 +539,96 @@ function emptyCells(columns: readonly BoardColumn[]): Readonly<Record<string, im
 
 /* ---------------------------------------------------------------- columns */
 
+/**
+ * Add a column, optionally at a position rather than at the end.
+ *
+ * `atIndex` is what Insert left / Insert right speak: the caller says where the
+ * column goes and the schema renumbers `position` for everything after it, so
+ * nothing anywhere has to do `index + 1` against an array it does not own.
+ *
+ * The name is made unique against the board's *current* schema. Two columns
+ * called the same thing is how a board becomes ambiguous — to the person
+ * reading it, and to the importer, which pairs source columns to board columns
+ * by name.
+ */
 async function createColumn(
   boardId: string,
   type: ColumnType,
   name: string,
+  atIndex?: number,
   signal?: AbortSignal,
 ): Promise<BoardColumn> {
   await writeDelay(signal);
   const record = recordByBoardId(boardId);
+  requirePermission(nodeIdFromBoardId(boardId), "board.column.create", "add a column");
   assertWritable(record, "the column");
 
-  const column = makeColumn(nextId("col"), name, type, record.board.columns.length);
-  record.board = { ...record.board, columns: [...record.board.columns, column], updatedAt: nowIso() };
+  const columns = record.board.columns;
+  const column = makeColumn(
+    nextId("col"),
+    uniqueColumnName(columns, name),
+    type,
+    atIndex ?? columns.length,
+  );
 
-  return column;
+  const next =
+    atIndex === undefined
+      ? [...columns, column]
+      : insertColumnAt(columns, column, atIndex);
+
+  record.board = { ...record.board, columns: next, updatedAt: nowIso() };
+
+  return record.board.columns.find((candidate) => candidate.id === column.id) ?? column;
+}
+
+/**
+ * Copy a column, its configuration and its values, to the right of the original.
+ *
+ * The values come too. A duplicate that carried the shape but not the contents
+ * would be a differently-named empty column, which is what Insert right already
+ * gives you — the reason to duplicate "Expected result" is to start from what
+ * is in it.
+ */
+async function duplicateColumn(
+  boardId: string,
+  columnId: string,
+  signal?: AbortSignal,
+): Promise<{ readonly column: BoardColumn; readonly rows: readonly BoardRow[] }> {
+  await writeDelay(signal);
+  const record = recordByBoardId(boardId);
+  requirePermission(nodeIdFromBoardId(boardId), "board.column.create", "duplicate a column");
+  assertWritable(record, "the column");
+
+  const source = record.board.columns.find((column) => column.id === columnId);
+  if (!source) throw notFound("That column");
+
+  const copy = {
+    ...source,
+    id: nextId("col"),
+    name: uniqueColumnName(record.board.columns, source.name),
+    // Never a second primary: a board has exactly one column that titles a row.
+    isPrimary: false,
+    position: source.position + 1,
+  } as BoardColumn;
+
+  record.board = {
+    ...record.board,
+    columns: insertColumnAt(record.board.columns, copy, source.position + 1),
+    updatedAt: nowIso(),
+  };
+
+  const updated: BoardRow[] = [];
+  for (const [rowId, row] of record.rows) {
+    const value = row.cells[columnId];
+    if (!value) continue;
+
+    const next = { ...row, cells: { ...row.cells, [copy.id]: value }, revision: row.revision + 1 };
+    record.rows.set(rowId, next);
+    updated.push(next);
+  }
+
+  const stored = record.board.columns.find((column) => column.id === copy.id) ?? copy;
+  return { column: stored, rows: updated };
 }
 
 /**
@@ -589,6 +668,7 @@ async function reorderColumn(
 ): Promise<readonly BoardColumn[]> {
   await writeDelay(signal);
   const record = recordByBoardId(boardId);
+  requirePermission(nodeIdFromBoardId(boardId), "board.column.update", "reorder columns");
   assertWritable(record, "the column order");
 
   const columns = moveColumn(record.board.columns, columnId, toIndex);
@@ -603,7 +683,15 @@ async function deleteColumn(
 ): Promise<readonly BoardColumn[]> {
   await writeDelay(signal);
   const record = recordByBoardId(boardId);
+  requirePermission(nodeIdFromBoardId(boardId), "board.column.delete", "delete this column");
   assertWritable(record, "the column");
+
+  const target = record.board.columns.find((column) => column.id === columnId);
+  if (!target) throw notFound("That column");
+  // The row's identity column is the one thing a board cannot be without.
+  if (isProtectedColumn(target)) {
+    throw conflict(`“${target.name}” titles every record and cannot be deleted`);
+  }
 
   const columns = removeColumn(record.board.columns, columnId);
   record.board = { ...record.board, columns, updatedAt: nowIso() };
@@ -636,6 +724,7 @@ async function convertColumn(
 ): Promise<ConvertColumnResult> {
   await writeDelay(signal);
   const record = recordByBoardId(boardId);
+  requirePermission(nodeIdFromBoardId(boardId), "board.column.update", "change this column's type");
   assertWritable(record, "the conversion");
 
   const source = record.board.columns.find((column) => column.id === columnId);
@@ -1069,6 +1158,7 @@ async function importRows(
 ): Promise<readonly BoardRow[]> {
   await writeDelay(signal);
   const record = recordByBoardId(boardId);
+  requirePermission(nodeIdFromBoardId(boardId), "board.import", "import into this board");
   assertWritable(record, "the import");
 
   const now = nowIso();
@@ -1277,6 +1367,7 @@ export const boardService = {
   bulkMove,
   importRows,
   createColumn,
+  duplicateColumn,
   updateColumn,
   reorderColumn,
   deleteColumn,
