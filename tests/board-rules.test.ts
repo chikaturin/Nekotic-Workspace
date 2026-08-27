@@ -38,7 +38,9 @@ import {
 } from "@/lib/transition-rules";
 import { resolveOptionAvailability, visibleOptions } from "@/lib/select-availability";
 import { UNGROUPED_KEY } from "@/lib/board-grouping";
+import { MEMBERS } from "@/mock/users";
 import { boardService } from "@/services/board-service";
+import { ServiceError } from "@/services/errors";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useBoardStore } from "@/store/board-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
@@ -49,6 +51,7 @@ import type {
   BoardRow,
   CellValue,
   TransitionRules,
+  WorkspaceRole,
 } from "@/types";
 import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 
@@ -1081,5 +1084,96 @@ describe("bulk writes obey the same rules", () => {
       });
     }
     expect(useWorkspaceStore.getState().feedback?.tone).toBe("error");
+  });
+});
+
+/* ------------------------------------------------------ who may write them */
+
+/**
+ * A transition table decides what every card on the board is allowed to do.
+ * Being able to write a Status cell is not the same as being able to rewrite
+ * the workflow that governs it, and the service is where that distinction has
+ * to hold — a hidden button is a courtesy, not a control.
+ */
+describe("permission to change the workflow", () => {
+  const rules = {
+    config: {
+      transitionRules: { enabled: true, mode: "allow-list" as const, transitions: {} },
+    },
+  };
+
+  function signedInAs(role: WorkspaceRole) {
+    useWorkspaceStore.setState({
+      workspaces: [
+        {
+          ...TEST_WORKSPACE,
+          members: MEMBERS.map((member, index) => (index === 0 ? { ...member, role } : member)),
+        },
+      ],
+      activeWorkspaceId: WORKSPACE_ID,
+      treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
+      feedback: null,
+      seed: 0,
+    });
+  }
+
+  beforeEach(() => {
+    resetSimulation();
+    setSimulation({ latency: "fast" });
+    boardService.reset();
+    signedInAs("admin");
+  });
+
+  const boardId = `brd_${ID.roadmap}`;
+
+  test("a manager may rewrite the transition table", async () => {
+    signedInAs("manager");
+
+    const column = await boardService.updateColumn(boardId, "col_status", rules);
+    if (column.type !== "select") throw new Error("fixture");
+
+    expect(column.config.transitionRules?.enabled).toBe(true);
+  });
+
+  test("an admin may too, since the matrix accumulates", async () => {
+    signedInAs("admin");
+    await expect(boardService.updateColumn(boardId, "col_status", rules)).resolves.toBeDefined();
+  });
+
+  test("a member is refused by the service, not merely by the UI", async () => {
+    signedInAs("member");
+
+    await expect(boardService.updateColumn(boardId, "col_status", rules)).rejects.toThrow(
+      /permission/i,
+    );
+  });
+
+  test("a viewer is refused, and the stored table is untouched", async () => {
+    // `getBoard` is addressed by node id; `updateColumn` by board id.
+    const before = await boardService.getBoard(ID.roadmap);
+    signedInAs("viewer");
+
+    await expect(boardService.updateColumn(boardId, "col_status", rules)).rejects.toThrow(
+      /permission/i,
+    );
+
+    signedInAs("admin");
+    const after = await boardService.getBoard(ID.roadmap);
+    const column = after.board.columns.find((item) => item.id === "col_status");
+    const original = before.board.columns.find((item) => item.id === "col_status");
+
+    if (column?.type !== "select" || original?.type !== "select") throw new Error("fixture");
+    expect(column.config.transitionRules).toEqual(original.config.transitionRules);
+  });
+
+  test("the refusal names the role that would hold the permission", async () => {
+    signedInAs("member");
+
+    await expect(
+      boardService.updateColumn(boardId, "col_status", rules),
+    ).rejects.toSatisfy((error: unknown) => {
+      const detail = error instanceof ServiceError ? error.appError.detail : "";
+      return typeof detail === "string" && detail.includes("Manager");
+    });
   });
 });

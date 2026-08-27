@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, CircleCheck, Plus, Settings2, SlidersHorizontal, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CircleCheck, Lock, Plus, Settings2, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { ConditionBuilder } from "@/components/board/config/condition-builder";
 import { TransitionRulesEditor } from "@/components/board/config/transition-rules-editor";
@@ -29,6 +29,14 @@ interface SelectColumnDialogProps {
   /** Every column on the board — what a condition can be written against. */
   readonly columns: readonly BoardColumn[];
   readonly people: readonly DirectoryUser[];
+  /**
+   * `can("board.column.update")`, resolved by the caller. Everything in this
+   * dialog is column *configuration* — the options, the rules that gate them
+   * and the workflow between them — so one key governs the lot rather than
+   * each section inventing its own. Without it the dialog is a reference:
+   * readable, and with nothing on it that writes.
+   */
+  readonly canEdit: boolean;
   readonly onClose: () => void;
   readonly onSave: (config: SelectConfigDraft) => void;
 }
@@ -58,6 +66,7 @@ export function SelectColumnDialog({
   column,
   columns,
   people,
+  canEdit,
   onClose,
   onSave,
 }: SelectColumnDialogProps) {
@@ -160,15 +169,22 @@ export function SelectColumnDialog({
             <div className="flex items-center gap-2">
               <h3 className="text-ui font-medium text-foreground">Options</h3>
               <Badge variant="default">{draft.options.length}</Badge>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="ml-auto h-6 gap-1 px-1.5 text-body"
-                onClick={addOption}
-              >
-                <Plus />
-                Add option
-              </Button>
+              {canEdit ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto h-6 gap-1 px-1.5 text-body"
+                  onClick={addOption}
+                >
+                  <Plus />
+                  Add option
+                </Button>
+              ) : (
+                <Badge variant="default" className="ml-auto gap-1">
+                  <Lock aria-hidden="true" className="size-2.5" />
+                  read only
+                </Badge>
+              )}
             </div>
 
             <ul className="space-y-1.5">
@@ -184,7 +200,7 @@ export function SelectColumnDialog({
                         <button
                           type="button"
                           aria-label={`Move ${option.label} up`}
-                          disabled={index === 0}
+                          disabled={!canEdit || index === 0}
                           onClick={() => move(index, -1)}
                           className="text-faint-foreground hover:text-foreground disabled:opacity-[var(--disabled-opacity)]"
                         >
@@ -193,7 +209,7 @@ export function SelectColumnDialog({
                         <button
                           type="button"
                           aria-label={`Move ${option.label} down`}
-                          disabled={index === draft.options.length - 1}
+                          disabled={!canEdit || index === draft.options.length - 1}
                           onClick={() => move(index, 1)}
                           className="text-faint-foreground hover:text-foreground disabled:opacity-[var(--disabled-opacity)]"
                         >
@@ -204,12 +220,14 @@ export function SelectColumnDialog({
                       <Input
                         value={option.label}
                         aria-label="Option label"
+                        readOnly={!canEdit}
                         onChange={(event) => patchOption(option.id, { label: event.target.value })}
                         className={cn("h-7 w-40 text-ui", option.isDisabled && "is-disabled")}
                       />
 
                       <SelectField
                         aria-label={`Colour for ${option.label}`}
+                        disabled={!canEdit}
                         value={option.color}
                         onChange={(event) =>
                           patchOption(option.id, { color: event.target.value as SelectColor })
@@ -226,6 +244,7 @@ export function SelectColumnDialog({
                       <label className="flex items-center gap-1 text-body text-muted-foreground">
                         <Checkbox
                           checked={!option.isDisabled}
+                          disabled={!canEdit}
                           aria-label={`Enable ${option.label}`}
                           onChange={(event) =>
                             patchOption(option.id, { isDisabled: !event.target.checked })
@@ -240,6 +259,7 @@ export function SelectColumnDialog({
                       >
                         <Checkbox
                           checked={isCompleted}
+                          disabled={!canEdit}
                           aria-label={`${option.label} means completed`}
                           onChange={() => toggleCompleted(option.id)}
                         />
@@ -249,24 +269,28 @@ export function SelectColumnDialog({
                         Completed
                       </label>
 
-                      <Button
-                        size="sm"
-                        variant={isExpanded ? "subtle" : "ghost"}
-                        className="ml-auto h-6 gap-1 px-1.5 text-body"
-                        onClick={() => setExpandedId(isExpanded ? null : option.id)}
-                      >
-                        <Settings2 />
-                        {isConditionGroupEmpty(option.availability) ? "Add rule" : "Edit rule"}
-                      </Button>
+                      {canEdit && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant={isExpanded ? "subtle" : "ghost"}
+                            className="ml-auto h-6 gap-1 px-1.5 text-body"
+                            onClick={() => setExpandedId(isExpanded ? null : option.id)}
+                          >
+                            <Settings2 />
+                            {isConditionGroupEmpty(option.availability) ? "Add rule" : "Edit rule"}
+                          </Button>
 
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label={`Delete ${option.label}`}
-                        onClick={() => removeOption(option.id)}
-                      >
-                        <Trash2 />
-                      </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={`Delete ${option.label}`}
+                            onClick={() => removeOption(option.id)}
+                          >
+                            <Trash2 />
+                          </Button>
+                        </>
+                      )}
                     </div>
 
                     {rule && !isExpanded && (
@@ -307,6 +331,7 @@ export function SelectColumnDialog({
             </h3>
             <SelectField
               aria-label="Unavailable option behaviour"
+              disabled={!canEdit}
               value={draft.unavailableBehavior}
               onChange={(event) =>
                 patch({ unavailableBehavior: event.target.value as UnavailableOptionBehavior })
@@ -328,6 +353,7 @@ export function SelectColumnDialog({
               options={draft.options}
               rules={draft.transitionRules}
               columnName={column.name}
+              canEdit={canEdit}
               onChange={(transitionRules) => patch({ transitionRules })}
             />
           </section>
@@ -346,22 +372,26 @@ export function SelectColumnDialog({
               onClose();
             }}
           >
-            Cancel
+            {canEdit ? "Cancel" : "Close"}
           </Button>
-          <Button
-            size="sm"
-            variant="default"
-            onClick={() => {
-              onSave({
-                ...draft,
-                transitionRules: pruneTransitionRules(draft.transitionRules, draft.options),
-              });
-              setEdited(null);
-              onClose();
-            }}
-          >
-            Save changes
-          </Button>
+          {/* No Save without the permission to write one. The service refuses
+              the call either way — this is only about not offering it. */}
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => {
+                onSave({
+                  ...draft,
+                  transitionRules: pruneTransitionRules(draft.transitionRules, draft.options),
+                });
+                setEdited(null);
+                onClose();
+              }}
+            >
+              Save changes
+            </Button>
+          )}
         </footer>
       </DialogContent>
     </Dialog>

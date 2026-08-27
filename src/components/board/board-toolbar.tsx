@@ -177,7 +177,7 @@ export function BoardToolbar({
 
       <div className="pt-2">
         <ViewTabs model={model} can={can} />
-        <ViewConfigBar model={model} />
+        <ViewConfigBar model={model} can={can} />
       </div>
     </div>
   );

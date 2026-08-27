@@ -13,7 +13,7 @@ import type { BoardViewModel } from "@/hooks/use-board-view";
 import { describeFilter } from "@/lib/board-filters";
 import { SUBTASK_DISPLAY_LABELS } from "@/lib/board-hierarchy";
 import { useBoardStore } from "@/store/board-store";
-import type { RowHeight, SubtaskDisplay } from "@/types";
+import type { PermissionResolver, RowHeight, SubtaskDisplay } from "@/types";
 
 const ROW_HEIGHTS: readonly RowHeight[] = ["short", "medium", "tall"];
 const SUBTASK_DISPLAYS: readonly SubtaskDisplay[] = ["nested", "flat", "hidden"];
@@ -28,8 +28,19 @@ const CONTROL_SIZE = "sm" as const;
 /**
  * One configuration bar for every view type. Filter, sort and group are shared
  * by all four; the date anchors only appear where they mean something.
+ *
+ * Filter, sort, group and row height are how anybody *reads* a board, so they
+ * are open to everybody. Transition rules are not: they decide what every card
+ * on the board is allowed to do, and the button that opens them is gated on the
+ * same key the column header's own menu checks.
  */
-export function ViewConfigBar({ model }: { model: BoardViewModel }) {
+export function ViewConfigBar({
+  model,
+  can,
+}: {
+  readonly model: BoardViewModel;
+  readonly can: PermissionResolver;
+}) {
   const { view, columns, groupColumn, subtaskDisplay } = model;
   const setFilters = useBoardStore((state) => state.setFilters);
   const setRowHeight = useBoardStore((state) => state.setRowHeight);
@@ -50,6 +61,10 @@ export function ViewConfigBar({ model }: { model: BoardViewModel }) {
   const kanbanStatusColumn =
     view?.type === "kanban" && groupColumn?.type === "select" ? groupColumn : null;
 
+  // Reading the workflow is how you understand a refused drag, so the button
+  // stays for everyone; what it opens is read-only below Manager.
+  const canEditRules = can("board.column.update");
+
   return (
     <div className="flex flex-wrap items-center gap-1 border-t border-hairline px-3 py-1.5">
       <FilterMenu model={model} />
@@ -66,6 +81,7 @@ export function ViewConfigBar({ model }: { model: BoardViewModel }) {
         >
           <Workflow />
           Transition rules
+          {!canEditRules && <span className="sr-only"> (read only)</span>}
         </Button>
       )}
 
@@ -137,6 +153,7 @@ export function ViewConfigBar({ model }: { model: BoardViewModel }) {
         column={isEditingRules ? kanbanStatusColumn : null}
         columns={columns}
         people={people}
+        canEdit={canEditRules}
         onClose={() => setIsEditingRules(false)}
         onSave={(config) => {
           if (kanbanStatusColumn) void updateColumnConfig(kanbanStatusColumn.id, { config });

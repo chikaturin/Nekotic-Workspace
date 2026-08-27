@@ -20,6 +20,7 @@ import {
   readDelay,
   writeDelay,
 } from "@/services/backend";
+import { requirePermission } from "@/services/authz";
 import { appError, conflict, notFound, ServiceError } from "@/services/errors";
 import { shouldFailSave } from "@/services/simulation";
 import { findNodeById, flattenTree } from "@/lib/tree";
@@ -551,6 +552,16 @@ async function createColumn(
   return column;
 }
 
+/**
+ * Reshaping a column — its name, its options, the conditions on them and the
+ * transition table that decides which status may follow which.
+ *
+ * Every one of those is workspace *configuration*, not record data: a member
+ * who may write a Status cell is not thereby entitled to rewrite the workflow
+ * that governs every card on the board. The check is here as well as in the UI
+ * because the UI's job is to not offer the button, and this one's is to refuse
+ * the call — see `services/authz`.
+ */
 async function updateColumn(
   boardId: string,
   columnId: string,
@@ -559,6 +570,7 @@ async function updateColumn(
 ): Promise<BoardColumn> {
   await writeDelay(signal);
   const record = recordByBoardId(boardId);
+  requirePermission(nodeIdFromBoardId(boardId), "board.column.update", "change this column");
   assertWritable(record, "the column");
 
   const columns = patchColumn(record.board.columns, columnId, patch);

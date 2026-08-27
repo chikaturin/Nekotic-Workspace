@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, CircleAlert, Info } from "lucide-react";
+import { ArrowRight, CircleAlert, Info, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SELECT_COLOR_CLASSES } from "@/lib/board-schema";
@@ -28,6 +28,14 @@ interface TransitionRulesEditorProps {
   readonly rules: TransitionRules;
   readonly onChange: (rules: TransitionRules) => void;
   readonly columnName: string;
+  /**
+   * Whether this person may rewrite the workflow — `board.column.update`,
+   * resolved by the caller. Read-only is a *mode*, not a hidden section: the
+   * rule that refuses your drag is worth being able to look up, and a board
+   * whose workflow is invisible to the people working it is one where every
+   * refusal reads as a bug.
+   */
+  readonly canEdit: boolean;
 }
 
 /**
@@ -54,11 +62,16 @@ export function TransitionRulesEditor({
   rules,
   onChange,
   columnName,
+  canEdit,
 }: TransitionRulesEditorProps) {
   const keys = transitionKeys(options);
   const unconfigured = ungovernedKeys(rules, options);
   const stranded = strandedKeys(rules, options);
   const noun = columnName.toLowerCase();
+
+  if (!canEdit) {
+    return <TransitionRulesSummary options={options} rules={rules} noun={noun} />;
+  }
 
   return (
     <div className="space-y-2.5">
@@ -220,6 +233,72 @@ export function TransitionRulesEditor({
             </p>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The workflow as a reader sees it.
+ *
+ * Same table, no controls: every governed status and where a card sitting on
+ * it may go. Statuses the table says nothing about are left out entirely — a
+ * row reading "Backlog → (unrestricted)" is noise on a screen whose whole job
+ * is to explain the restrictions.
+ */
+function TransitionRulesSummary({
+  options,
+  rules,
+  noun,
+}: {
+  readonly options: readonly SelectOption[];
+  readonly rules: TransitionRules;
+  readonly noun: string;
+}) {
+  const governed = transitionKeys(options).filter((key) => isGoverned(rules, key));
+
+  return (
+    <div className="space-y-2">
+      <p className="flex items-start gap-1.5 text-body text-faint-foreground">
+        <Lock aria-hidden="true" className="mt-px size-3 shrink-0" />
+        <span>
+          {rules.enabled
+            ? `Only the moves below are allowed. Managers and above can change them.`
+            : `Off — a card can be dragged from any ${noun} to any other. Managers and above can restrict it.`}
+        </span>
+      </p>
+
+      {rules.enabled && governed.length > 0 && (
+        <ul className="space-y-1">
+          {governed.map((from) => {
+            const targets = rules.transitions[from] ?? [];
+
+            return (
+              <li
+                key={from}
+                className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-border bg-surface px-2 py-1.5"
+              >
+                <OptionPill optionKey={from} options={options} />
+                <ArrowRight aria-hidden="true" className="size-3 shrink-0 text-faint-foreground" />
+
+                {targets.length > 0 ? (
+                  targets.map((to) => <OptionPill key={to} optionKey={to} options={options} />)
+                ) : (
+                  <span className="flex items-center gap-1 text-body text-warning">
+                    <CircleAlert aria-hidden="true" className="size-3 shrink-0" />
+                    nowhere — cards here cannot move
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {rules.enabled && governed.length === 0 && (
+        <p className="text-body text-faint-foreground">
+          Restrictions are on, but no {noun} has a rule yet — everything still moves freely.
+        </p>
       )}
     </div>
   );

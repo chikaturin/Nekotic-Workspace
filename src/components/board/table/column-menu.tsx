@@ -101,13 +101,13 @@ export function ColumnMenu({ column, columns, can, onRename, onConvert }: Column
           </DropdownMenuSubContent>
         </DropdownMenuSub>
 
+        {/* Not gated: what this opens is read-only without
+            `board.column.update`, and the workflow it shows is exactly what a
+            member needs to read when a status change is refused. */}
         {column.type === "select" && (
-          <DropdownMenuItem
-            disabled={!canEditSchema}
-            onSelect={() => setIsConfiguringSelect(true)}
-          >
+          <DropdownMenuItem onSelect={() => setIsConfiguringSelect(true)}>
             <SlidersHorizontal />
-            Options &amp; rules…
+            {canEditSchema ? "Options & rules…" : "Options & rules (read only)…"}
           </DropdownMenuItem>
         )}
 
@@ -175,6 +175,7 @@ export function ColumnMenu({ column, columns, can, onRename, onConvert }: Column
         column={isConfiguringSelect && column.type === "select" ? column : null}
         columns={columns}
         people={people}
+        canEdit={canEditSchema}
         onClose={() => setIsConfiguringSelect(false)}
         onSave={(config) => void updateColumnConfig(column.id, { config })}
       />
