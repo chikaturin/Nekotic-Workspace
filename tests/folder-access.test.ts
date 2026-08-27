@@ -19,6 +19,7 @@ import type {
   AccessRule,
   AccessSubject,
   DriveNode,
+  FileNode,
   FolderNode,
   NodeAccessMode,
   UserSummary,
@@ -74,6 +75,41 @@ function folder(
     type: "folder",
     children,
     ...(accessMode ? { accessMode } : {}),
+  };
+}
+
+/** A leaf, so the same rules can be tested on something that holds nothing. */
+function file(id: string, name: string, accessMode?: NodeAccessMode): FileNode {
+  return {
+    id,
+    name,
+    slug: id,
+    parentId: null,
+    workspaceId: "ws",
+    owner: OWNER,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    isFavorite: false,
+    isTrashed: false,
+    isShared: false,
+    type: "file",
+    kind: "other",
+    extension: "env",
+    mimeType: "text/plain",
+    sizeBytes: 128,
+    version: 1,
+    ...(accessMode ? { accessMode } : {}),
+  };
+}
+
+function roleRule(nodeId: string, role: WorkspaceRole): AccessRule {
+  return {
+    id: `acl_${nodeId}_role_${role}`,
+    nodeId,
+    subject: { kind: "role", role },
+    role,
+    grantedAt: "2026-01-01T00:00:00.000Z",
+    grantedBy: OWNER.id,
   };
 }
 
@@ -411,5 +447,85 @@ describe("resolution rather than duplication", () => {
     const view = input(tree, {});
 
     expect(visibleTree(view, as(PEOPLE.nam.id))).toBe(tree);
+  });
+});
+
+/* ------------------------------------------------------------ one file */
+
+/**
+ * Restricting a *leaf*.
+ *
+ * The commonest thing anyone actually wants to shut is one file — a credentials
+ * dump, an `.env`, a signed contract — sitting in a folder full of harmless
+ * ones. `accessMode` has always been on the base node type and the walk has
+ * always visited every node in the chain; only the menu that wrote it was
+ * folders-only. These are the cases that used to be unreachable.
+ */
+describe("a restricted file", () => {
+  const tree = [
+    folder("shared", "Shared", [
+      file("readme", "readme.md"),
+      file("env", ".env.production", "restricted"),
+    ]),
+  ];
+
+  const rules: RulesByNode = { env: [rule("env", PEOPLE.thanh.id)] };
+  const view = input(tree, rules);
+
+  test("a member who is not granted cannot see it, whatever their role", () => {
+    expect(sees(view, "env", PEOPLE.an.id)).toBe(false);
+    // Manager buys nothing here, exactly as it buys nothing on a folder.
+    expect(sees(view, "env", PEOPLE.nam.id)).toBe(false);
+  });
+
+  test("a granted member sees it, and its neighbours stay visible to everyone", () => {
+    expect(sees(view, "env", PEOPLE.thanh.id)).toBe(true);
+    expect(sees(view, "readme", PEOPLE.an.id)).toBe(true);
+    expect(sees(view, "shared", PEOPLE.an.id)).toBe(true);
+  });
+
+  test("its owner keeps it, so a file cannot be shut away from the person who put it there", () => {
+    expect(sees(view, "env", OWNER.id)).toBe(true);
+  });
+
+  test("the pruned tree drops the file and nothing else", () => {
+    expect(namesIn(visibleTree(view, as(PEOPLE.an.id)))).toEqual(["Shared", "readme.md"]);
+    expect(namesIn(visibleTree(view, as(PEOPLE.thanh.id)))).toEqual([
+      "Shared",
+      "readme.md",
+      ".env.production",
+    ]);
+  });
+
+  test("a role-scoped grant admits everyone holding that role", () => {
+    const byRole = input(tree, { env: [roleRule("env", "manager")] });
+
+    expect(sees(byRole, "env", PEOPLE.nam.id)).toBe(true);
+    expect(sees(byRole, "env", PEOPLE.thanh.id)).toBe(false);
+    expect(sees(byRole, "env", PEOPLE.minh.id)).toBe(false);
+  });
+
+  /** The refusal names the file itself, not the folder it happens to sit in. */
+  test("the denial points at the file, not at its parent", () => {
+    expect(nodeVisibility(view, "env", as(PEOPLE.an.id)).deniedAt).toEqual({
+      nodeId: "env",
+      name: ".env.production",
+    });
+  });
+
+  test("a restricted file is listed for the admin recovery path", () => {
+    expect(restrictedNodesOf(tree).map((node) => node.name)).toEqual([".env.production"]);
+  });
+
+  /**
+   * A file cannot be reopened from inside itself, so the same lock-out guard a
+   * folder gets has to apply here too.
+   */
+  test("shutting a file you are not granted would lock you out", () => {
+    const target = tree[0]!.children[1]!;
+
+    expect(wouldLockOut(view, target, as(PEOPLE.an.id))).toBe(true);
+    expect(wouldLockOut(view, target, as(PEOPLE.thanh.id))).toBe(false);
+    expect(wouldLockOut(view, target, as(OWNER.id))).toBe(false);
   });
 });

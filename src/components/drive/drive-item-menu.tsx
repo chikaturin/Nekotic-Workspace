@@ -13,7 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
-import { FolderAccessDialog } from "@/components/permissions/folder-access-dialog";
+import { NodeAccessDialog } from "@/components/permissions/node-access-dialog";
 import { PermissionDialog } from "@/components/permissions/permission-dialog";
 import { FavoriteStar } from "@/components/shared/favorite-star";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import { isArchivedNode } from "@/lib/archive";
-import { isContainer, isFile, type DriveNode } from "@/types";
+import { isFile, type DriveNode } from "@/types";
 
 interface DriveItemMenuProps {
   readonly node: DriveNode;
@@ -112,16 +112,19 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
         {/* Two separate things, and the menu keeps them apart on purpose.
             "Manage access" answers who gets *in*; "Roles on this item" answers
             what somebody who is already in may do. Folding them into one entry
-            is how a role becomes a way past a restriction. */}
-        {isContainer(node) && (
-          <DropdownMenuItem
-            disabled={!can("node.access.manage")}
-            onSelect={() => setIsAccessOpen(true)}
-          >
-            <Lock />
-            Manage access
-          </DropdownMenuItem>
-        )}
+            is how a role becomes a way past a restriction.
+
+            Offered on every node, files included. It used to be folders only,
+            which meant the commonest thing anyone wants to shut — one file
+            holding credentials, sitting beside a dozen harmless ones — could
+            only be shut by restricting everything around it. */}
+        <DropdownMenuItem
+          disabled={!can("node.access.manage")}
+          onSelect={() => setIsAccessOpen(true)}
+        >
+          <Lock />
+          Manage access
+        </DropdownMenuItem>
         <DropdownMenuItem
           disabled={!can("workspace.permission.manage")}
           onSelect={() => setIsRolesOpen(true)}
@@ -162,7 +165,7 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
         </DropdownMenuItem>
       </DropdownMenuContent>
 
-      <FolderAccessDialog
+      <NodeAccessDialog
         node={node}
         isOpen={isAccessOpen}
         onClose={() => setIsAccessOpen(false)}

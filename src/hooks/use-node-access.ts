@@ -19,27 +19,27 @@ import type {
   WorkspaceRole,
 } from "@/types";
 
-export interface FolderAccessEntry {
+export interface NodeAccessEntry {
   readonly user: WorkspaceMember;
   readonly role: WorkspaceRole;
-  /** Owners are always in, and cannot be removed from their own folder. */
+  /** Owners are always in, and cannot be removed from their own item. */
   readonly isOwner: boolean;
 }
 
-export interface FolderAccess {
+export interface NodeAccess {
   readonly canManage: boolean;
   /** People granted here — the list the dialog shows. */
-  readonly granted: readonly FolderAccessEntry[];
+  readonly granted: readonly NodeAccessEntry[];
   /** Workspace members not yet granted, for the add box. */
   readonly candidates: readonly WorkspaceMember[];
-  /** Name of the ancestor an inheriting folder currently follows, if any. */
+  /** Name of the ancestor an inheriting node currently follows, if any. */
   readonly inheritedFrom: string | null;
   setMode: (mode: NodeAccessMode) => void;
   grant: (userId: string, role: WorkspaceRole) => void;
   revoke: (userId: string) => void;
 }
 
-const NO_ACCESS: FolderAccess = {
+const NO_ACCESS: NodeAccess = {
   canManage: false,
   granted: [],
   candidates: [],
@@ -50,17 +50,24 @@ const NO_ACCESS: FolderAccess = {
 };
 
 /**
- * Everything the folder access dialog needs, in one place.
+ * Everything the access dialog needs, in one place.
  *
- * The rule worth stating: **switching a folder to Restricted grants the actor
- * first**. A folder you cannot see is a folder you cannot reopen, so the write
- * that could strand somebody carries its own remedy rather than leaving the
- * dialog to notice afterwards — the same reason the owner is always admitted.
+ * It works on *any* node, not only a folder. `accessMode` has always been on
+ * the base node type and `visibility.ts` has always walked every node in the
+ * chain without asking whether it holds children — the restriction was only
+ * ever in the menu that opened this. A single `.env` file being readable by
+ * everyone who can reach its folder is exactly the case the model was built
+ * for, and exactly the one the UI would not let you write.
+ *
+ * The rule worth stating: **switching to Restricted grants the actor first**.
+ * Something you cannot see is something you cannot reopen, so the write that
+ * could strand somebody carries its own remedy rather than leaving the dialog
+ * to notice afterwards — the same reason the owner is always admitted.
  *
  * Mode lives on the node and grants live in the rule table, which is why this
  * hook talks to both stores. Nothing else has to know they are separate.
  */
-export function useFolderAccess(node: DriveNode | null): FolderAccess {
+export function useNodeAccess(node: DriveNode | null): NodeAccess {
   const workspace = useWorkspaceStore(selectActiveWorkspace);
   const tree = useWorkspaceStore(selectFullTree);
   const rules = usePermissionStore(selectRulesFor(workspace.id));
@@ -72,7 +79,7 @@ export function useFolderAccess(node: DriveNode | null): FolderAccess {
   const can = usePermissions(node);
   const canManage = can("node.access.manage") || can("workspace.permission.manage");
 
-  const granted = useMemo<readonly FolderAccessEntry[]>(() => {
+  const granted = useMemo<readonly NodeAccessEntry[]>(() => {
     if (!node) return [];
 
     return workspace.members
@@ -147,7 +154,7 @@ export function useFolderAccess(node: DriveNode | null): FolderAccess {
     (userId: string) => {
       if (!node || !canManage) return;
 
-      // The last person out would leave a folder only its owner and an admin
+      // The last person out would leave something only its owner and an admin
       // could reopen. It is allowed, and it is said out loud.
       if (granted.length === 1) {
         pushFeedback(

@@ -2,7 +2,7 @@
 
 import { Lock, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
-import { FolderAccessDialog } from "@/components/permissions/folder-access-dialog";
+import { NodeAccessDialog } from "@/components/permissions/node-access-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useRestrictedNodes } from "@/hooks/use-workspace-access";
@@ -89,7 +89,7 @@ export function WorkspaceRestrictedTab() {
         </ul>
       )}
 
-      <FolderAccessDialog
+      <NodeAccessDialog
         node={managing}
         isOpen={managing !== null}
         onClose={() => setManaging(null)}

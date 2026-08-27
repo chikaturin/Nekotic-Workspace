@@ -21,18 +21,19 @@ import { IconButton } from "@/components/ui/icon-button";
 import type { ListboxOption } from "@/components/ui/listbox";
 import { RadioCard, RadioGroup } from "@/components/ui/radio-group";
 import { Select } from "@/components/ui/select";
-import { useFolderAccess } from "@/hooks/use-folder-access";
+import { useNodeAccess } from "@/hooks/use-node-access";
 import { ROLE_LABELS, ROLE_SUMMARIES } from "@/lib/permissions";
 import {
   ACCESS_MODE_LABELS,
   ACCESS_MODE_SUMMARIES,
   accessModeOf,
 } from "@/lib/permissions/visibility";
+import { nodeVisual } from "@/lib/node-visuals";
 import { CURRENT_USER } from "@/mock/users";
-import { NODE_ACCESS_MODES, WORKSPACE_ROLES } from "@/types";
+import { isContainer, NODE_ACCESS_MODES, WORKSPACE_ROLES } from "@/types";
 import type { DriveNode, NodeAccessMode, WorkspaceRole } from "@/types";
 
-interface FolderAccessDialogProps {
+interface NodeAccessDialogProps {
   readonly node: DriveNode | null;
   readonly isOpen: boolean;
   readonly onClose: () => void;
@@ -64,6 +65,29 @@ function describeMode(mode: NodeAccessMode, inheritedFrom: string | null): strin
 }
 
 /**
+ * How to talk about the thing being restricted.
+ *
+ * A folder gates its whole subtree and a file gates itself, and saying "and
+ * everything inside it" over a CSV would describe a rule that does not exist.
+ * The noun comes from the same visual table the icons do, so a Config document
+ * is called a Config here too.
+ */
+function accessScope(node: DriveNode): {
+  readonly noun: string;
+  readonly subject: string;
+  readonly everything: string;
+} {
+  const noun = nodeVisual(node).label.toLowerCase();
+  const subject = `this ${noun}`;
+
+  return {
+    noun,
+    subject,
+    everything: isContainer(node) ? `${subject} and everything inside it` : subject,
+  };
+}
+
+/**
  * The empty state of the add box, which has to name what was searched for.
  *
  * `Combobox` owns its query and does not hand it back, so the query is read off
@@ -79,7 +103,7 @@ function NoCandidateNotice() {
   // Reached when everyone is already listed rather than when a search missed,
   // so the membership rule would be answering a question nobody asked.
   if (query.length === 0) {
-    return <>Everyone in this workspace already has access to this folder.</>;
+    return <>Everyone in this workspace already has access to this item.</>;
   }
 
   return (
@@ -91,21 +115,26 @@ function NoCandidateNotice() {
 }
 
 /**
- * Who can see this folder (SY-FAC).
+ * Who can see this item (SY-FAC).
  *
  * One choice and one list, in that order, because that is the order the
- * question is actually asked: *is this folder shut*, and if so, *who is in*.
- * Anything more — condition builders, effective-permission simulators, deny
- * rules — turns a folder into an IAM console, and a folder that needs a manual
- * is a folder nobody restricts.
+ * question is actually asked: *is this shut*, and if so, *who is in*. Anything
+ * more — condition builders, effective-permission simulators, deny rules —
+ * turns it into an IAM console, and access control that needs a manual is
+ * access control nobody sets.
  *
  * The two layers stay visible and separate: the mode decides who gets *in*, the
  * role beside each name decides what they can do once they are. A viewer who is
- * listed sees the folder and edits nothing; a manager who is not listed does
- * not see it at all.
+ * listed sees the item and edits nothing; a manager who is not listed does not
+ * see it at all.
+ *
+ * It opens on any node, a single file included. Restricting one file is the
+ * case people actually reach for first — a credentials dump or an `.env` beside
+ * a dozen harmless ones — and demanding a whole folder around it was making the
+ * feature answer a question nobody asked.
  */
-export function FolderAccessDialog({ node, isOpen, onClose }: FolderAccessDialogProps) {
-  const access = useFolderAccess(node);
+export function NodeAccessDialog({ node, isOpen, onClose }: NodeAccessDialogProps) {
+  const access = useNodeAccess(node);
   const [pendingMode, setPendingMode] = useState<NodeAccessMode | null>(null);
 
   const mode = node ? accessModeOf(node) : "inherit";
@@ -130,6 +159,8 @@ export function FolderAccessDialog({ node, isOpen, onClose }: FolderAccessDialog
   );
 
   if (!node) return null;
+
+  const scope = accessScope(node);
 
   function changeMode(next: NodeAccessMode) {
     // Widening access is the change worth stopping to confirm: it is the one
@@ -159,9 +190,7 @@ export function FolderAccessDialog({ node, isOpen, onClose }: FolderAccessDialog
               {mode === "restricted" && <Lock className="size-3.5 text-faint-foreground" />}
               {node.name}
             </DialogTitle>
-            <DialogDescription>
-              Who can see this folder and everything inside it.
-            </DialogDescription>
+            <DialogDescription>Who can see {scope.everything}.</DialogDescription>
           </DialogHeader>
 
           <DialogBody size="sm" className="space-y-4">
@@ -229,7 +258,7 @@ export function FolderAccessDialog({ node, isOpen, onClose }: FolderAccessDialog
                         <IconButton
                           variant="ghost"
                           aria-label={`Remove ${entry.user.name}`}
-                          tooltip="Remove from this folder"
+                          tooltip={`Remove from ${scope.noun}`}
                           onClick={() => access.revoke(entry.user.id)}
                           className="shrink-0 text-faint-foreground hover:text-danger"
                         >
@@ -264,8 +293,8 @@ export function FolderAccessDialog({ node, isOpen, onClose }: FolderAccessDialog
             ) : (
               <p className="rounded-md border border-hairline bg-surface px-3 py-2 text-body text-muted-foreground">
                 {mode === "workspace"
-                  ? "Every member of the workspace can see this folder — as long as they can reach the folder it sits in. All-members widens from here down; it cannot reopen a restriction set above."
-                  : "This folder shows whoever can see the folder it sits in. Switch to Restricted to choose people yourself."}
+                  ? `Every member of the workspace can see ${scope.everything} — as long as they can reach the folder it sits in. All-members widens from here down; it cannot reopen a restriction set above.`
+                  : `${scope.subject} is shown to whoever can see the folder it sits in. Switch to Restricted to choose people yourself.`}
               </p>
             )}
 
@@ -288,7 +317,7 @@ export function FolderAccessDialog({ node, isOpen, onClose }: FolderAccessDialog
         isOpen={pendingMode !== null}
         isDestructive={false}
         title={`Make “${node.name}” visible to everyone?`}
-        description={`Every member of the workspace will be able to see ${node.name} and everything inside it. The people listed here keep the roles they were given.`}
+        description={`Every member of the workspace will be able to see ${scope.everything}. The people listed here keep the roles they were given.`}
         confirmLabel="Make accessible"
         onClose={() => setPendingMode(null)}
         onConfirm={() => {
