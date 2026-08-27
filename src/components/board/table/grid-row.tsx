@@ -4,6 +4,7 @@ import { Archive, ChevronRight, Maximize2 } from "lucide-react";
 import { memo, type MouseEvent } from "react";
 import { GridCell } from "@/components/board/table/grid-cell";
 import { GUTTER_WIDTH, type GridShared } from "@/components/board/table/grid-shared";
+import { GRID_FROZEN_ATTR } from "@/lib/dom/grid-scroll";
 import { RowActionsMenu } from "@/components/board/table/row-actions-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { isRowArchived } from "@/lib/archive";
@@ -77,6 +78,7 @@ export const GridRow = memo(function GridRow({
     >
       <div
         style={{ width: GUTTER_WIDTH }}
+        {...{ [GRID_FROZEN_ATTR]: "" }}
         className={cn(
           "sticky left-0 z-sticky flex shrink-0 items-center gap-1 border-b border-r border-hairline px-1.5",
           isWarned ? "border-l-2 border-l-warning bg-warning/10" : "bg-surface",

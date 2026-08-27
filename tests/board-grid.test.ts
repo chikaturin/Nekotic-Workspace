@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { indexRows } from "@/lib/board-records";
+import { CELL_CHIP_LIMIT, splitForCell } from "@/lib/cell-overflow";
 import { makeColumn } from "@/lib/board-schema";
 import { clearRange, copyRange, pasteRange } from "@/lib/grid-clipboard";
 import { scrollOffsetFor, windowRange } from "@/lib/grid-geometry";
@@ -179,5 +180,66 @@ describe("row virtualisation", () => {
     expect(scrollOffsetFor(2, 0, 440, 44)).toBeNull();
     expect(scrollOffsetFor(0, 200, 440, 44)).toBe(0);
     expect(scrollOffsetFor(20, 0, 440, 44)).toBe(484);
+  });
+});
+
+/* ------------------------------------------------------------- cell width */
+
+/**
+ * A grid column has a width the user chose, and a cell has one line. What
+ * happens to the values that do not fit is a correctness question, not a
+ * cosmetic one: they used to be drawn straight across the next column.
+ */
+describe("fitting many values into one cell", () => {
+  const ids = (count: number) => Array.from({ length: count }, (_, index) => `TASK-${index + 1}`);
+
+  test("a value on its own is never counted", () => {
+    expect(splitForCell(ids(1))).toEqual({ shown: ids(1), overflow: 0 });
+  });
+
+  test("everything up to the cap is drawn", () => {
+    expect(splitForCell(ids(CELL_CHIP_LIMIT))).toEqual({
+      shown: ids(CELL_CHIP_LIMIT),
+      overflow: 0,
+    });
+  });
+
+  /** "+1" costs the same width as the chip it replaces and says less. */
+  test("one over the cap is drawn rather than counted", () => {
+    const four = ids(CELL_CHIP_LIMIT + 1);
+    expect(splitForCell(four)).toEqual({ shown: four, overflow: 0 });
+  });
+
+  test("five relations become three and a count", () => {
+    const { shown, overflow } = splitForCell(ids(5));
+
+    expect(shown).toEqual(["TASK-1", "TASK-2", "TASK-3"]);
+    expect(overflow).toBe(2);
+  });
+
+  test("twenty relations still draw exactly three", () => {
+    const { shown, overflow } = splitForCell(ids(20));
+
+    expect(shown).toHaveLength(CELL_CHIP_LIMIT);
+    expect(overflow).toBe(20 - CELL_CHIP_LIMIT);
+  });
+
+  test("shown plus counted is always everything, at every size", () => {
+    for (let count = 0; count <= 25; count += 1) {
+      const { shown, overflow } = splitForCell(ids(count));
+
+      expect(shown.length + overflow, `${count} values`).toBe(count);
+      expect(shown.length).toBeLessThanOrEqual(Math.max(count, CELL_CHIP_LIMIT + 1));
+    }
+  });
+
+  test("an empty cell counts nothing", () => {
+    expect(splitForCell([])).toEqual({ shown: [], overflow: 0 });
+  });
+
+  test("a caller can ask for a different cap", () => {
+    expect(splitForCell(ids(6), 1)).toEqual({ shown: ["TASK-1"], overflow: 5 });
+    // A nonsensical cap still returns every value accounted for.
+    expect(splitForCell(ids(3), -2)).toEqual({ shown: [], overflow: 3 });
   });
 });

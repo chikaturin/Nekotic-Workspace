@@ -2,9 +2,15 @@
 
 import { Link2, Loader2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CellShell, EditorSurface, UnparsedBadge } from "@/components/board/cells/cell-frame";
+import {
+  CellOverflowCount,
+  CellShell,
+  EditorSurface,
+  UnparsedBadge,
+} from "@/components/board/cells/cell-frame";
 import { Input } from "@/components/ui/input";
 import { useAsyncResource } from "@/hooks/use-async-resource";
+import { splitForCell } from "@/lib/cell-overflow";
 import { DELETED_LABEL } from "@/lib/cell-values";
 import { cn } from "@/lib/utils";
 import { boardService } from "@/services/board-service";
@@ -19,6 +25,25 @@ type RelationValue = Extract<CellValue, { kind: "relation" }>;
  * one-for-one. Bidirectional mirroring and referential cleanup are the parts
  * still owned by the backend — see the API report.
  */
+/** What a linked id reads as: its record's own display id, or the raw id. */
+function relationLabel(
+  rowId: string,
+  labels: ReadonlyMap<string, string>,
+  isResolved: boolean,
+): string {
+  const label = labels.get(rowId);
+  if (label !== undefined) return label;
+  return isResolved ? DELETED_LABEL : rowId;
+}
+
+/**
+ * Links, in a cell one line tall.
+ *
+ * A "Blocked by" field routinely holds more records than a column is wide, so
+ * only the first few are drawn and the rest are counted. The count carries the
+ * whole list as its title and opens the cell when clicked, which is what keeps
+ * the truncation a summary rather than a loss.
+ */
 export function RelationCellView({
   value,
   labels,
@@ -29,28 +54,44 @@ export function RelationCellView({
   /** Until every target board has answered, an unknown id is not a deletion. */
   isResolved?: boolean;
 }) {
+  const { shown, overflow } = splitForCell(value.rowIds);
+
   return (
     <CellShell>
       {value.rowIds.length > 0 ? (
-        value.rowIds.map((rowId) => {
-          const label = labels.get(rowId);
-          const isDeleted = label === undefined && isResolved;
+        <>
+          {shown.map((rowId) => {
+            const isDeleted = labels.get(rowId) === undefined && isResolved;
 
-          return (
-            <span
-              key={rowId}
-              className={cn(
-                "metric inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-micro",
-                isDeleted
-                  ? "border-danger/40 bg-danger/10 text-danger"
-                  : "border-border bg-surface text-muted-foreground",
-              )}
-            >
-              <Link2 className="size-2.5" />
-              {isDeleted ? DELETED_LABEL : label ?? rowId}
-            </span>
-          );
-        })
+            return (
+              <span
+                key={rowId}
+                title={relationLabel(rowId, labels, isResolved)}
+                className={cn(
+                  // `min-w-0` and the truncate inside are what stop one long
+                  // display id doing on its own what four short ones do
+                  // together: pushing the cell past the column it lives in.
+                  "metric inline-flex min-w-0 shrink items-center gap-1 rounded border px-1.5 py-0.5 text-micro",
+                  isDeleted
+                    ? "border-danger/40 bg-danger/10 text-danger"
+                    : "border-border bg-surface text-muted-foreground",
+                )}
+              >
+                <Link2 className="size-2.5 shrink-0" />
+                <span className="truncate">{relationLabel(rowId, labels, isResolved)}</span>
+              </span>
+            );
+          })}
+
+          {overflow > 0 && (
+            <CellOverflowCount
+              count={overflow}
+              title={value.rowIds
+                .map((rowId) => relationLabel(rowId, labels, isResolved))
+                .join(", ")}
+            />
+          )}
+        </>
       ) : value.text ? (
         <UnparsedBadge text={value.text} />
       ) : null}

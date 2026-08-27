@@ -2,8 +2,14 @@
 
 import { Check, UserX } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CellShell, EditorSurface, UnparsedBadge } from "@/components/board/cells/cell-frame";
+import {
+  CellOverflowCount,
+  CellShell,
+  EditorSurface,
+  UnparsedBadge,
+} from "@/components/board/cells/cell-frame";
 import { UserAvatar } from "@/components/shared/user-avatar";
+import { splitForCell } from "@/lib/cell-overflow";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { BoardColumnOf, CellValue, DirectoryUser } from "@/types";
@@ -47,14 +53,21 @@ export function UserCellView({
     .filter((person): person is DirectoryUser => Boolean(person));
 
   const unknown = value.userIds.filter((id) => !people.has(id));
+  const { shown, overflow } = splitForCell(chips);
 
   return (
     <CellShell>
-      {chips.map((person) => (
+      {shown.map((person) => (
         <UserChip key={person.id} person={person} />
       ))}
+      {overflow > 0 && (
+        <CellOverflowCount
+          count={overflow}
+          title={chips.map((person) => person.name).join(", ")}
+        />
+      )}
       {unknown.length > 0 && (
-        <span className="inline-flex items-center gap-1 text-body text-faint-foreground">
+        <span className="inline-flex shrink-0 items-center gap-1 text-body text-faint-foreground">
           <UserX className="size-3" />
           {unknown.length} unknown
         </span>

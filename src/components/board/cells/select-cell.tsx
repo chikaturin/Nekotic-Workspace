@@ -2,10 +2,15 @@
 
 import { Check, Lock, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CellShell, UnparsedBadge } from "@/components/board/cells/cell-frame";
-import { EditorSurface } from "@/components/board/cells/cell-frame";
+import {
+  CellOverflowCount,
+  CellShell,
+  EditorSurface,
+  UnparsedBadge,
+} from "@/components/board/cells/cell-frame";
 import { Input } from "@/components/ui/input";
 import { findOptionByLabel, SELECT_COLOR_CLASSES } from "@/lib/board-schema";
+import { splitForCell } from "@/lib/cell-overflow";
 import type { CellContext } from "@/lib/cell-values";
 import {
   resolveOptionAvailability,
@@ -48,10 +53,22 @@ export function SelectCellView({
     .map((id) => column.config.options.find((option) => option.id === id))
     .filter((option): option is SelectOption => Boolean(option));
 
+  const { shown, overflow } = splitForCell(chips);
+
   return (
     <CellShell>
       {chips.length > 0 ? (
-        chips.map((option) => <SelectChip key={option.id} option={option} />)
+        <>
+          {shown.map((option) => (
+            <SelectChip key={option.id} option={option} />
+          ))}
+          {overflow > 0 && (
+            <CellOverflowCount
+              count={overflow}
+              title={chips.map((option) => option.label).join(", ")}
+            />
+          )}
+        </>
       ) : value.text ? (
         <UnparsedBadge text={value.text} />
       ) : null}

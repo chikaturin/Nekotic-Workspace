@@ -1,10 +1,11 @@
 "use client";
 
-import { memo, useCallback, type MouseEvent, type ReactNode } from "react";
+import { memo, useCallback, useLayoutEffect, useRef, type MouseEvent, type ReactNode } from "react";
 import { CellEditor } from "@/components/board/cells/cell-editor";
 import { CellRenderer } from "@/components/board/cells/cell-renderer";
 import { widthStyle, type GridShared } from "@/components/board/table/grid-shared";
 import { cellOf } from "@/lib/cell-values";
+import { GRID_FROZEN_ATTR, revealBeyondFrozen } from "@/lib/dom/grid-scroll";
 import { cn } from "@/lib/utils";
 import {
   selectIsEditing,
@@ -32,6 +33,26 @@ interface GridCellProps {
 }
 
 /**
+ * The one cell type a *single* click opens.
+ *
+ * Everything else in the grid opens on double-click, and that is right: a
+ * single click is how you select, and a cell full of data has something to
+ * select. An empty Attachment cell has nothing — there is no value to pick, no
+ * text to range over, and the only thing anyone wants from it is the uploader.
+ * Making them find the second click, or a menu, to reach the only action the
+ * cell offers is a step that exists for the grid's convenience rather than
+ * theirs.
+ *
+ * A cell that already holds files is *not* included: there, a click has to
+ * reach the file, not the uploader.
+ */
+function opensOnSingleClick(column: BoardColumn, value: CellValue): boolean {
+  return (
+    column.type === "attachment" && value.kind === "attachment" && value.attachments.length === 0
+  );
+}
+
+/**
  * One cell.
  *
  * It subscribes to three booleans out of the grid store rather than to the
@@ -56,8 +77,22 @@ export const GridCell = memo(function GridCell({
       ? state.editing.initialText
       : undefined,
   );
+  const focusId = useGridStore((state) =>
+    state.editing?.rowId === row.id && state.editing.columnId === column.id
+      ? state.editing.focusId
+      : undefined,
+  );
 
   const value = cellOf(row, column);
+  const element = useRef<HTMLDivElement>(null);
+
+  /**
+   * An editor must not open behind the frozen columns. Only ever runs for the
+   * one cell that is being edited, and only when edit mode starts.
+   */
+  useLayoutEffect(() => {
+    if (isEditing) revealBeyondFrozen(element.current);
+  }, [isEditing]);
 
   const handleMouseDown = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
@@ -81,6 +116,30 @@ export const GridCell = memo(function GridCell({
     if (grid.isDragSelecting) grid.dragSelectTo({ rowIndex, columnIndex });
   }, [rowIndex, columnIndex]);
 
+  /**
+   * Single click, for the two things that are not selection.
+   *
+   * A `+4` marker means "there is more here than fits" — clicking it has to
+   * show the rest, which is what the cell's own editor does. The other is the
+   * empty Attachment cell above. Both are read off the DOM rather than passed
+   * down as callbacks, because `CellRenderer` is memoised on the value and
+   * handing it a fresh function per cell would undo that for five thousand
+   * rows to serve two of them.
+   */
+  const handleClick = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      if (isReadOnly) return;
+
+      const target = event.target as Element | null;
+      const isExpand = target?.closest?.("[data-cell-expand]") != null;
+      if (!isExpand && !opensOnSingleClick(column, value)) return;
+
+      const openId = target?.closest?.<HTMLElement>("[data-cell-focus-id]")?.dataset.cellFocusId;
+      useGridStore.getState().beginEdit(row.id, column.id, openId ? { focusId: openId } : undefined);
+    },
+    [isReadOnly, column, value, row.id],
+  );
+
   const commit = useCallback(
     (next: CellValue, move: "down" | "none" = "none") => {
       shared.onCommitCell(row.id, column.id, next);
@@ -96,17 +155,23 @@ export const GridCell = memo(function GridCell({
 
   return (
     <div
+      ref={element}
       role="gridcell"
       aria-colindex={columnIndex + 1}
       aria-selected={isSelected}
+      // The frozen pane the rest of the row scrolls beneath. Marked in the DOM
+      // because the only thing that needs it — keeping an editor out from
+      // under it — measures the pane rather than recomputing its width.
+      {...(column.isPrimary ? { [GRID_FROZEN_ATTR]: "" } : {})}
       onMouseDown={handleMouseDown}
       onMouseEnter={handleMouseEnter}
+      onClick={handleClick}
       onDoubleClick={() => {
         if (!isReadOnly) useGridStore.getState().beginEdit(row.id, column.id);
       }}
       style={widthStyle(column.id, column.isPrimary)}
       className={cn(
-        "relative h-full shrink-0 border-b border-r border-hairline",
+        "group/cell relative h-full shrink-0 border-b border-r border-hairline",
         column.isPrimary && "sticky z-sticky bg-surface",
         !column.isPrimary && isSelected && "bg-selection",
         isFocused && "z-raised ring-2 ring-inset ring-accent",
@@ -133,6 +198,7 @@ export const GridCell = memo(function GridCell({
           columns={shared.columns}
           context={shared.context}
           initialText={initialText}
+          focusId={focusId}
           onCommit={commit}
           onCancel={() => useGridStore.getState().endEdit()}
           onCreateOption={(label) => shared.onCreateOption(column.id, label)}

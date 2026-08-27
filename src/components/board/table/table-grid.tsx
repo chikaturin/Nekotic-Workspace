@@ -14,6 +14,7 @@ import { useGridKeyboard } from "@/hooks/use-grid-keyboard";
 import { useVirtualRows } from "@/hooks/use-virtual-rows";
 import type { BoardViewModel } from "@/hooks/use-board-view";
 import { flattenGroups, flattenUngrouped, type RowExpander } from "@/lib/board-grouping";
+import { GRID_SCROLLER_ATTR } from "@/lib/dom/grid-scroll";
 import { layoutHierarchy } from "@/lib/board-hierarchy";
 import { ROW_HEIGHTS } from "@/lib/grid-geometry";
 import { useBoardStore } from "@/store/board-store";
@@ -272,6 +273,7 @@ export function TableGrid({
       <div
         ref={scrollRef}
         onScroll={onScroll}
+        {...{ [GRID_SCROLLER_ATTR]: "" }}
         className="min-h-0 flex-1 overflow-auto bg-canvas outline-none"
       >
         <div
