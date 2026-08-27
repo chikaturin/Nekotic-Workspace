@@ -1,6 +1,7 @@
 "use client";
 
 import type { GanttLink, GanttRow } from "@/lib/board-gantt";
+import { connectorGutterY, connectorPath, connectorPoints } from "@/lib/gantt-connector";
 
 interface GanttDependenciesProps {
   /** Every scheduled row, so a connector can reach a row that is off-screen. */
@@ -14,9 +15,6 @@ interface GanttDependenciesProps {
   readonly windowEnd: number;
 }
 
-/** How far a connector reaches out before it turns. */
-const ELBOW = 10;
-
 /**
  * "Blocked by", drawn.
  *
@@ -25,6 +23,10 @@ const ELBOW = 10;
  * the blocked record starting before its blocker ends — is drawn in warning
  * colour and nothing else happens: the chart reports the clash, it does not
  * reschedule anyone. Deciding what to move is the plan owner's job.
+ *
+ * Routing is in `gantt-connector`, which is where the backwards case is
+ * handled: a conflict points leftwards, and running straight back at the
+ * target's own height drew the line through the target's bar.
  *
  * A link is drawn when *either* end is on screen. Requiring both meant that
  * scrolling a blocker out of the window silently deleted the arrow pointing at
@@ -70,20 +72,25 @@ export function GanttDependencies({
         const to = rows[toIndex]?.schedule;
         if (!from || !to) return null;
 
-        const x1 = (from.offset + from.span) * dayWidth;
-        const y1 = fromIndex * rowHeight + rowHeight / 2;
+        const stroke = link.isConflict ? "var(--warning)" : "var(--border-strong)";
+
+        const path = connectorPath(
+          connectorPoints({
+            x1: (from.offset + from.span) * dayWidth,
+            y1: fromIndex * rowHeight + rowHeight / 2,
+            x2: to.offset * dayWidth,
+            y2: toIndex * rowHeight + rowHeight / 2,
+            gutterY: connectorGutterY(fromIndex, toIndex, rowHeight),
+          }),
+        );
+
         const x2 = to.offset * dayWidth;
         const y2 = toIndex * rowHeight + rowHeight / 2;
-
-        // Right, down, then in — an orthogonal elbow reads as a dependency
-        // where a diagonal reads as a stray line across the chart.
-        const turn = Math.max(x1 + ELBOW, x2 - ELBOW);
-        const stroke = link.isConflict ? "var(--warning)" : "var(--border-strong)";
 
         return (
           <g key={`${link.fromRowId}->${link.toRowId}`}>
             <path
-              d={`M ${x1} ${y1} H ${turn} V ${y2} H ${x2}`}
+              d={path}
               fill="none"
               stroke={stroke}
               strokeWidth={link.isConflict ? 1.5 : 1.25}
