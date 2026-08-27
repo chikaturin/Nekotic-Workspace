@@ -54,6 +54,14 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
   const people = useBoardStore((state) => state.people);
 
   const [tab, setTab] = useState<DrawerTabId>("details");
+  /**
+   * The one field with its editor open, stored with the record it belongs to.
+   * Keying it by row means opening another record starts closed by derivation
+   * rather than by resetting state in an effect, and only ever one editor is
+   * mounted — two open pickers competing for the caret is not "editing", it is
+   * a stack of half-finished inputs.
+   */
+  const [editing, setEditing] = useState<{ rowId: string; columnId: string } | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const { board, columns, context } = model;
 
@@ -70,6 +78,8 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
     const value = parent.cells[board.primaryColumnId];
     return value && value.kind === "text" ? value.value : "";
   }, [parent, board]);
+
+  const editingColumnId = editing && editing.rowId === rowId ? editing.columnId : null;
 
   const isOpen = Boolean(rowId && row && board);
   const isArchived = row ? isRowArchived(row) : false;
@@ -96,7 +106,14 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
   }
 
   return (
-    <Drawer open={isOpen} onOpenChange={(open) => !open && closeDrawer()}>
+    <Drawer
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (open) return;
+        setEditing(null);
+        closeDrawer();
+      }}
+    >
       <DrawerContent
         aria-describedby={undefined}
         // A mention picker or a reply composer owns its own Escape; the drawer
@@ -157,7 +174,19 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
               >
                 {/* `inert` takes the fields out of the tab order too — a frozen
                     record must not be reachable by keyboard either. */}
-                <div inert={isArchived} className={cn(isArchived && "opacity-70")}>
+                <div
+                  inert={isArchived}
+                  className={cn(isArchived && "opacity-70")}
+                  // A press anywhere in the field list that is not on a field
+                  // puts the open editor away, the way clicking off a cell does
+                  // in the grid. Editors that portal out sit outside this
+                  // subtree, so their own clicks never reach it.
+                  onPointerDown={(event) => {
+                    const target = event.target;
+                    if (target instanceof Element && target.closest("[data-drawer-field]")) return;
+                    setEditing(null);
+                  }}
+                >
                   {columns.map((column) => (
                     <DrawerField
                       key={column.id}
@@ -170,6 +199,10 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
                       folderId={folderId}
                       people={people}
                       columns={columns}
+                      isEditing={editingColumnId === column.id}
+                      onEditingChange={(next) =>
+                        setEditing(next && rowId ? { rowId, columnId: column.id } : null)
+                      }
                       onCommit={(value) => commit(column.id, value)}
                       onCreateOption={(label) => createOption(column.id, label)}
                     />

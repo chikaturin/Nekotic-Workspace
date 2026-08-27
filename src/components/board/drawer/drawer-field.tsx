@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { CellEditor } from "@/components/board/cells/cell-editor";
 import { CellRenderer } from "@/components/board/cells/cell-renderer";
 import { columnVisual } from "@/lib/board-visuals";
@@ -19,6 +18,13 @@ interface DrawerFieldProps {
   readonly people: readonly DirectoryUser[];
   /** The whole schema — an option rule can test any column of this record. */
   readonly columns: readonly BoardColumn[];
+  /**
+   * Whether this field is the one being edited. The drawer owns it, so opening
+   * a second field closes the first — one editor on screen, one caret, one
+   * place a keystroke can land.
+   */
+  readonly isEditing: boolean;
+  readonly onEditingChange: (isEditing: boolean) => void;
   readonly onCommit: (value: CellValue) => void;
   readonly onCreateOption: (label: string) => Promise<SelectOption | null>;
 }
@@ -38,14 +44,18 @@ export function DrawerField({
   folderId,
   people,
   columns,
+  isEditing,
+  onEditingChange,
   onCommit,
   onCreateOption,
 }: DrawerFieldProps) {
-  const [isEditing, setIsEditing] = useState(false);
   const visual = columnVisual(column.type);
 
   return (
-    <div className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-start gap-3 py-1.5">
+    <div
+      data-drawer-field={column.id}
+      className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-start gap-3 py-1.5"
+    >
       <div className="flex items-center gap-1.5 pt-1.5">
         <visual.Icon className="size-3.5 shrink-0 text-faint-foreground" />
         <span className="truncate text-[12px] text-muted-foreground">{column.name}</span>
@@ -65,15 +75,15 @@ export function DrawerField({
             context={context}
             onCommit={(next) => {
               onCommit(next);
-              setIsEditing(false);
+              onEditingChange(false);
             }}
-            onCancel={() => setIsEditing(false)}
+            onCancel={() => onEditingChange(false)}
             onCreateOption={onCreateOption}
           />
         ) : (
           <button
             type="button"
-            onClick={() => setIsEditing(true)}
+            onClick={() => onEditingChange(true)}
             className={cn(
               "flex min-h-8 w-full items-center rounded-md border border-transparent text-left",
               "hover:border-border hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring",
