@@ -1,16 +1,24 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CircleAlert, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SELECT_COLOR_CLASSES } from "@/lib/board-schema";
 import {
+  allowAllTransitions,
+  clearAllTransitions,
+  clearTransitionsFor,
   EMPTY_OPTION_KEY,
+  isGoverned,
+  linearTransitions,
+  NO_TRANSITION_RULES,
   seedTransitionRules,
+  setTransitions,
+  strandedKeys,
   toggleTransition,
   transitionKeys,
   transitionLabel,
-  NO_TRANSITION_RULES,
+  ungovernedKeys,
 } from "@/lib/transition-rules";
 import { cn } from "@/lib/utils";
 import type { SelectOption, TransitionRules } from "@/types";
@@ -23,15 +31,23 @@ interface TransitionRulesEditorProps {
 }
 
 /**
- * The transition table, as a grid of checkboxes.
+ * The workflow, as one line per status.
  *
- * A row is a status a record can be in; the ticked columns are the statuses it
- * may move to. This is the whole rule — there is no code path anywhere that
- * knows a particular status pair, only this table.
+ * Each row reads as a sentence — "From **Debug** → can move to: Fixing,
+ * Backlog" — and every target is a tappable pill of the status itself, so the
+ * thing you click looks like the thing you see on the board. One click per
+ * edge, no dialog, no expression, no workflow vocabulary.
  *
- * Turning rules on seeds "everything reachable" rather than an empty table: an
- * allow-list that starts empty would freeze every card on the board, which is
- * a trap rather than a default.
+ * A grid — status × status — was the other candidate, and is genuinely denser
+ * to *scan*. It is worse to *use*: with eight statuses a cell sits at row 6,
+ * column 7 of an unlabelled checkbox field, the table scrolls sideways on any
+ * narrow screen, and every tick asks the reader to re-derive which pair they
+ * are looking at. A per-status list grows downwards instead, which is the
+ * direction a page already scrolls. A node graph was rejected outright: it
+ * needs a layout engine and edge routing to say what a list says in text.
+ *
+ * There is no code path anywhere that knows a particular status pair — only
+ * this table, keyed by option id so a rename cannot break it.
  */
 export function TransitionRulesEditor({
   options,
@@ -40,132 +56,230 @@ export function TransitionRulesEditor({
   columnName,
 }: TransitionRulesEditorProps) {
   const keys = transitionKeys(options);
+  const unconfigured = ungovernedKeys(rules, options);
+  const stranded = strandedKeys(rules, options);
+  const noun = columnName.toLowerCase();
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-1.5 text-[12px] text-foreground">
-          <Checkbox
-            checked={rules.enabled}
-            aria-label="Only allow declared transitions"
-            onChange={(event) =>
-              onChange(
-                event.target.checked
-                  ? rules.enabled
-                    ? rules
-                    : seedTransitionRules(options)
-                  : { ...rules, enabled: false },
-              )
-            }
-          />
-          Only allow declared transitions
-        </label>
+    <div className="space-y-2.5">
+      <label className="flex cursor-pointer items-start gap-2.5">
+        <Checkbox
+          checked={rules.enabled}
+          aria-label="Restrict status transitions"
+          className="mt-0.5"
+          onChange={(event) =>
+            onChange(
+              event.target.checked
+                ? // Re-enabling keeps whatever table was already written; a
+                  // first enable starts from a workflow rather than a blank
+                  // allow-list that would strand every card on the board.
+                  Object.keys(rules.transitions).length > 0
+                  ? { ...rules, enabled: true }
+                  : seedTransitionRules(options)
+                : { ...rules, enabled: false },
+            )
+          }
+        />
+        <span className="min-w-0">
+          <span className="block text-[12px] font-medium text-foreground">
+            Restrict {noun} transitions
+          </span>
+          <span className="block text-[11px] text-faint-foreground">
+            {rules.enabled
+              ? "Only the moves ticked below are allowed. A drag that breaks a rule is refused and the card stays where it was."
+              : `Off — a card can be dragged from any ${noun} to any other, like a plain Kanban.`}
+          </span>
+        </span>
+      </label>
 
-        {rules.enabled && (
-          <div className="ml-auto flex items-center gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-1.5 text-[11px]"
-              onClick={() => onChange(seedTransitionRules(options))}
-            >
-              Allow all
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-1.5 text-[11px]"
-              onClick={() => onChange({ ...rules, transitions: {} })}
-            >
-              Clear all
-            </Button>
+      {rules.enabled && (
+        <>
+          <div className="flex flex-wrap items-center gap-1 rounded-md border border-hairline bg-hover/40 px-1.5 py-1">
+            <span className="px-1 text-[11px] text-faint-foreground">Start from</span>
+            <Preset label="Anything" onClick={() => onChange(allowAllTransitions(options))} />
+            <Preset
+              label="Linear →"
+              title={`Each ${noun} may only move to the next one in the list`}
+              onClick={() => onChange(linearTransitions(options))}
+            />
+            <Preset
+              label="Linear ⇄"
+              title={`Each ${noun} may move to the next or back to the previous one`}
+              onClick={() => onChange(linearTransitions(options, { allowBackward: true }))}
+            />
+            <Preset label="Nothing" onClick={() => onChange(clearAllTransitions(options))} />
           </div>
-        )}
-      </div>
 
-      {!rules.enabled ? (
-        <p className="text-[11px] text-faint-foreground">
-          Every {columnName.toLowerCase()} change is permitted. Turn this on to declare which
-          transitions are allowed — a drag that breaks a rule is refused and the card stays put.
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full border-collapse text-[11px]">
-            <caption className="sr-only">
-              Allowed {columnName} transitions: each row is a starting status, each ticked column a
-              status it may move to.
-            </caption>
-            <thead>
-              <tr>
-                <th
-                  scope="col"
-                  className="sticky left-0 z-10 border-b border-r border-hairline bg-hover px-2 py-1.5 text-left font-medium text-muted-foreground"
+          <ul className="space-y-1.5">
+            {keys.map((from) => {
+              const targets = rules.transitions[from] ?? [];
+              const governed = isGoverned(rules, from);
+              const isStranded = governed && targets.length === 0;
+
+              return (
+                <li
+                  key={from}
+                  className={cn(
+                    "rounded-md border bg-surface p-2",
+                    isStranded ? "border-warning/40" : "border-border",
+                  )}
                 >
-                  From
-                  <ArrowRight className="ml-1 inline size-3" />
-                </th>
-                {keys.map((key) => (
-                  <th
-                    key={key}
-                    scope="col"
-                    className="border-b border-r border-hairline bg-hover px-1.5 py-1.5 font-medium text-muted-foreground"
-                  >
-                    <OptionLabel optionKey={key} options={options} />
-                  </th>
-                ))}
-              </tr>
-            </thead>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <span className="text-[11px] text-faint-foreground">From</span>
+                      <OptionPill optionKey={from} options={options} />
+                      <ArrowRight className="size-3 text-faint-foreground" />
+                    </span>
 
-            <tbody>
-              {keys.map((from) => {
-                const targets = rules.transitions[from] ?? [];
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+                      {keys
+                        .filter((to) => to !== from)
+                        .map((to) => (
+                          <TargetToggle
+                            key={to}
+                            optionKey={to}
+                            options={options}
+                            isOn={targets.includes(to)}
+                            fromLabel={transitionLabel(from, options)}
+                            onToggle={() => onChange(toggleTransition(rules, from, to))}
+                          />
+                        ))}
+                    </div>
 
-                return (
-                  <tr key={from}>
-                    <th
-                      scope="row"
-                      className="sticky left-0 z-10 whitespace-nowrap border-b border-r border-hairline bg-surface px-2 py-1 text-left font-normal"
-                    >
-                      <OptionLabel optionKey={from} options={options} />
-                    </th>
+                    <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-1.5 text-[11px]"
+                        title={`Allow ${transitionLabel(from, options)} to move anywhere`}
+                        onClick={() =>
+                          onChange(
+                            setTransitions(
+                              rules,
+                              from,
+                              keys.filter((to) => to !== from),
+                            ),
+                          )
+                        }
+                      >
+                        All
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-1.5 text-[11px]"
+                        title={
+                          governed
+                            ? `Lift the rule — ${transitionLabel(from, options)} goes back to unrestricted`
+                            : `Pin ${transitionLabel(from, options)} in place — no move out of it`
+                        }
+                        onClick={() =>
+                          onChange(
+                            governed
+                              ? clearTransitionsFor(rules, from)
+                              : setTransitions(rules, from, []),
+                          )
+                        }
+                      >
+                        {governed ? "Reset" : "None"}
+                      </Button>
+                    </div>
+                  </div>
 
-                    {keys.map((to) => {
-                      const isSelf = from === to;
+                  {!governed && (
+                    <p className="mt-1 flex items-center gap-1 text-[10px] text-faint-foreground">
+                      <Info className="size-2.5 shrink-0" />
+                      No rule yet — cards can move in and out freely. Tick a target to restrict it.
+                    </p>
+                  )}
 
-                      return (
-                        <td
-                          key={to}
-                          className={cn(
-                            "border-b border-r border-hairline px-1.5 py-1 text-center",
-                            isSelf && "bg-hover/60",
-                          )}
-                        >
-                          {isSelf ? (
-                            <span className="text-faint-foreground" title="Staying put is always allowed">
-                              —
-                            </span>
-                          ) : (
-                            <Checkbox
-                              checked={targets.includes(to)}
-                              aria-label={`Allow ${transitionLabel(from, options)} to ${transitionLabel(to, options)}`}
-                              onChange={() => onChange(toggleTransition(rules, from, to))}
-                            />
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                  {isStranded && (
+                    <p className="mt-1 flex items-center gap-1 text-[10px] text-warning">
+                      <CircleAlert className="size-2.5 shrink-0" />
+                      Cards here cannot move anywhere. Tick a target, or Reset to lift the rule.
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+
+          {unconfigured.length > 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              {unconfigured.map((key) => transitionLabel(key, options)).join(", ")}{" "}
+              {unconfigured.length === 1 ? "has" : "have"} no transition rule yet, so{" "}
+              {unconfigured.length === 1 ? "it stays" : "they stay"} unrestricted until you tick
+              something.
+            </p>
+          )}
+
+          {stranded.length === keys.length && keys.length > 0 && (
+            <p className="flex items-center gap-1 text-[11px] text-warning">
+              <CircleAlert className="size-3 shrink-0" />
+              Nothing is allowed anywhere — no card on this board can change {noun}.
+            </p>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-function OptionLabel({
+function Preset({
+  label,
+  title,
+  onClick,
+}: {
+  readonly label: string;
+  readonly title?: string;
+  readonly onClick: () => void;
+}) {
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="h-6 px-1.5 text-[11px]"
+      title={title}
+      onClick={onClick}
+    >
+      {label}
+    </Button>
+  );
+}
+
+/** One target, as the status pill itself: lit when allowed, muted when not. */
+function TargetToggle({
+  optionKey,
+  options,
+  isOn,
+  fromLabel,
+  onToggle,
+}: {
+  readonly optionKey: string;
+  readonly options: readonly SelectOption[];
+  readonly isOn: boolean;
+  readonly fromLabel: string;
+  readonly onToggle: () => void;
+}) {
+  const label = transitionLabel(optionKey, options);
+
+  return (
+    <button
+      type="button"
+      aria-pressed={isOn}
+      aria-label={`Allow ${fromLabel} to ${label}`}
+      onClick={onToggle}
+      className={cn(
+        "rounded-full outline-offset-2 transition-opacity focus-visible:outline-2 focus-visible:outline-ring",
+        isOn ? "opacity-100" : "opacity-45 grayscale hover:opacity-75",
+      )}
+    >
+      <OptionPill optionKey={optionKey} options={options} />
+    </button>
+  );
+}
+
+function OptionPill({
   optionKey,
   options,
 }: {
@@ -173,16 +287,20 @@ function OptionLabel({
   readonly options: readonly SelectOption[];
 }) {
   if (optionKey === EMPTY_OPTION_KEY) {
-    return <span className="text-faint-foreground">No value</span>;
+    return (
+      <span className="inline-block whitespace-nowrap rounded-full border border-dashed border-border px-1.5 py-px text-[11px] text-faint-foreground">
+        No value
+      </span>
+    );
   }
 
   const option = options.find((candidate) => candidate.id === optionKey);
-  if (!option) return <span>{optionKey}</span>;
+  if (!option) return <span className="text-[11px]">{optionKey}</span>;
 
   return (
     <span
       className={cn(
-        "inline-block whitespace-nowrap rounded-full border px-1.5 py-px",
+        "inline-block whitespace-nowrap rounded-full border px-1.5 py-px text-[11px]",
         SELECT_COLOR_CLASSES[option.color],
       )}
     >

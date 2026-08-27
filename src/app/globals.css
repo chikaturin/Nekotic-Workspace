@@ -218,3 +218,47 @@
     scrollbar-width: none;
   }
 }
+
+/*
+ * A refused Kanban drop.
+ *
+ * The card never moves — the rule is checked before the write — so without a
+ * beat of motion the reader has only a toast and a board that looks unchanged.
+ * One short nudge ties the message to the card it is about.
+ */
+@keyframes nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes nudge-still {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+  50% {
+    box-shadow: 0 0 0 2px var(--danger);
+  }
+}
+
+@layer utilities {
+  .animate-nudge {
+    animation: nudge 220ms ease-in-out 2;
+  }
+
+  /* Still an animation, so `animationend` fires and the flag clears — it
+     just marks the card instead of moving it. */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-nudge {
+      animation: nudge-still 440ms ease-in-out 1;
+    }
+  }
+}

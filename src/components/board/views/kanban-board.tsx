@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock, Plus } from "lucide-react";
+import { Lock, Plus, Workflow } from "lucide-react";
 import { useCallback, useMemo, useState, type DragEvent } from "react";
 import { RecordCard } from "@/components/board/views/record-card";
 import { StatePanel } from "@/components/shared/state-panels";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import type { BoardViewModel } from "@/hooks/use-board-view";
 import { SELECT_COLOR_CLASSES } from "@/lib/board-schema";
 import { groupValueFor, UNGROUPED_KEY, type RowGroup } from "@/lib/board-grouping";
-import { evaluateTransition, transitionKeyOf } from "@/lib/transition-rules";
+import { allowedTargets, evaluateTransition, transitionKeyOf } from "@/lib/transition-rules";
 import { groupKeyOf } from "@/lib/board-grouping";
 import { formatCount } from "@/lib/format";
 import { useBoardStore } from "@/store/board-store";
@@ -27,6 +27,12 @@ interface KanbanBoardProps {
  * Kanban is the group engine with a horizontal layout: a column *is* a group,
  * and a card *is* a row id. Dropping a card writes the group column's cell on
  * the board record — the same mutation the table would make.
+ *
+ * Dragging is deliberately never blocked. A card can be picked up and carried
+ * anywhere, because a drag that dies under the cursor with no explanation is
+ * worse than one that is refused out loud: the drop is what gets validated,
+ * and a refusal nudges the card and says why. The card never visits the
+ * column it was refused from, so there is no flicker to undo either.
  */
 export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
   const { groupColumn, groups, columnsShown, context, board } = model;
@@ -36,6 +42,8 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
+  /** The card a rule just turned away — nudged once so the toast has a subject. */
+  const [refusedId, setRefusedId] = useState<string | null>(null);
   /** Cards mounted per column — a 5.000-record board must not build 5.000 DOM cards. */
   const [limits, setLimits] = useState<Readonly<Record<string, number>>>({});
 
@@ -53,14 +61,15 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
    *
    * They are deliberately not merged: the first is about the person, the
    * second about the record, and a refusal from each says something different.
-   * Either refusal returns before the optimistic write, so the card snaps back
-   * to its column and no request is made.
+   * Either refusal returns before the optimistic write, so no request is made
+   * and the board record is untouched.
    */
   const drop = useCallback(
     (group: RowGroup, rowId: string) => {
       if (!groupColumn) return;
 
       if (!canEdit) {
+        setRefusedId(rowId);
         pushFeedback(`You do not have permission to change ${groupColumn.name}`, "error");
         return;
       }
@@ -70,6 +79,7 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
         const verdict = evaluateTransition(groupColumn, from, transitionKeyOf(group.key));
 
         if (!verdict.isAllowed) {
+          setRefusedId(rowId);
           pushFeedback(verdict.reason ?? "That status change is not allowed", "error");
           return;
         }
@@ -78,24 +88,24 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
       const value = groupValueFor(groupColumn, group.key);
       if (!value) return;
 
+      // Optimistic: the store writes the record, then reconciles or reverts on
+      // its own if the service refuses. Nothing here refetches the board.
       void editCells([{ rowId, columnId: groupColumn.id, value }]);
     },
     [groupColumn, canEdit, editCells, pushFeedback, rowsById],
   );
 
   /**
-   * Which columns the card being dragged may actually land in. Shown while a
-   * drag is in flight so a refused drop is visible before it is attempted,
-   * rather than only as a toast afterwards.
+   * Which columns the card being dragged may land in — resolved once, when the
+   * drag starts, so hovering a column is a set lookup rather than a rule
+   * evaluation, and never a request.
    */
   const reachable = useMemo<ReadonlySet<string> | null>(() => {
     if (!draggingId || !groupColumn || groupColumn.type !== "select") return null;
-
-    const rules = groupColumn.config.transitionRules;
-    if (!rules?.enabled) return null;
+    if (!groupColumn.config.transitionRules?.enabled) return null;
 
     const from = transitionKeyOf(groupKeyOf(draggingId, rowsById, groupColumn));
-    return new Set([from, ...(rules.transitions[from] ?? [])]);
+    return new Set(allowedTargets(groupColumn, from));
   }, [draggingId, groupColumn, rowsById]);
 
   if (!groupColumn || !groups) {
@@ -124,122 +134,157 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
     if (rowId) drop(group, rowId);
   }
 
+  const isDragging = draggingId !== null;
+
   return (
     <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden bg-canvas">
       <div className="flex h-full min-w-max items-stretch gap-3 p-3">
-        {groups.map((group) => (
-          <section
-            key={group.key}
-            aria-label={group.label}
-            onDragOver={(event) => {
-              event.preventDefault();
-              event.dataTransfer.dropEffect =
-                canEdit && isDroppable(group.key) ? "move" : "none";
-              setOverKey(group.key);
-            }}
-            onDragLeave={() => setOverKey((key) => (key === group.key ? null : key))}
-            onDrop={(event) => handleDrop(event, group)}
-            className={cn(
-              "flex w-72 shrink-0 flex-col rounded-xl border bg-background/60 transition-colors",
-              overKey === group.key && draggingId
-                ? canEdit && isDroppable(group.key)
-                  ? "border-accent bg-accent-soft"
-                  : "border-danger/40 bg-danger/5"
-                : "border-border",
-              // A rule that forbids this column says so while the card is in
-              // the air, not after it has been dropped and bounced back.
-              draggingId && !isDroppable(group.key) && overKey !== group.key && "opacity-45",
-            )}
-          >
-            <header className="flex shrink-0 items-center gap-2 border-b border-hairline px-3 py-2.5">
-              {group.color ? (
-                <span
-                  className={cn(
-                    "rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                    SELECT_COLOR_CLASSES[group.color],
-                  )}
-                >
-                  {group.label}
-                </span>
-              ) : (
-                <span
-                  className={cn(
-                    "text-[12px] font-medium",
-                    group.key === UNGROUPED_KEY ? "text-faint-foreground" : "text-foreground",
-                  )}
-                >
-                  {group.key === UNGROUPED_KEY ? `No ${groupColumn.name.toLowerCase()}` : group.label}
-                </span>
+        {groups.map((group) => {
+          const isOver = overKey === group.key && isDragging;
+          const canLand = isDroppable(group.key);
+
+          return (
+            <section
+              key={group.key}
+              aria-label={group.label}
+              // Always a valid drop target while the user may edit: refusing
+              // the drop outright would swallow the drop event, and with it
+              // the explanation the reader needs.
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = canEdit ? "move" : "none";
+                setOverKey(group.key);
+              }}
+              // dragleave also fires when the pointer crosses into a child, so
+              // the column only lets go once the pointer is genuinely outside.
+              onDragLeave={(event) => {
+                const next = event.relatedTarget;
+                if (next instanceof Node && event.currentTarget.contains(next)) return;
+                setOverKey((key) => (key === group.key ? null : key));
+              }}
+              onDrop={(event) => handleDrop(event, group)}
+              className={cn(
+                "flex w-72 shrink-0 flex-col rounded-xl border bg-background/60 transition-[opacity,border-color,background-color] duration-150",
+                "border-border",
+                // While a card is in the air: valid targets lift gently, ones a
+                // rule rules out fade back. Two states, no colour wash.
+                isDragging && canLand && "border-dashed border-accent/40",
+                isDragging && !canLand && "opacity-60",
+                isOver && canLand && "border-solid border-accent bg-accent-soft",
+                isOver && !canLand && "border-solid border-danger/50 bg-danger/5 opacity-100",
               )}
+            >
+              <header className="flex shrink-0 items-center gap-2 border-b border-hairline px-3 py-2.5">
+                {group.color ? (
+                  <span
+                    className={cn(
+                      "rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                      SELECT_COLOR_CLASSES[group.color],
+                    )}
+                  >
+                    {group.label}
+                  </span>
+                ) : (
+                  <span
+                    className={cn(
+                      "text-[12px] font-medium",
+                      group.key === UNGROUPED_KEY ? "text-faint-foreground" : "text-foreground",
+                    )}
+                  >
+                    {group.key === UNGROUPED_KEY
+                      ? `No ${groupColumn.name.toLowerCase()}`
+                      : group.label}
+                  </span>
+                )}
 
-              <Badge variant="default" className="ml-auto">
-                {group.rowIds.length}
-              </Badge>
-            </header>
+                {isDragging && !canLand ? (
+                  <span
+                    className="ml-auto flex items-center gap-1 text-[10px] text-faint-foreground"
+                    title="A transition rule does not allow this move"
+                  >
+                    <Workflow className="size-3" />
+                    not from here
+                  </span>
+                ) : (
+                  <Badge variant="default" className="ml-auto">
+                    {group.rowIds.length}
+                  </Badge>
+                )}
+              </header>
 
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
-              {group.rowIds.slice(0, limits[group.key] ?? CARDS_PER_PAGE).map((rowId) => (
-                <RecordCard
-                  key={rowId}
-                  rowId={rowId}
-                  primaryColumnId={board?.primaryColumnId ?? ""}
-                  fields={cardFields}
-                  context={context}
-                  canDrag={canEdit}
-                  hierarchy={model.hierarchy}
-                  completionColumn={model.completionColumn}
-                  onDragStart={setDraggingId}
-                  onDragEnd={() => setDraggingId(null)}
-                />
-              ))}
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
+                {group.rowIds.slice(0, limits[group.key] ?? CARDS_PER_PAGE).map((rowId) => (
+                  <div
+                    key={rowId}
+                    className={cn(refusedId === rowId && "animate-nudge")}
+                    onAnimationEnd={() => setRefusedId((id) => (id === rowId ? null : id))}
+                  >
+                    <RecordCard
+                      rowId={rowId}
+                      primaryColumnId={board?.primaryColumnId ?? ""}
+                      fields={cardFields}
+                      context={context}
+                      canDrag={canEdit}
+                      hierarchy={model.hierarchy}
+                      completionColumn={model.completionColumn}
+                      onDragStart={setDraggingId}
+                      onDragEnd={() => {
+                        setDraggingId(null);
+                        setOverKey(null);
+                      }}
+                    />
+                  </div>
+                ))}
 
-              {group.rowIds.length > (limits[group.key] ?? CARDS_PER_PAGE) && (
+                {group.rowIds.length > (limits[group.key] ?? CARDS_PER_PAGE) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full text-[11px]"
+                    onClick={() =>
+                      setLimits((current) => ({
+                        ...current,
+                        [group.key]: (current[group.key] ?? CARDS_PER_PAGE) + CARDS_PER_PAGE,
+                      }))
+                    }
+                  >
+                    Show{" "}
+                    {Math.min(
+                      CARDS_PER_PAGE,
+                      group.rowIds.length - (limits[group.key] ?? CARDS_PER_PAGE),
+                    )}{" "}
+                    more of {group.rowIds.length}
+                  </Button>
+                )}
+
+                {group.rowIds.length === 0 && (
+                  <p className="px-1 py-4 text-center text-[11px] text-faint-foreground">
+                    {formatCount(0, "record")}
+                  </p>
+                )}
+              </div>
+
+              {canEdit && group.key !== UNGROUPED_KEY && (
                 <Button
                   size="sm"
-                  variant="outline"
-                  className="w-full text-[11px]"
-                  onClick={() =>
-                    setLimits((current) => ({
-                      ...current,
-                      [group.key]: (current[group.key] ?? CARDS_PER_PAGE) + CARDS_PER_PAGE,
-                    }))
-                  }
+                  variant="ghost"
+                  className="m-1 shrink-0 justify-start gap-1.5 text-[12px]"
+                  onClick={() => {
+                    void addRow().then((rowId) => {
+                      const value = groupValueFor(groupColumn, group.key);
+                      if (rowId && value) {
+                        void editCells([{ rowId, columnId: groupColumn.id, value }]);
+                      }
+                    });
+                  }}
                 >
-                  Show {Math.min(
-                    CARDS_PER_PAGE,
-                    group.rowIds.length - (limits[group.key] ?? CARDS_PER_PAGE),
-                  )}{" "}
-                  more of {group.rowIds.length}
+                  <Plus />
+                  New in {group.label}
                 </Button>
               )}
-
-              {group.rowIds.length === 0 && (
-                <p className="px-1 py-4 text-center text-[11px] text-faint-foreground">
-                  {formatCount(0, "record")}
-                </p>
-              )}
-            </div>
-
-            {canEdit && group.key !== UNGROUPED_KEY && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="m-1 shrink-0 justify-start gap-1.5 text-[12px]"
-                onClick={() => {
-                  void addRow().then((rowId) => {
-                    const value = groupValueFor(groupColumn, group.key);
-                    if (rowId && value) {
-                      void editCells([{ rowId, columnId: groupColumn.id, value }]);
-                    }
-                  });
-                }}
-              >
-                <Plus />
-                New in {group.label}
-              </Button>
-            )}
-          </section>
-        ))}
+            </section>
+          );
+        })}
       </div>
     </div>
   );

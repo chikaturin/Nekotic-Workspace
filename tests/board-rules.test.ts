@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
   conditionOperatorsFor,
   describeCondition,
@@ -19,7 +19,15 @@ import {
 } from "@/lib/conditions";
 import { guardCellEdits } from "@/lib/board-write-rules";
 import {
+  allowAllTransitions,
   allowedTargets,
+  clearAllTransitions,
+  clearTransitionsFor,
+  isGoverned,
+  linearTransitions,
+  setTransitions,
+  strandedKeys,
+  ungovernedKeys,
   EMPTY_OPTION_KEY,
   evaluateTransition,
   pruneTransitionRules,
@@ -154,12 +162,100 @@ describe("transition rules", () => {
     expect(evaluateTransition(statusColumn(USER_RULES), UNGROUPED_KEY, DONE).isAllowed).toBe(false);
   });
 
-  test("seeding turns the rules on with everything still reachable", () => {
+  test("the refusal says where the record can go instead", () => {
+    const verdict = evaluateTransition(statusColumn(USER_RULES), DEBUG, DONE);
+
+    expect(verdict.reason).toContain("Debug can move to Fixing");
+  });
+
+  test("turning rules on starts from the column's own order, both ways", () => {
     const options = statusColumn().config.options;
     const seeded = seedTransitionRules(options);
+    const column = statusColumn(seeded);
 
     expect(seeded.enabled).toBe(true);
-    expect(evaluateTransition(statusColumn(seeded), DEBUG, DONE).isAllowed).toBe(true);
+    // Debug → Fixing → Review → Done, and back again — but never a skip.
+    expect(evaluateTransition(column, DEBUG, FIXING).isAllowed).toBe(true);
+    expect(evaluateTransition(column, FIXING, DEBUG).isAllowed).toBe(true);
+    expect(evaluateTransition(column, REVIEW, DONE).isAllowed).toBe(true);
+    expect(evaluateTransition(column, DEBUG, DONE).isAllowed).toBe(false);
+  });
+
+  test("a linear preset without backward moves is one-way", () => {
+    const column = statusColumn(linearTransitions(statusColumn().config.options));
+
+    expect(evaluateTransition(column, FIXING, REVIEW).isAllowed).toBe(true);
+    expect(evaluateTransition(column, REVIEW, FIXING).isAllowed).toBe(false);
+  });
+
+  test("allow-all governs every status and refuses nothing", () => {
+    const options = statusColumn().config.options;
+    const rules = allowAllTransitions(options);
+    const column = statusColumn(rules);
+
+    expect(ungovernedKeys(rules, options)).toEqual([]);
+    expect(evaluateTransition(column, DEBUG, DONE).isAllowed).toBe(true);
+  });
+
+  test("clear-all governs every status and refuses everything", () => {
+    const options = statusColumn().config.options;
+    const rules = clearAllTransitions(options);
+
+    expect(strandedKeys(rules, options)).toEqual(transitionKeys(options));
+    expect(evaluateTransition(statusColumn(rules), DEBUG, FIXING).isAllowed).toBe(false);
+  });
+
+  /**
+   * Adding a status must never freeze it, or the board around it. A rule table
+   * that says nothing about a status is not a rule refusing every move — it is
+   * the absence of a decision.
+   */
+  test("a status the table does not mention is unrestricted", () => {
+    const TESTING = "o_testing";
+    const options = [
+      ...statusColumn().config.options,
+      { id: TESTING, label: "Testing", color: "amber" } as const,
+    ];
+
+    const column: BoardColumnOf<"select"> = {
+      ...statusColumn(USER_RULES),
+      config: { ...statusColumn(USER_RULES).config, options },
+    };
+
+    expect(ungovernedKeys(USER_RULES, options)).toEqual([TESTING]);
+    // Out of the new status, and into it from a governed one.
+    expect(evaluateTransition(column, TESTING, DONE).isAllowed).toBe(true);
+    expect(evaluateTransition(column, DEBUG, TESTING).isAllowed).toBe(true);
+    // ...while the rules that *were* written still hold.
+    expect(evaluateTransition(column, DEBUG, DONE).isAllowed).toBe(false);
+    expect(allowedTargets(column, DEBUG)).toContain(TESTING);
+  });
+
+  test("a governed status with no targets is stranded, and resettable", () => {
+    const frozen = setTransitions(USER_RULES, DEBUG, []);
+    expect(evaluateTransition(statusColumn(frozen), DEBUG, FIXING).isAllowed).toBe(false);
+
+    const lifted = clearTransitionsFor(frozen, DEBUG);
+    expect(isGoverned(lifted, DEBUG)).toBe(false);
+    expect(evaluateTransition(statusColumn(lifted), DEBUG, FIXING).isAllowed).toBe(true);
+  });
+
+  /** Rules are keyed by option id, so a label is free to change. */
+  test("renaming a status leaves its transitions intact", () => {
+    const base = statusColumn(USER_RULES);
+    const renamed: BoardColumnOf<"select"> = {
+      ...base,
+      config: {
+        ...base.config,
+        options: base.config.options.map((option) =>
+          option.id === DEBUG ? { ...option, label: "Investigating" } : option,
+        ),
+      },
+    };
+
+    expect(evaluateTransition(renamed, DEBUG, FIXING).isAllowed).toBe(true);
+    expect(evaluateTransition(renamed, DEBUG, DONE).isAllowed).toBe(false);
+    expect(evaluateTransition(renamed, DEBUG, DONE).reason).toContain("Investigating");
   });
 
   test("toggling an edge adds it, then removes it", () => {
@@ -872,6 +968,47 @@ describe("rules through the board store", () => {
       kind: "select",
       optionIds: ["status_1"],
     });
+  });
+
+  /**
+   * A permitted move is still optimistic, and the service is still allowed to
+   * say no — the record has to come back, without the board being reloaded.
+   */
+  test("a permitted move that the service rejects rolls the record back", async () => {
+    const row = firstRow();
+
+    await useBoardStore.getState().editCells([
+      { rowId: row.id, columnId: "col_status", value: { kind: "select", optionIds: ["status_0"] } },
+    ]);
+    await enableRules({ status_0: ["status_1"], status_1: ["status_4"], status_4: [] });
+
+    const before = useBoardStore.getState().rowsById[row.id];
+    const rowCount = useBoardStore.getState().rowOrder.length;
+
+    const failing = vi
+      .spyOn(boardService, "updateCells")
+      .mockRejectedValue(new Error("the server said no"));
+    const reload = vi.spyOn(boardService, "getBoard");
+
+    try {
+      await useBoardStore.getState().editCells([
+        {
+          rowId: row.id,
+          columnId: "col_status",
+          value: { kind: "select", optionIds: ["status_1"] },
+        },
+      ]);
+    } finally {
+      failing.mockRestore();
+    }
+
+    const after = useBoardStore.getState().rowsById[row.id];
+    expect(after?.cells.col_status).toEqual(before?.cells.col_status);
+    expect(useWorkspaceStore.getState().feedback?.tone).toBe("error");
+    // No reload: the same records are still in place, fetched no further.
+    expect(reload).not.toHaveBeenCalled();
+    expect(useBoardStore.getState().rowOrder).toHaveLength(rowCount);
+    reload.mockRestore();
   });
 
   test("switching the rules off permits what they refused", async () => {
