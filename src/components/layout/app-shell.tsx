@@ -32,14 +32,22 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <TooltipProvider>
-      <div className="flex h-svh w-full overflow-hidden bg-background">
+      {/*
+        `overflow-clip`, not `overflow-hidden`.
+        Hidden still makes a scroll container — one that clips its scrollbar
+        away. So anything that scrolls a box programmatically, a focus landing
+        on a control that is out of view above all, could shove the entire
+        frame up and out of sight with nothing left to scroll it back. Clip
+        has no scrollport at all, so the frame cannot move.
+      */}
+      <div className="flex h-svh w-full overflow-clip bg-background">
         <AppSidebar />
 
         <div className="flex min-w-0 flex-1 flex-col">
           <AppHeader />
           <RolePreviewBanner />
           {/* Membership is settled before anything inside a workspace mounts. */}
-          <main className="min-h-0 flex-1 overflow-hidden">
+          <main className="min-h-0 flex-1 overflow-clip">
             <WorkspaceGuard>{children}</WorkspaceGuard>
           </main>
         </div>

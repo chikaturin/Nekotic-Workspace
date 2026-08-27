@@ -331,6 +331,40 @@
     text-rendering: optimizeLegibility;
   }
 
+  /**
+   * The document itself never scrolls.
+   *
+   * The app is a fixed frame — `AppShell` is exactly one viewport tall and
+   * every list inside it scrolls in its own box — so a scrollbar on the
+   * document is never anything but a bug. Pinning the height here is what
+   * makes that structural instead of a property of whichever page is open:
+   * without it, one overflowing element anywhere drags the whole frame,
+   * header and rail included, up out of view, and there is no scrollbar on
+   * the frame to bring it back.
+   */
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /**
+   * Scroll stops where it started.
+   *
+   * Reaching the end of a list and carrying on used to hand the rest of the
+   * gesture to whatever was behind it — which, in a frame with no scrollbar of
+   * its own, means the page slides away and cannot be slid back. The audit log
+   * is where it showed worst, but it was true of forty-odd scroll containers
+   * that each would have had to remember the same class.
+   *
+   * `overscroll-behavior` only does anything on a scroll container, so this is
+   * inert on every other element. `contain` rather than `none`: a list still
+   * gets its own overscroll affordance, it just cannot spend it on its parent.
+   */
+  * {
+    overscroll-behavior: contain;
+  }
+
   ::selection {
     background-color: var(--accent-soft);
   }

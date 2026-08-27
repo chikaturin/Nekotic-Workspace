@@ -197,3 +197,44 @@ describe("token scales", () => {
     expect(CSS).toContain("animation-duration: 0.01ms !important");
   });
 });
+
+/* ------------------------------------------------------------- the frame */
+
+const SHELL = readFileSync(
+  fileURLToPath(new URL("../src/components/layout/app-shell.tsx", import.meta.url)),
+  "utf8",
+);
+
+/**
+ * The app is a fixed frame, and every one of these is what keeps it fixed.
+ *
+ * They are asserted from the source because there is nothing else to assert
+ * them from: the failure is a CSS one, it shows up only in a browser, and what
+ * it looks like there is the whole product sliding out of view with no
+ * scrollbar left to bring it back. Each rule below is one of the ways that
+ * could happen, closed.
+ */
+describe("nothing scrolls the frame itself", () => {
+  test("the document has no scrollbar to offer in the first place", () => {
+    expect(CSS).toMatch(/html,\s*\n?\s*body\s*\{[^}]*height:\s*100%/);
+    expect(CSS).toMatch(/html,\s*\n?\s*body\s*\{[^}]*overflow:\s*hidden/);
+  });
+
+  /**
+   * `overflow: hidden` is still a scroll container — it only hides the
+   * scrollbar. A focus landing on a control that is out of view scrolls the
+   * nearest one, and on a frame that is the whole app. `clip` has no
+   * scrollport at all, which is the difference that matters here.
+   */
+  test("the frame and the main region clip rather than hide", () => {
+    expect(SHELL).toContain("h-svh w-full overflow-clip");
+    expect(SHELL).toContain('<main className="min-h-0 flex-1 overflow-clip">');
+    expect(SHELL).not.toMatch(/className="[^"]*\boverflow-hidden\b/);
+  });
+
+  /** A list that reaches its end must not spend the rest of the gesture on
+      whatever is behind it — which is how the frame moved in the first place. */
+  test("scroll is contained by default, not per scroll container", () => {
+    expect(CSS).toMatch(/\*\s*\{[^}]*overscroll-behavior:\s*contain/);
+  });
+});
