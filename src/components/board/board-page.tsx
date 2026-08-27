@@ -1,8 +1,8 @@
 "use client";
 
-import { TriangleAlert, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ApiDuplicateBanner } from "@/components/board/api-duplicate-banner";
+import { ConflictNotices } from "@/components/board/conflict-notices";
 import { BoardToolbar } from "@/components/board/board-toolbar";
 import { RowDrawer } from "@/components/board/drawer/row-drawer";
 import { ExportDialog } from "@/components/board/export/export-dialog";
@@ -13,7 +13,6 @@ import { CalendarBoard } from "@/components/board/views/calendar-board";
 import { KanbanBoard } from "@/components/board/views/kanban-board";
 import { GanttBoard } from "@/components/board/gantt/gantt-board";
 import { ErrorState, ListLoadingState, PermissionDeniedState } from "@/components/shared/state-panels";
-import { Button } from "@/components/ui/button";
 import { useBoard } from "@/hooks/use-board";
 import { useBoardView } from "@/hooks/use-board-view";
 import { useBoardExport } from "@/hooks/use-board-export";
@@ -59,8 +58,6 @@ export function BoardPage({ node }: { node: BoardNode }) {
     [nodeCan, node],
   );
   const canEdit = can("row.update");
-  const conflicts = useBoardStore((state) => state.conflicts);
-  const dismissConflict = useBoardStore((state) => state.dismissConflict);
   const rowsById = useBoardStore((state) => state.rowsById);
 
   const rowRequest = useWorkspaceStore((state) => state.rowRequest);
@@ -160,26 +157,7 @@ export function BoardPage({ node }: { node: BoardNode }) {
         canRestore={nodeCan("node.archive")}
       />
 
-      {conflicts.length > 0 && (
-        <ul className="shrink-0 divide-y divide-hairline border-b border-warning/30 bg-warning/10">
-          {conflicts.map((conflict) => (
-            <li key={conflict.id} className="flex items-center gap-2 px-4 py-1.5">
-              <TriangleAlert className="size-3.5 shrink-0 text-warning" />
-              <span className="min-w-0 flex-1 truncate text-ui text-foreground">
-                {conflict.message}
-              </span>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label="Dismiss"
-                onClick={() => dismissConflict(conflict.id)}
-              >
-                <X />
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ConflictNotices />
 
       {/* Every view renders the same records; only the reading changes. */}
       <ApiDuplicateBanner report={duplicates} />
