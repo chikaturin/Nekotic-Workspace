@@ -20,10 +20,18 @@
   --z-raised: 10;          /* a focused grid cell, a sticky column     */
   --z-sticky: 20;          /* sticky headers, the frozen first column  */
   --z-overlay: 30;         /* the grid's own in-flow cell editor       */
-  --z-dropdown: 40;        /* menus, popovers, listboxes               */
-  --z-modal: 50;           /* dialogs, drawers, their overlays         */
+  --z-modal: 40;           /* dialogs, drawers, their overlays         */
+  --z-dropdown: 50;        /* menus, popovers, listboxes               */
   --z-toast: 60;           /* above a modal, on purpose                */
   --z-tooltip: 70;         /* above everything, including a toast      */
+
+  /* Dropdown sits ABOVE modal, which looks wrong in a list and is right in
+   * practice: a menu is always opened *from* something, so it has to paint
+   * over whatever opened it. A Select inside a Dialog is the case that
+   * decides it — both portal to <body>, and if the menu ranked lower it would
+   * open behind the dialog that owns it. Ordering them by DOM insertion
+   * instead, which is what a shared z-50 was quietly doing, works until
+   * somebody opens two overlays in the other order. */
 
   /* ------------------------------------------------------------ elevation
    * Tailwind's stock shadows are black, which reads as dirt on the dark

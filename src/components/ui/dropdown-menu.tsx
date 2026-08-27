@@ -21,7 +21,7 @@ export function DropdownMenuContent({
       <DropdownMenuPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          "z-50 min-w-[11rem] overflow-hidden rounded-lg border border-border bg-elevated p-1 shadow-xl",
+          "z-dropdown min-w-[11rem] overflow-hidden rounded-lg border border-border bg-elevated p-1 shadow-pop",
           "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
           className,
         )}
@@ -112,7 +112,7 @@ export function DropdownMenuLabel({
   return (
     <DropdownMenuPrimitive.Label
       className={cn(
-        "px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground",
+        "px-2 py-1.5 text-micro font-semibold uppercase tracking-wider text-faint-foreground",
         className,
       )}
       {...props}
@@ -130,7 +130,7 @@ export function DropdownMenuSeparator({
 export function DropdownMenuShortcut({ className, ...props }: ComponentProps<"span">) {
   return (
     <span
-      className={cn("metric ml-auto text-[10px] tracking-widest text-faint-foreground", className)}
+      className={cn("metric ml-auto text-micro tracking-widest text-faint-foreground", className)}
       {...props}
     />
   );
@@ -163,7 +163,7 @@ export function DropdownMenuSubContent({
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.SubContent
         className={cn(
-          "z-50 min-w-[10rem] overflow-hidden rounded-lg border border-border bg-elevated p-1 shadow-xl",
+          "z-dropdown min-w-[10rem] overflow-hidden rounded-lg border border-border bg-elevated p-1 shadow-pop",
           "animate-in fade-in-0 zoom-in-95",
           className,
         )}

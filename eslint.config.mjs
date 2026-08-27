@@ -42,7 +42,7 @@ const config = [
         "error",
         bannedClassName(
           "\\btext-\\[\\d",
-          "Use a typography token — text-micro (10) / text-body (11) / text-base (12) / text-lead (13) / text-title (15) / text-display (18) / text-code. An arbitrary pixel size is how 568 of them ended up on screen with no rule behind any of them.",
+          "Use a typography token — text-micro (10) / text-body (11) / text-ui (12) / text-lead (13) / text-title (15) / text-display (18) / text-code. An arbitrary pixel size is how 568 of them ended up on screen with no rule behind any of them.",
         ),
         bannedClassName(
           "\\bz-\\[?\\d",
@@ -53,11 +53,11 @@ const config = [
           "Use shadow-raise / shadow-pop / shadow-float. Tailwind's stock shadows are black, which reads as dirt on this app's navy dark theme rather than as lift.",
         ),
         bannedClassName(
-          "disabled:opacity-\d",
+          "disabled:opacity-\\d",
           "Disabled is one value: disabled:opacity-[var(--disabled-opacity)] — or the is-disabled utility when the state is not the DOM `disabled` attribute. It was five different values, so nothing disabled looked the same as anything else disabled.",
         ),
         bannedClassName(
-          "\bopacity-(30|55|70)\b",
+          "\\bopacity-(30|55|70)\\b",
           "Off the state scale. Use is-disabled / is-dragging / is-pending / is-frozen, which name what is true rather than how faded it happens to be.",
         ),
         {

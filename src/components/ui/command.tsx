@@ -16,11 +16,11 @@ export function Command({ className, ...props }: ComponentProps<typeof CommandPr
 
 export function CommandInput({ className, ...props }: ComponentProps<typeof CommandPrimitive.Input>) {
   return (
-    <div className="flex items-center gap-2.5 border-b border-border px-3.5" cmdk-input-wrapper="">
-      <Search className="size-4 shrink-0 text-faint-foreground" />
+    <div className="flex items-center gap-2 border-b border-border px-2" cmdk-input-wrapper="">
+      <Search className="size-3.5 shrink-0 text-faint-foreground" />
       <CommandPrimitive.Input
         className={cn(
-          "flex h-12 w-full bg-transparent text-sm outline-none placeholder:text-faint-foreground disabled:opacity-50",
+          "flex h-12 w-full bg-transparent text-ui outline-none placeholder:text-faint-foreground disabled:opacity-[var(--disabled-opacity)]",
           className,
         )}
         {...props}
@@ -53,7 +53,7 @@ export function CommandGroup({ className, ...props }: ComponentProps<typeof Comm
       className={cn(
         "overflow-hidden text-foreground",
         "[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5",
-        "[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold",
+        "[&_[cmdk-group-heading]]:text-micro [&_[cmdk-group-heading]]:font-semibold",
         "[&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider",
         "[&_[cmdk-group-heading]]:text-faint-foreground",
         className,

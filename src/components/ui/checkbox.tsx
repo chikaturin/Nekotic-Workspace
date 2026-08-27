@@ -32,7 +32,7 @@ export function Checkbox({
         }}
         className={cn(
           "size-4 cursor-pointer appearance-none rounded border transition-colors outline-none",
-          "focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40",
+          "focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-[var(--disabled-opacity)]",
           isMarked ? "border-accent bg-accent" : "border-border-strong bg-surface hover:border-accent",
         )}
         {...props}

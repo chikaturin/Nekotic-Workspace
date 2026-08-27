@@ -25,7 +25,7 @@ export function TooltipContent({
       <TooltipPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          "z-50 overflow-hidden rounded-md border border-border bg-elevated px-2 py-1 text-xs text-foreground shadow-lg",
+          "z-tooltip overflow-hidden rounded-md border border-border bg-elevated px-2 py-1 text-ui text-foreground shadow-pop",
           "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
           className,
         )}
