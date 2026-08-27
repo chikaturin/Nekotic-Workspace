@@ -7,7 +7,6 @@ import {
   Briefcase,
   Clock,
   FolderPlus,
-  Component,
   HardDrive,
   LayoutDashboard,
   Moon,
@@ -158,17 +157,6 @@ export function AppSidebar() {
               isCollapsed={isCollapsed}
             />
           )}
-
-          {/* In the rail rather than in a README, because the question it
-              answers — "does this control already exist" — is asked while
-              somebody is already in the app, about to write a sixth version
-              of something the system has had all along. */}
-          <SidebarNavItem
-            href="/design-system"
-            label="Design system"
-            icon={Component}
-            isCollapsed={isCollapsed}
-          />
         </SidebarSection>
       </div>
 
