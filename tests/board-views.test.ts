@@ -335,6 +335,58 @@ describe("gantt scale", () => {
     expect(weekScale.dayWidth).toBe(DAY_WIDTH.week);
   });
 
+  /**
+   * A chart that opens on a range the reader is not living in makes them hunt
+   * for the present before they can read anything, so today is in the window
+   * whether or not any record happens to be near it.
+   */
+  test("today is inside the window even when every record is months away", () => {
+    const past = timelineScale(
+      rowIds,
+      index.rowsById,
+      start,
+      due,
+      "week",
+      "2026-12-25T00:00:00.000Z",
+    );
+
+    expect(past.todayOffset).toBeGreaterThanOrEqual(0);
+    expect(past.todayOffset).toBeLessThan(past.dayCount);
+    expect(offsetToIso(past, past.todayOffset)).toBe("2026-12-25T00:00:00.000Z");
+  });
+
+  test("a record dated years out trims the window instead of stretching it", () => {
+    const far = [
+      ...rows,
+      makeRow("r4", {
+        c_start: { kind: "date", iso: "2090-01-01T00:00:00.000Z" },
+        c_due: { kind: "date", iso: "2090-02-01T00:00:00.000Z" },
+      }),
+    ];
+
+    const scale = timelineScale(
+      ["r1", "r2", "r3", "r4"],
+      indexRows(far).rowsById,
+      start,
+      due,
+      "week",
+      "2026-08-12T00:00:00.000Z",
+    );
+
+    expect(scale.dayCount).toBeLessThan(2500);
+    // The present survives the trim; the outlier is what falls off.
+    expect(offsetToIso(scale, scale.todayOffset)).toBe("2026-08-12T00:00:00.000Z");
+  });
+
+  test("the header bands name each month once, covering the whole window", () => {
+    const scale = timelineScale(rowIds, index.rowsById, start, due, "day", "2026-08-12T00:00:00.000Z");
+    const keys = scale.bands.map((band) => band.key);
+
+    expect(keys).toEqual([...new Set(keys)]);
+    expect(scale.bands.reduce((total, band) => total + band.days, 0)).toBe(scale.dayCount);
+    expect(scale.bands[0]?.offset).toBe(0);
+  });
+
   test("the chart offers four scales, widest day to narrowest quarter", () => {
     expect(TIMELINE_ZOOMS).toEqual(["day", "week", "month", "quarter"]);
 

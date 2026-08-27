@@ -59,11 +59,34 @@ const PADDING_DAYS = 3;
 const FALLBACK_SPAN_DAYS = 30;
 const MIN_BAR_DAYS = 1;
 
+/**
+ * The widest window the chart will build.
+ *
+ * One record dated years out would otherwise stretch the timeline across a
+ * decade of empty columns, which costs DOM and tells the reader nothing. The
+ * window is clamped around today instead, and the outlier is simply off-screen.
+ */
+const MAX_RANGE_DAYS = 1100;
+
 export interface TimelineTick {
   readonly iso: string;
   readonly offset: number;
   readonly label: string;
   readonly isMajor: boolean;
+}
+
+/**
+ * The upper row of the header: the month (or year) a run of ticks belongs to.
+ *
+ * A scale that only labels "17 Aug, 24 Aug, 31 Aug" makes the reader carry the
+ * month in their head. Naming the span above the columns is what turns a row of
+ * dates into a calendar.
+ */
+export interface TimelineBand {
+  readonly key: string;
+  readonly offset: number;
+  readonly days: number;
+  readonly label: string;
 }
 
 export interface TimelineBar {
@@ -84,7 +107,9 @@ export interface TimelineScale {
   readonly dayCount: number;
   readonly dayWidth: number;
   readonly ticks: readonly TimelineTick[];
-  readonly todayOffset: number | null;
+  readonly bands: readonly TimelineBand[];
+  /** Whole days from the range start; never null — today is always in range. */
+  readonly todayOffset: number;
 }
 
 /**
@@ -149,7 +174,14 @@ export function buildBars(
   return bars;
 }
 
-/** The window the chart spans, padded around whatever the records occupy. */
+/**
+ * The window the chart spans.
+ *
+ * Today is always inside it. A chart that opens on a range the reader is not
+ * living in — because every record happens to sit last quarter — makes them
+ * hunt for the present before they can read anything, so the present is part
+ * of the range by construction rather than by luck.
+ */
 export function timelineScale(
   rowIds: readonly string[],
   rows: RowMap,
@@ -158,8 +190,10 @@ export function timelineScale(
   zoom: TimelineZoom,
   todayIso: string,
 ): TimelineScale {
-  let min = Number.POSITIVE_INFINITY;
-  let max = Number.NEGATIVE_INFINITY;
+  const today = dayIndex(todayIso);
+
+  let min = today;
+  let max = today;
 
   for (const rowId of rowIds) {
     for (const iso of [readDate(rowId, rows, startColumn), readDate(rowId, rows, endColumn)]) {
@@ -170,25 +204,58 @@ export function timelineScale(
     }
   }
 
-  const today = dayIndex(todayIso);
-  if (!Number.isFinite(min)) {
-    min = today;
-    max = today + FALLBACK_SPAN_DAYS;
-  }
+  if (min === max) max = today + FALLBACK_SPAN_DAYS;
 
-  const startIso = startOfDay(isoFromDayIndex(min - PADDING_DAYS));
+  // Clamp around today rather than around the data, so an outlier trims the
+  // far end instead of pushing the present off the chart.
+  min = Math.max(min, today - MAX_RANGE_DAYS);
+  max = Math.min(max, today + MAX_RANGE_DAYS);
+
+  const from = min - PADDING_DAYS;
+  const startIso = startOfDay(isoFromDayIndex(from));
   const dayCount = max - min + 1 + PADDING_DAYS * 2;
-  const todayOffset = today >= min - PADDING_DAYS && today <= max + PADDING_DAYS
-    ? today - (min - PADDING_DAYS)
-    : null;
 
   return {
     startIso,
     dayCount,
     dayWidth: DAY_WIDTH[zoom],
     ticks: buildTicks(startIso, dayCount, zoom),
-    todayOffset,
+    bands: buildBands(startIso, dayCount, zoom),
+    todayOffset: today - from,
   };
+}
+
+/**
+ * The header's upper row: one entry per month, or per year once a month is too
+ * narrow to hold its own name.
+ */
+function buildBands(
+  startIso: string,
+  dayCount: number,
+  zoom: TimelineZoom,
+): readonly TimelineBand[] {
+  const bands: TimelineBand[] = [];
+  const byYear = zoom === "quarter";
+
+  for (let offset = 0; offset < dayCount; offset += 1) {
+    const iso = addDays(startIso, offset);
+    const key = byYear ? iso.slice(0, 4) : iso.slice(0, 7);
+    const last = bands[bands.length - 1];
+
+    if (last && last.key === key) {
+      bands[bands.length - 1] = { ...last, days: last.days + 1 };
+      continue;
+    }
+
+    bands.push({
+      key,
+      offset,
+      days: 1,
+      label: byYear ? iso.slice(0, 4) : monthLabel(iso),
+    });
+  }
+
+  return bands;
 }
 
 /**

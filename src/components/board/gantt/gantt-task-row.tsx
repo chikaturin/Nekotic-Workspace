@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, TriangleAlert } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo } from "react";
 import type { GanttRow } from "@/lib/board-gantt";
 import { selectRow, useBoardStore } from "@/store/board-store";
@@ -74,13 +74,6 @@ export const GanttTaskRow = memo(function GanttTaskRow({
         <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">
           {label || "Untitled"}
         </span>
-
-        {row.isInvalid && (
-          <TriangleAlert
-            className="size-3 shrink-0 text-danger"
-            aria-label="Start date is after the end date"
-          />
-        )}
 
         {row.progress && (
           <span className="metric shrink-0 text-[10px] text-faint-foreground">

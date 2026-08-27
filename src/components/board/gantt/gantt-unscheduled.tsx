@@ -3,9 +3,17 @@
 import { CalendarPlus, ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import type { GanttRow } from "@/lib/board-gantt";
+import type { GanttGap, GanttRow } from "@/lib/board-gantt";
 import { selectRow, useBoardStore } from "@/store/board-store";
+import { cn } from "@/lib/utils";
 import { useGridStore } from "@/store/grid-store";
+
+/** Why the chart could not place a record — named, so it can be fixed. */
+const GAP_LABELS: Readonly<Record<GanttGap, string>> = {
+  none: "no dates",
+  partial: "needs both dates",
+  inverted: "start is after end",
+};
 
 interface GanttUnscheduledProps {
   readonly rows: readonly GanttRow[];
@@ -19,16 +27,19 @@ interface GanttUnscheduledProps {
  * rather than dropped — a chart that quietly omits part of the board is a chart
  * that misrepresents it. Opening one goes to its drawer, where the dates are.
  *
- * Records whose start is after their end land here too, flagged: the chart will
- * not draw an impossible bar, and it will not silently reorder what someone
- * typed either.
+ * Three things land here, each saying which date is missing or wrong:
+ *
+ *   - neither date set,
+ *   - only one of the two set, because one date is not a duration — drawing a
+ *     one-day bar from a lone start invents an end the record never claimed,
+ *   - the start after the end, which the chart reports rather than reorders.
  */
 export function GanttUnscheduled({ rows, primaryColumnId }: GanttUnscheduledProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   if (rows.length === 0) return null;
 
-  const invalid = rows.filter((row) => row.isInvalid).length;
+  const invalid = rows.filter((row) => row.gap === "inverted").length;
 
   return (
     <section className="shrink-0 border-t border-border bg-background">
@@ -46,9 +57,7 @@ export function GanttUnscheduled({ rows, primaryColumnId }: GanttUnscheduledProp
         <CalendarPlus className="size-3.5 text-faint-foreground" />
         <span className="text-[12px] text-foreground">Unscheduled</span>
         <Badge variant="default">{rows.length}</Badge>
-        {invalid > 0 && (
-          <Badge variant="danger">{invalid} with the start after the end</Badge>
-        )}
+        {invalid > 0 && <Badge variant="danger">{invalid} with the start after the end</Badge>}
       </button>
 
       {isOpen && (
@@ -88,9 +97,14 @@ function UnscheduledRow({
         <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">
           {label || "Untitled"}
         </span>
-        {row.isInvalid && (
-          <span className="shrink-0 text-[10px] text-danger">start is after end</span>
-        )}
+        <span
+          className={cn(
+            "shrink-0 text-[10px]",
+            row.gap === "inverted" ? "text-danger" : "text-faint-foreground",
+          )}
+        >
+          {GAP_LABELS[row.gap ?? "none"]}
+        </span>
       </button>
     </li>
   );

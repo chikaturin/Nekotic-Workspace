@@ -2,7 +2,6 @@
 
 import { memo, useMemo } from "react";
 import { GanttBar } from "@/components/board/gantt/gantt-bar";
-import type { GanttDrag } from "@/hooks/use-gantt-drag";
 import { longDayLabel } from "@/lib/board-dates";
 import type { GanttRow } from "@/lib/board-gantt";
 import { cellOf, cellText, type CellContext } from "@/lib/cell-values";
@@ -15,16 +14,12 @@ interface GanttLaneProps {
   readonly primaryColumnId: string;
   /** Columns worth naming in the tooltip — the view's own visible ones. */
   readonly columns: readonly BoardColumn[];
-  readonly startColumn: BoardColumn | null;
-  readonly endColumn: BoardColumn | null;
   /** The select column the board designates as meaning "finished". */
   readonly statusColumn: BoardColumnOf<"select"> | null;
   readonly context: CellContext;
   readonly dayWidth: number;
   readonly height: number;
-  readonly canEdit: boolean;
   readonly hasConflict: boolean;
-  readonly drag: GanttDrag;
 }
 
 /**
@@ -38,15 +33,11 @@ export const GanttLane = memo(function GanttLane({
   row,
   primaryColumnId,
   columns,
-  startColumn,
-  endColumn,
   statusColumn,
   context,
   dayWidth,
   height,
-  canEdit,
   hasConflict,
-  drag,
 }: GanttLaneProps) {
   const record = useBoardStore(selectRow(row.rowId));
   const isOpen = useGridStore((state) => state.drawerRowId === row.rowId);
@@ -78,8 +69,10 @@ export const GanttLane = memo(function GanttLane({
     lines.push(`Start: ${longDayLabel(row.schedule.startIso)}`);
     lines.push(`End: ${longDayLabel(row.schedule.endIso)}`);
 
-    if (row.isDerived) lines.push("Derived from subtasks — edit the subtasks' dates");
-    if (row.isPartial) lines.push(`Only ${startColumn && endColumn ? "one date" : "one date column"} is set`);
+    lines.push(`Duration: ${row.schedule.span} day${row.schedule.span === 1 ? "" : "s"}`);
+    if (row.isDerived) {
+      lines.push("Summary of its subtasks — set the dates on the subtasks");
+    }
 
     for (const column of columns) {
       if (column.type !== "select" && column.type !== "user") continue;
@@ -93,7 +86,7 @@ export const GanttLane = memo(function GanttLane({
     if (hasConflict) lines.push("⚠ Starts before something it is blocked by finishes");
 
     return lines.join("\n");
-  }, [record, row, label, columns, context, startColumn, endColumn, hasConflict]);
+  }, [record, row, label, columns, context, hasConflict]);
 
   if (!record) return null;
 
@@ -104,11 +97,10 @@ export const GanttLane = memo(function GanttLane({
         dayWidth={dayWidth}
         label={label || record.displayId}
         color={color}
-        canEdit={canEdit}
         isOpen={isOpen}
         hasConflict={hasConflict}
         tooltip={tooltip}
-        drag={drag}
+        onOpen={() => useGridStore.getState().openDrawer(row.rowId)}
       />
     </div>
   );

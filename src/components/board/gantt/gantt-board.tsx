@@ -1,40 +1,35 @@
 "use client";
 
 import { CalendarOff } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { GanttDependencies } from "@/components/board/gantt/gantt-dependencies";
+import { GanttGridLayer } from "@/components/board/gantt/gantt-grid-layer";
 import { GanttLane } from "@/components/board/gantt/gantt-lane";
 import { GanttSetup } from "@/components/board/gantt/gantt-setup";
 import { GanttTaskRow } from "@/components/board/gantt/gantt-task-row";
+import { GanttTimelineHeader } from "@/components/board/gantt/gantt-timeline-header";
 import { GanttToolbar } from "@/components/board/gantt/gantt-toolbar";
 import { GanttUnscheduled } from "@/components/board/gantt/gantt-unscheduled";
 import { StatePanel } from "@/components/shared/state-panels";
 import { MOCK_NOW } from "@/config/app";
 import type { BoardViewModel } from "@/hooks/use-board-view";
-import { useGanttDrag } from "@/hooks/use-gantt-drag";
 import { useVirtualRows } from "@/hooks/use-virtual-rows";
-import { isWeekend } from "@/lib/board-dates";
 import { buildGanttLinks, buildGanttRows } from "@/lib/board-gantt";
 import { layoutHierarchy } from "@/lib/board-hierarchy";
 import { timelineScale } from "@/lib/board-timeline";
 import { formatCount } from "@/lib/format";
-import { addDays } from "@/lib/board-dates";
 import { selectCollapsedParents, useGridStore } from "@/store/grid-store";
 import { useBoardStore } from "@/store/board-store";
-import { cn } from "@/lib/utils";
 import type { GanttZoom } from "@/types";
 
-const ROW_HEIGHT = 34;
-const HEADER_HEIGHT = 32;
-const DEFAULT_PANEL_WIDTH = 268;
-const MIN_PANEL_WIDTH = 160;
-const MAX_PANEL_WIDTH = 520;
-/** Below this a weekend stripe is thinner than its own border. */
-const WEEKEND_MIN_DAY_WIDTH = 12;
+const ROW_HEIGHT = 30;
+const HEADER_HEIGHT = 44;
+const DEFAULT_PANEL_WIDTH = 280;
+const MIN_PANEL_WIDTH = 180;
+const MAX_PANEL_WIDTH = 560;
 
 interface GanttBoardProps {
   readonly model: BoardViewModel;
-  readonly canEdit: boolean;
 }
 
 /**
@@ -47,19 +42,28 @@ interface GanttBoardProps {
  *
  * Two structures sit side by side: a task panel that stays put while the chart
  * scrolls sideways, and a chart whose lanes line up with it row for row. Both
- * mount only what is on screen.
+ * are driven by one virtual window, so the name on the left is always the bar
+ * on the right.
+ *
+ * The chart is a *view* of the schedule and does not edit it. Dragging a bar to
+ * a new date was removed: a chart that rewrites dates on a mouse slip is worse
+ * than one that asks you to type them, and the drawer and the grid already have
+ * proper date editors. Clicking a bar opens the record, where the dates live.
+ *
+ * Rendering is layered — background rules, then bars, then connectors — rather
+ * than each row drawing its own grid. That is what lets a rule run the whole
+ * height of the chart, and it keeps the background's cost tied to the width of
+ * the window rather than to the number of records.
  */
-export function GanttBoard({ model, canEdit }: GanttBoardProps) {
+export function GanttBoard({ model }: GanttBoardProps) {
   const { board, view, columns, columnsShown, rowIds, dateColumn, endDateColumn, context } = model;
 
   const rowsById = useBoardStore((state) => state.rowsById);
-  const editCells = useBoardStore((state) => state.editCells);
   const setGanttZoom = useBoardStore((state) => state.setGanttZoom);
   const setShowDependencies = useBoardStore((state) => state.setShowDependencies);
 
   const collapsed = useGridStore(selectCollapsedParents(view?.id ?? null));
   const toggleParent = useGridStore((state) => state.toggleParent);
-  const openDrawer = useGridStore((state) => state.openDrawer);
 
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH);
   const scroll = useRef<HTMLDivElement>(null);
@@ -119,51 +123,24 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
   });
 
   /**
-   * A date written from the chart is an ordinary cell edit, so it takes the
-   * same optimistic path — and the same rollback — as one typed in the table.
-   * Nothing here knows about transition rules: those govern Status, not dates.
+   * Put today in the middle of the chart. Only the viewport moves — no record's
+   * dates are touched by this, or by anything else on this surface.
    */
-  const commit = useCallback(
-    (rowId: string, next: { startIso: string; endIso: string }) => {
-      const edits = [];
-      if (dateColumn) {
-        edits.push({
-          rowId,
-          columnId: dateColumn.id,
-          value: { kind: "date" as const, iso: next.startIso },
-        });
-      }
-      if (endDateColumn) {
-        edits.push({
-          rowId,
-          columnId: endDateColumn.id,
-          value: { kind: "date" as const, iso: next.endIso },
-        });
-      }
-
-      if (edits.length > 0) void editCells(edits);
-    },
-    [dateColumn, endDateColumn, editCells],
-  );
-
-  const drag = useGanttDrag({
-    dayWidth: scale.dayWidth,
-    canEdit,
-    onCommit: commit,
-    onClick: openDrawer,
-  });
-
   const scrollToToday = useCallback(() => {
     const element = scroll.current;
-    if (!element || scale.todayOffset === null) return;
+    if (!element) return;
 
-    element.scrollLeft =
-      scale.todayOffset * scale.dayWidth - (element.clientWidth - panelWidth) / 2;
+    const centre = scale.todayOffset * scale.dayWidth - (element.clientWidth - panelWidth) / 2;
+    element.scrollLeft = Math.max(0, centre);
   }, [scale.todayOffset, scale.dayWidth, panelWidth]);
 
-  /** Open on today rather than on whatever the earliest record happens to be. */
+  /**
+   * Open on today, not on whatever the earliest record happens to be. A chart
+   * that opens three months in the past makes the reader hunt for the present
+   * before they can read anything.
+   */
   const hasCentred = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (hasCentred.current || scheduled.length === 0) return;
     hasCentred.current = true;
     scrollToToday();
@@ -191,7 +168,10 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
     element.scrollLeft = day * scale.dayWidth - (element.clientWidth - panelWidth) / 2;
   }, [scale.dayWidth, panelWidth]);
 
-  if (!dateColumn && !endDateColumn) {
+  // A duration needs both ends. With only one column chosen every record would
+  // fall through to Unscheduled, which looks like a broken chart rather than an
+  // unfinished setup — so the setup is what gets shown.
+  if (!dateColumn || !endDateColumn) {
     return (
       <GanttSetup
         columns={columns}
@@ -202,6 +182,7 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
   }
 
   const chartWidth = scale.dayCount * scale.dayWidth;
+  const bodyHeight = scheduled.length * ROW_HEIGHT;
   const visible = scheduled.slice(range.start, range.end);
   const primaryColumnId = board?.primaryColumnId ?? "";
 
@@ -209,35 +190,21 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
     `${dateColumn?.name ?? "—"} → ${endDateColumn?.name ?? "—"}`,
     formatCount(scheduled.length, "bar"),
     unscheduled.length > 0 ? `${unscheduled.length} unscheduled` : null,
-    canEdit ? null : "read-only",
+    "read-only — dates are edited in the record",
   ]
     .filter(Boolean)
     .join(" · ");
 
   return (
-    // `relative` so the drag label anchors to the chart, not to the page.
-    <div className="relative flex min-h-0 flex-1 flex-col bg-canvas">
+    <div className="flex min-h-0 flex-1 flex-col bg-canvas">
       <GanttToolbar
         zoom={zoom}
         onZoomChange={changeZoom}
         showDependencies={showDependencies}
         onToggleDependencies={() => void setShowDependencies(!showDependencies)}
         onToday={scrollToToday}
-        hasToday={scale.todayOffset !== null}
         summary={summary}
       />
-
-      {drag.preview && (
-        <div className="pointer-events-none absolute left-1/2 top-14 z-50 -translate-x-1/2 rounded-md border border-border bg-elevated px-2 py-1 shadow-lg">
-          <span className="metric text-[11px] text-foreground">
-            {drag.preview.mode === "resize-end"
-              ? `End: ${drag.preview.endIso.slice(0, 10)}`
-              : drag.preview.mode === "resize-start"
-                ? `Start: ${drag.preview.startIso.slice(0, 10)}`
-                : `${drag.preview.startIso.slice(0, 10)} → ${drag.preview.endIso.slice(0, 10)}`}
-          </span>
-        </div>
-      )}
 
       {scheduled.length === 0 && unscheduled.length === 0 ? (
         <div className="min-h-0 flex-1 p-6">
@@ -265,26 +232,13 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
             >
               <div
                 style={{ width: panelWidth }}
-                className="sticky left-0 z-10 flex shrink-0 items-center border-r border-hairline bg-elevated px-3 text-[11px] font-medium text-muted-foreground"
+                className="sticky left-0 z-10 flex shrink-0 items-end border-r border-hairline bg-elevated px-3 pb-1 text-[11px] font-medium text-muted-foreground"
               >
                 Task
               </div>
 
-              <div style={{ width: chartWidth }} className="relative shrink-0">
-                {scale.ticks.map((tick) => (
-                  <div
-                    key={tick.iso}
-                    style={{ left: tick.offset * scale.dayWidth }}
-                    className={cn(
-                      "absolute top-0 h-full whitespace-nowrap border-l pl-1 pt-1.5 text-[10px]",
-                      tick.isMajor
-                        ? "border-border text-foreground"
-                        : "border-hairline text-faint-foreground",
-                    )}
-                  >
-                    {tick.label}
-                  </div>
-                ))}
+              <div style={{ width: chartWidth }} className="shrink-0">
+                <GanttTimelineHeader scale={scale} height={HEADER_HEIGHT} />
               </div>
             </div>
 
@@ -309,21 +263,9 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
               <PanelResizer width={panelWidth} onResize={setPanelWidth} />
 
               <div style={{ width: chartWidth }} className="relative shrink-0">
-                {scale.dayWidth >= WEEKEND_MIN_DAY_WIDTH && (
-                  <Weekends
-                    startIso={scale.startIso}
-                    dayCount={scale.dayCount}
-                    dayWidth={scale.dayWidth}
-                  />
-                )}
-
-                {scale.todayOffset !== null && (
-                  <div
-                    aria-hidden
-                    style={{ left: scale.todayOffset * scale.dayWidth }}
-                    className="absolute inset-y-0 z-10 w-px bg-accent/50"
-                  />
-                )}
+                {/* One background for the whole chart, so a rule runs its full
+                    height instead of stopping at every row border. */}
+                <GanttGridLayer scale={scale} height={bodyHeight} />
 
                 <div style={{ height: range.paddingTop }} aria-hidden />
                 {visible.map((row) => (
@@ -332,15 +274,11 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
                     row={row}
                     primaryColumnId={primaryColumnId}
                     columns={columnsShown}
-                    startColumn={dateColumn}
-                    endColumn={endDateColumn}
                     statusColumn={model.completionColumn}
                     context={context}
                     dayWidth={scale.dayWidth}
                     height={ROW_HEIGHT}
-                    canEdit={canEdit}
                     hasConflict={conflicted.has(row.rowId)}
-                    drag={drag}
                   />
                 ))}
                 <div style={{ height: range.paddingBottom }} aria-hidden />
@@ -363,35 +301,6 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
 
       <GanttUnscheduled rows={unscheduled} primaryColumnId={primaryColumnId} />
     </div>
-  );
-}
-
-/** Weekend shading — enough to read a week at a glance, not enough to notice. */
-function Weekends({
-  startIso,
-  dayCount,
-  dayWidth,
-}: {
-  readonly startIso: string;
-  readonly dayCount: number;
-  readonly dayWidth: number;
-}) {
-  const days: number[] = [];
-  for (let offset = 0; offset < dayCount; offset += 1) {
-    if (isWeekend(addDays(startIso, offset))) days.push(offset);
-  }
-
-  return (
-    <>
-      {days.map((offset) => (
-        <div
-          key={offset}
-          aria-hidden
-          style={{ left: offset * dayWidth, width: dayWidth }}
-          className="absolute inset-y-0 bg-foreground/[0.03]"
-        />
-      ))}
-    </>
   );
 }
 

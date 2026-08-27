@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
-  applyDrag,
   buildGanttLinks,
   buildGanttRows,
-  daysFromPixels,
-  hasMoved,
   relationColumnsOf,
   spanDays,
   type GanttRow,
@@ -137,7 +134,7 @@ describe("placing records on the chart", () => {
 
     expect(bar.schedule?.offset).toBe(2);
     expect(bar.schedule?.span).toBe(4);
-    expect(bar.kind).toBe("bar");
+    expect(bar.kind).toBe("task");
   });
 
   test("a timestamp is read as the day it falls in — no bar starts at 13:37", () => {
@@ -149,19 +146,38 @@ describe("placing records on the chart", () => {
     expect(find(scheduled, "a").schedule?.span).toBe(2);
   });
 
-  test("a single-day record is a point, drawn as a diamond", () => {
+  /**
+   * A one-day task is a task, not a milestone. Rendering it as a marker is how
+   * a Gantt stops showing duration, so it gets a bar exactly one day wide.
+   */
+  test("a single-day record is a one-day bar, never a zero-width one", () => {
     const { scheduled } = build([row("a", { start: day("2026-08-26"), end: day("2026-08-26") })]);
 
-    expect(find(scheduled, "a").kind).toBe("point");
+    expect(find(scheduled, "a").kind).toBe("task");
     expect(find(scheduled, "a").schedule?.span).toBe(1);
   });
 
-  test("only one date set still places the record, flagged as partial", () => {
-    const { scheduled } = build([row("a", { start: day("2026-08-26"), end: null })]);
-    const bar = find(scheduled, "a");
+  /**
+   * One date is not a duration. Inventing the other end would make every such
+   * record look identical to a real one-day task.
+   */
+  test("only one date set is an incomplete schedule, not a one-day bar", () => {
+    const onlyStart = build([row("a", { start: day("2026-08-26"), end: null })]);
+    expect(onlyStart.scheduled).toHaveLength(0);
+    expect(find(onlyStart.unscheduled, "a").gap).toBe("partial");
 
-    expect(bar.isPartial).toBe(true);
-    expect(bar.schedule?.span).toBe(1);
+    const onlyEnd = build([row("b", { start: null, end: day("2026-08-26") })]);
+    expect(onlyEnd.scheduled).toHaveLength(0);
+    expect(find(onlyEnd.unscheduled, "b").gap).toBe("partial");
+  });
+
+  test("nothing on the chart is a milestone by inference", () => {
+    const { scheduled } = build([
+      row("a", { start: day("2026-08-26"), end: day("2026-08-26") }),
+      row("b", { start: day("2026-08-26"), end: day("2026-09-02") }),
+    ]);
+
+    expect(scheduled.map((entry) => entry.kind)).toEqual(["task", "task"]);
   });
 
   /** A chart that quietly omits part of the board misrepresents the board. */
@@ -170,6 +186,7 @@ describe("placing records on the chart", () => {
 
     expect(scheduled).toHaveLength(0);
     expect(unscheduled.map((entry) => entry.rowId)).toEqual(["a"]);
+    expect(find(unscheduled, "a").gap).toBe("none");
   });
 
   /**
@@ -182,7 +199,7 @@ describe("placing records on the chart", () => {
     ]);
 
     expect(scheduled).toHaveLength(0);
-    expect(find(unscheduled, "a").isInvalid).toBe(true);
+    expect(find(unscheduled, "a").gap).toBe("inverted");
     // The record itself is untouched — nothing was written to fix it.
     expect(find(unscheduled, "a").schedule).toBeNull();
   });
@@ -319,42 +336,21 @@ describe("blocked by", () => {
   });
 });
 
-/* -------------------------------------------------------------- drag maths */
+/* ---------------------------------------------------------------- geometry */
 
-describe("dragging a bar", () => {
-  const schedule = { startIso: day("2026-08-26"), endIso: day("2026-08-29"), offset: 2, span: 4 };
-
-  test("pixels become whole days — a bar snaps to the grid", () => {
-    expect(daysFromPixels(88, 44)).toBe(2);
-    expect(daysFromPixels(60, 44)).toBe(1);
-    expect(daysFromPixels(-88, 44)).toBe(-2);
-    expect(daysFromPixels(10, 0)).toBe(0);
+describe("bar geometry", () => {
+  test("a range covers both of its end days", () => {
+    expect(spanDays(day("2026-08-27"), day("2026-08-27"))).toBe(1);
+    expect(spanDays(day("2026-08-27"), day("2026-09-03"))).toBe(8);
   });
 
-  test("moving keeps the duration exactly", () => {
-    const next = applyDrag(schedule, "move", 2);
+  test("offset and span are whole days from the range start", () => {
+    const { scheduled } = build([row("a", { start: day("2026-08-27"), end: day("2026-09-03") })]);
+    const schedule = find(scheduled, "a").schedule;
 
-    expect(next.startIso).toBe(day("2026-08-28"));
-    expect(next.endIso).toBe(day("2026-08-31"));
-    expect(spanDays(next.startIso, next.endIso)).toBe(schedule.span);
-  });
-
-  test("resizing an edge moves only that date", () => {
-    expect(applyDrag(schedule, "resize-end", 5).endIso).toBe(day("2026-09-03"));
-    expect(applyDrag(schedule, "resize-end", 5).startIso).toBe(schedule.startIso);
-    expect(applyDrag(schedule, "resize-start", -2).startIso).toBe(day("2026-08-24"));
-    expect(applyDrag(schedule, "resize-start", -2).endIso).toBe(schedule.endIso);
-  });
-
-  /** A drag must never be able to produce the invalid state the chart refuses. */
-  test("an edge dragged past the other one stops there", () => {
-    expect(applyDrag(schedule, "resize-start", 99).startIso).toBe(schedule.endIso);
-    expect(applyDrag(schedule, "resize-end", -99).endIso).toBe(schedule.startIso);
-  });
-
-  test("a drag that changed nothing is not worth a write", () => {
-    expect(hasMoved(schedule, applyDrag(schedule, "move", 0))).toBe(false);
-    expect(hasMoved(schedule, applyDrag(schedule, "move", 1))).toBe(true);
+    // RANGE_START is 24 Aug, so 27 Aug is three days in and runs eight days.
+    expect(schedule?.offset).toBe(3);
+    expect(schedule?.span).toBe(8);
   });
 });
 
@@ -385,7 +381,7 @@ describe("the chart writes through the board", () => {
   }
 
   /** Moving a bar is a cell edit, so the table has the new dates too. */
-  test("a moved bar writes both date cells on the record", async () => {
+  test("a date edited on the record is what lengthens its bar", async () => {
     const record = firstRow();
     const columns = useBoardStore.getState().board?.columns ?? [];
     const start = columns.find((column) => column.type === "date");
@@ -397,20 +393,16 @@ describe("the chart writes through the board", () => {
       { rowId: record.id, columnId: end.id, value: { kind: "date", iso: day("2026-08-29") } },
     ]);
 
-    const moved = applyDrag(
-      { startIso: day("2026-08-26"), endIso: day("2026-08-29"), offset: 0, span: 4 },
-      "move",
-      2,
-    );
-
+    // Editing the record — from the drawer, the grid, anywhere — is what moves
+    // a bar. The chart re-reads the same cells and redraws.
     await useBoardStore.getState().editCells([
-      { rowId: record.id, columnId: start.id, value: { kind: "date", iso: moved.startIso } },
-      { rowId: record.id, columnId: end.id, value: { kind: "date", iso: moved.endIso } },
+      { rowId: record.id, columnId: end.id, value: { kind: "date", iso: day("2026-09-06") } },
     ]);
 
     const after = useBoardStore.getState().rowsById[record.id];
-    expect(after?.cells[start.id]).toEqual({ kind: "date", iso: day("2026-08-28") });
-    expect(after?.cells[end.id]).toEqual({ kind: "date", iso: day("2026-08-31") });
+    expect(after?.cells[start.id]).toEqual({ kind: "date", iso: day("2026-08-26") });
+    expect(after?.cells[end.id]).toEqual({ kind: "date", iso: day("2026-09-06") });
+    expect(spanDays(day("2026-08-26"), day("2026-09-06"))).toBe(12);
   });
 
   test("a date the service rejects rolls back to what it was", async () => {

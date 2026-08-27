@@ -12,7 +12,6 @@ interface GanttToolbarProps {
   readonly showDependencies: boolean;
   readonly onToggleDependencies: () => void;
   readonly onToday: () => void;
-  readonly hasToday: boolean;
   readonly summary: string;
 }
 
@@ -28,7 +27,6 @@ export function GanttToolbar({
   showDependencies,
   onToggleDependencies,
   onToday,
-  hasToday,
   summary,
 }: GanttToolbarProps) {
   return (
@@ -37,8 +35,7 @@ export function GanttToolbar({
         size="sm"
         variant="outline"
         className="gap-1.5"
-        disabled={!hasToday}
-        title={hasToday ? "Scroll to today" : "Today is outside this range"}
+        title="Scroll the timeline back to today"
         onClick={onToday}
       >
         <CalendarClock />

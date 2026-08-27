@@ -1,4 +1,4 @@
-import { addDays, dayIndex, daysBetween, startOfDay } from "@/lib/board-dates";
+import { dayIndex, daysBetween, startOfDay } from "@/lib/board-dates";
 import {
   childIdsOf,
   descendantIdsOf,
@@ -30,19 +30,29 @@ import type { BoardColumn, BoardColumnOf } from "@/types";
  * other's data.
  */
 
-/** How wide a bar's grab zone is before it becomes a resize handle. */
-export const RESIZE_HANDLE_PX = 8;
-
-/** A drag has to travel this far before it stops being a click. */
-export const DRAG_THRESHOLD_PX = 4;
-
+/**
+ * What a line on the chart is.
+ *
+ * There is no milestone kind, and deliberately so. A milestone is a record the
+ * user declared to be one; this board has no such field, and inferring it from
+ * "start and end fall on the same day" would turn every one-day task into a
+ * diamond — which is exactly how a Gantt stops showing duration. Until the
+ * record can say it, everything scheduled is a bar.
+ */
 export type GanttBarKind =
-  /** Scheduled on the record itself, across more than one day. */
-  | "bar"
-  /** Scheduled on the record itself, on a single day — drawn as a diamond. */
-  | "point"
-  /** No dates of its own; the range its subtasks occupy. Not editable. */
+  /** Scheduled on the record itself. */
+  | "task"
+  /** No dates of its own; the range its subtasks occupy. Derived, read-only. */
   | "summary";
+
+/** Why a record could not be placed on the chart. */
+export type GanttGap =
+  /** Neither date is set. */
+  | "none"
+  /** One date is set — a duration needs both. */
+  | "partial"
+  /** The start is after the end. */
+  | "inverted";
 
 export interface GanttSchedule {
   readonly startIso: string;
@@ -58,15 +68,13 @@ export interface GanttRow {
   readonly hasChildren: boolean;
   readonly childCount: number;
   readonly isCollapsed: boolean;
-  /** Null when the record has neither date — those go to Unscheduled. */
+  /** Null when the record cannot be placed — those are listed, not dropped. */
   readonly schedule: GanttSchedule | null;
   readonly kind: GanttBarKind;
   /** True when the range came from the children rather than the record. */
   readonly isDerived: boolean;
-  /** The record names a start after its end — shown as an error, never fixed. */
-  readonly isInvalid: boolean;
-  /** Only one of the two dates is set; the bar covers that single day. */
-  readonly isPartial: boolean;
+  /** Set only on unscheduled rows, saying which date is missing or wrong. */
+  readonly gap: GanttGap | null;
   readonly progress: SubtaskProgress | null;
 }
 
@@ -169,30 +177,31 @@ export function buildGanttRows(input: GanttRowsInput): GanttRows {
     // silently reordered — swapping it would hide the error and rewrite what
     // the user actually typed.
     if (rawStart && rawEnd && dayIndex(rawStart) > dayIndex(rawEnd)) {
-      unscheduled.push({
+      unscheduled.push({ ...base, schedule: null, kind: "task", isDerived: false, gap: "inverted" });
+      continue;
+    }
+
+    if (rawStart && rawEnd) {
+      scheduled.push({
         ...base,
-        schedule: null,
-        kind: "bar",
+        schedule: scheduleOf(rawStart, rawEnd, input.rangeStartIso),
+        kind: "task",
         isDerived: false,
-        isInvalid: true,
-        isPartial: false,
+        gap: null,
       });
       continue;
     }
 
+    /**
+     * One date is not a duration.
+     *
+     * Drawing a single-day bar from a lone start date invents an end the record
+     * never claimed, and every such record then looks identical to a real
+     * one-day task. The honest answer is that the schedule is incomplete, so it
+     * is listed as such and the missing date is named.
+     */
     if (rawStart || rawEnd) {
-      const start = rawStart ?? rawEnd;
-      const end = rawEnd ?? rawStart;
-      if (!start || !end) continue;
-
-      scheduled.push({
-        ...base,
-        schedule: scheduleOf(start, end, input.rangeStartIso),
-        kind: start === end ? "point" : "bar",
-        isDerived: false,
-        isInvalid: false,
-        isPartial: !rawStart || !rawEnd,
-      });
+      unscheduled.push({ ...base, schedule: null, kind: "task", isDerived: false, gap: "partial" });
       continue;
     }
 
@@ -204,20 +213,12 @@ export function buildGanttRows(input: GanttRowsInput): GanttRows {
         schedule: scheduleOf(derived.start, derived.end, input.rangeStartIso),
         kind: "summary",
         isDerived: true,
-        isInvalid: false,
-        isPartial: false,
+        gap: null,
       });
       continue;
     }
 
-    unscheduled.push({
-      ...base,
-      schedule: null,
-      kind: "bar",
-      isDerived: false,
-      isInvalid: false,
-      isPartial: false,
-    });
+    unscheduled.push({ ...base, schedule: null, kind: "task", isDerived: false, gap: "none" });
   }
 
   return { scheduled, unscheduled };
@@ -290,52 +291,8 @@ export function buildGanttLinks(
   return links;
 }
 
-/* -------------------------------------------------------------- drag maths */
-
-export type GanttDragMode = "move" | "resize-start" | "resize-end";
-
-/** Pixels travelled, as whole days. Day precision is the V1 contract. */
-export function daysFromPixels(deltaX: number, dayWidth: number): number {
-  if (dayWidth <= 0) return 0;
-  return Math.round(deltaX / dayWidth);
-}
-
-/**
- * The range a drag would produce.
- *
- * Moving keeps the duration exactly — a bar dragged two days later starts and
- * ends two days later. Resizing moves one edge and is clamped at the other, so
- * a drag can never produce a start after its end.
- */
-export function applyDrag(
-  schedule: GanttSchedule,
-  mode: GanttDragMode,
-  days: number,
-): { readonly startIso: string; readonly endIso: string } {
-  if (mode === "move") {
-    return { startIso: addDays(schedule.startIso, days), endIso: addDays(schedule.endIso, days) };
-  }
-
-  if (mode === "resize-start") {
-    const next = addDays(schedule.startIso, days);
-    const startIso = dayIndex(next) > dayIndex(schedule.endIso) ? schedule.endIso : next;
-    return { startIso, endIso: schedule.endIso };
-  }
-
-  const next = addDays(schedule.endIso, days);
-  const endIso = dayIndex(next) < dayIndex(schedule.startIso) ? schedule.startIso : next;
-  return { startIso: schedule.startIso, endIso };
-}
-
 /** Whole days a range covers, both ends included — a bar is never zero wide. */
 export function spanDays(startIso: string, endIso: string): number {
   return Math.max(1, daysBetween(startIso, endIso) + 1);
 }
 
-/** Whether a drag actually changed anything worth writing. */
-export function hasMoved(
-  schedule: GanttSchedule,
-  next: { readonly startIso: string; readonly endIso: string },
-): boolean {
-  return schedule.startIso !== next.startIso || schedule.endIso !== next.endIso;
-}
