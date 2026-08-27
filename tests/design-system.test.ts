@@ -235,6 +235,21 @@ describe("nothing scrolls the frame itself", () => {
   /** A list that reaches its end must not spend the rest of the gesture on
       whatever is behind it — which is how the frame moved in the first place. */
   test("scroll is contained by default, not per scroll container", () => {
-    expect(CSS).toMatch(/\*\s*\{[^}]*overscroll-behavior:\s*contain/);
+    expect(CSS).toMatch(/\[class~="overflow-y-auto"\][\s\S]*?overscroll-behavior:\s*contain/);
+  });
+
+  /**
+   * Containment belongs to boxes that can actually scroll.
+   *
+   * `overflow: hidden` is a scroll container too — one with the scrollbar
+   * taken away — so containing it does not stop a scroll, it eats one: the
+   * box cannot move, the gesture may not reach anything that can, and the
+   * pointer is over a dead patch. There are 44 of those boxes here.
+   */
+  test("a clipped box is never contained, or it becomes a dead patch", () => {
+    const rule = /:where\(([\s\S]*?)\)\s*\{\s*overscroll-behavior:\s*contain/.exec(CSS);
+    expect(rule).not.toBeNull();
+    expect(rule?.[1]).not.toContain("hidden");
+    expect(rule?.[1]).not.toContain("clip");
   });
 });

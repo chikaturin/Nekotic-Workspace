@@ -349,19 +349,33 @@
   }
 
   /**
-   * Scroll stops where it started.
+   * Scroll stops where it started — but only where scrolling was on offer.
    *
    * Reaching the end of a list and carrying on used to hand the rest of the
-   * gesture to whatever was behind it — which, in a frame with no scrollbar of
-   * its own, means the page slides away and cannot be slid back. The audit log
-   * is where it showed worst, but it was true of forty-odd scroll containers
-   * that each would have had to remember the same class.
+   * gesture to whatever was behind it, and in a frame with no scrollbar of its
+   * own that means the page slides away and cannot be slid back. It was true
+   * of forty-odd scroll containers that would each have had to remember the
+   * same class, so it belongs here rather than at every call site.
    *
-   * `overscroll-behavior` only does anything on a scroll container, so this is
-   * inert on every other element. `contain` rather than `none`: a list still
-   * gets its own overscroll affordance, it just cannot spend it on its parent.
+   * The selector list is load-bearing, and `*` is wrong. `overscroll-behavior`
+   * applies to any scroll container — and `overflow: hidden` *is* one, just
+   * with the scrollbar taken away. Containing those does not stop a scroll, it
+   * swallows it: the box cannot scroll, the gesture is forbidden from reaching
+   * anything that can, and the pointer sits over a dead patch. There are 44 of
+   * them in this app, and the sidebar's collapse animation is one, which is
+   * why the rail only scrolled from its left and right margins.
+   *
+   * So: only the boxes that actually offer a scrollbar. `~=` matches a whole
+   * class token, so it cannot catch `overflow-hidden` by accident.
    */
-  * {
+  :where(
+      [class~="overflow-auto"],
+      [class~="overflow-scroll"],
+      [class~="overflow-x-auto"],
+      [class~="overflow-x-scroll"],
+      [class~="overflow-y-auto"],
+      [class~="overflow-y-scroll"]
+    ) {
     overscroll-behavior: contain;
   }
 
