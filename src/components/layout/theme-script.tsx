@@ -1,10 +1,12 @@
-import { THEME_STORAGE_KEY } from "@/hooks/use-theme";
+import { themeBootScript } from "@/lib/theme";
 
 /**
  * Applies the stored theme before the first paint so there is no flash.
- * Light is the product default; an explicit choice always wins.
+ *
+ * The script text comes from `lib/theme` rather than from the client hook:
+ * this is a server component, and a value imported across a `"use client"`
+ * boundary arrives as a reference, not a string.
  */
 export function ThemeScript() {
-  const script = `(function(){try{var s=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});var d=s==="dark";document.documentElement.classList.toggle("dark",d)}catch(e){}})();`;
-  return <script dangerouslySetInnerHTML={{ __html: script }} />;
+  return <script dangerouslySetInnerHTML={{ __html: themeBootScript() }} />;
 }

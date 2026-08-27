@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { DEFAULT_THEME, THEME_STORAGE_KEY, themeBootScript } from "@/lib/theme";
 import { MOCK_NOW } from "@/config/app";
 import { formatBytes, formatCount, formatDate, formatPercent, formatRelativeTime } from "@/lib/format";
 import { slugify, uniqueSlug } from "@/lib/utils";
@@ -78,5 +79,50 @@ describe("slugify", () => {
 
   test("uniqueSlug falls back to untitled for an empty base", () => {
     expect(uniqueSlug("", [])).toBe("untitled");
+  });
+});
+
+describe("theme", () => {
+  test("dark is the default until someone chooses otherwise", () => {
+    expect(DEFAULT_THEME).toBe("dark");
+  });
+
+  test("the boot script reads the real storage key, not a client reference", () => {
+    const script = themeBootScript();
+
+    // Regression: importing the key from the `"use client"` hook into the
+    // server component compiled it to `localStorage.getItem(undefined)`, so a
+    // stored choice was never readable at boot.
+    expect(script).toContain(`localStorage.getItem("${THEME_STORAGE_KEY}")`);
+    expect(script).not.toContain("undefined");
+  });
+
+  test("only an explicit light choice turns dark off", () => {
+    const apply = (stored: string | null): boolean => {
+      const script = themeBootScript();
+      let isDark: boolean | null = null;
+
+      const documentStub = {
+        documentElement: {
+          classList: {
+            toggle: (_name: string, force: boolean) => {
+              isDark = force;
+            },
+          },
+        },
+      };
+
+      new Function("localStorage", "document", script)(
+        { getItem: () => stored },
+        documentStub,
+      );
+
+      if (isDark === null) throw new Error("the script never applied a class");
+      return isDark;
+    };
+
+    expect(apply(null)).toBe(true);
+    expect(apply("dark")).toBe(true);
+    expect(apply("light")).toBe(false);
   });
 });

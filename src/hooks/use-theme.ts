@@ -1,14 +1,18 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
+import { DEFAULT_THEME, THEME_STORAGE_KEY, type Theme } from "@/lib/theme";
 
-export type Theme = "light" | "dark";
-export const THEME_STORAGE_KEY = "nexdrop-theme";
+export type { Theme };
+export { DEFAULT_THEME, THEME_STORAGE_KEY };
 
 /**
- * The `<html>` class is the source of truth — it is set by the boot script
- * before hydration. Components subscribe to it as an external store, which
- * keeps the value correct on first paint without a state-syncing effect.
+ * The `<html>` class is the source of truth — the server renders it and the
+ * boot script reconciles it with the stored choice before hydration.
+ * Components subscribe to it as an external store, which keeps the value
+ * correct on first paint without a state-syncing effect.
+ *
+ * Dark is the default: only an explicit choice of light turns it off.
  */
 const listeners = new Set<() => void>();
 
@@ -22,7 +26,7 @@ function getSnapshot(): Theme {
 }
 
 function getServerSnapshot(): Theme {
-  return "light";
+  return DEFAULT_THEME;
 }
 
 export function useTheme(): { theme: Theme; toggleTheme: () => void } {

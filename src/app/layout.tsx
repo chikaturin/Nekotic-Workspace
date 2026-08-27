@@ -12,16 +12,19 @@ export const metadata: Metadata = {
     "Projects, boards and files in one workspace. Drive Mode gives every team a shared, navigable file tree.",
 };
 
+/**
+ * The theme is the app's own setting, not the OS's, so the browser chrome
+ * follows the default rather than `prefers-color-scheme`.
+ */
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f8fafd" },
-    { media: "(prefers-color-scheme: dark)", color: "#1f2430" },
-  ],
+  themeColor: "#1f2430",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    // Dark is the default, rendered on the server so the first paint is
+    // already dark; the boot script only strips it for an explicit light choice.
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <ThemeScript />
       </head>
