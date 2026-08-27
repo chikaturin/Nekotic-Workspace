@@ -21,8 +21,15 @@ interface CellRendererProps {
    * would show nothing more of them.
    */
   readonly mode?: CellDisplayMode;
-  /** False on a frozen or read-only board, where no click opens an editor. */
-  readonly isInteractive?: boolean;
+  /**
+   * Lay the value out for this width rather than the column's. The detail
+   * dialog is far wider than the cell the value came from, and reusing the
+   * column's width there would wrap a paragraph as if it were still in a
+   * 180px column.
+   */
+  readonly width?: number;
+  /** True only where the surface delegates the reader — the grid. */
+  readonly hasReader?: boolean;
 }
 
 const EMPTY_PEOPLE = new Map();
@@ -38,8 +45,11 @@ export const CellRenderer = memo(function CellRenderer({
   column,
   context,
   mode = "compact",
-  isInteractive = true,
+  width,
+  hasReader = false,
 }: CellRendererProps) {
+  const laidOutAt = width ?? column.width;
+
   switch (column.type) {
     case "text":
       return value.kind === "text" ? (
@@ -47,8 +57,8 @@ export const CellRenderer = memo(function CellRenderer({
           value={value}
           isPrimary={column.isPrimary}
           mode={mode}
-          width={column.width}
-          isInteractive={isInteractive}
+          width={laidOutAt}
+          hasReader={hasReader}
         />
       ) : null;
 
@@ -57,8 +67,8 @@ export const CellRenderer = memo(function CellRenderer({
         <LongTextCellView
           value={value}
           mode={mode}
-          width={column.width}
-          isInteractive={isInteractive}
+          width={laidOutAt}
+          hasReader={hasReader}
         />
       ) : null;
 

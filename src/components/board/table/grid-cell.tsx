@@ -46,6 +46,11 @@ interface GridCellProps {
  * A cell that already holds files is *not* included: there, a click has to
  * reach the file, not the uploader.
  */
+/** The reader marker owns its own click; the cell's gestures must let it past. */
+function isReaderMarker(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest("[data-cell-detail]") != null;
+}
+
 function opensOnSingleClick(column: BoardColumn, value: CellValue): boolean {
   return (
     column.type === "attachment" && value.kind === "attachment" && value.attachments.length === 0
@@ -87,16 +92,36 @@ export const GridCell = memo(function GridCell({
   const element = useRef<HTMLDivElement>(null);
 
   /**
-   * An editor must not open behind the frozen columns. Only ever runs for the
-   * one cell that is being edited, and only when edit mode starts.
+   * What happens the moment a cell is asked to edit.
+   *
+   * A cell that cannot be edited — a viewer's board, or an archived record on
+   * a board anybody else can write — answers with the reader instead of
+   * nothing at all. That is the one place the substitution belongs: the
+   * keyboard handler knows the board is frozen but not that this row is, and a
+   * request that silently does nothing is how a clipped value becomes
+   * unreadable to somebody working without a mouse.
+   *
+   * Otherwise the editor must not open behind the frozen columns. Both only
+   * ever run for the one cell being edited, and only when edit mode starts.
    */
   useLayoutEffect(() => {
-    if (isEditing) revealBeyondFrozen(element.current);
-  }, [isEditing]);
+    if (!isEditing) return;
+
+    if (isReadOnly) {
+      const grid = useGridStore.getState();
+      grid.endEdit();
+      grid.openDetail(row.id, column.id);
+      return;
+    }
+
+    revealBeyondFrozen(element.current);
+  }, [isEditing, isReadOnly, row.id, column.id]);
 
   const handleMouseDown = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
-      if (isEditing) return;
+      // Pressing the reader marker must not begin a range: a few pixels of
+      // travel would turn it into a drag and swallow the click entirely.
+      if (isEditing || isReaderMarker(event.target)) return;
       const grid = useGridStore.getState();
       const address = { rowIndex, columnIndex };
 
@@ -132,9 +157,20 @@ export const GridCell = memo(function GridCell({
       // empty attachment cell — the one type that opens on a single click —
       // re-opened itself from every click in its own panel, so pressing Close
       // shut it and re-opened it in the same gesture.
-      if (isReadOnly || isEditing) return;
+      if (isEditing) return;
 
       const target = event.target as Element | null;
+
+      // Reading comes first, and is not gated on permission: showing somebody
+      // the whole of a value they can already see part of is not a write, and
+      // a read-only board is exactly where a clipped step is hardest to read.
+      if (target?.closest?.("[data-cell-detail]") != null) {
+        useGridStore.getState().openDetail(row.id, column.id);
+        return;
+      }
+
+      if (isReadOnly) return;
+
       const isExpand = target?.closest?.("[data-cell-expand]") != null;
       if (!isExpand && !opensOnSingleClick(column, value)) return;
 
@@ -170,8 +206,11 @@ export const GridCell = memo(function GridCell({
       onMouseDown={handleMouseDown}
       onMouseEnter={handleMouseEnter}
       onClick={handleClick}
-      onDoubleClick={() => {
-        if (!isReadOnly && !isEditing) useGridStore.getState().beginEdit(row.id, column.id);
+      onDoubleClick={(event) => {
+        // Two presses on the marker are two attempts to read, not a request to
+        // edit — without this the pair opened the reader *and* an editor.
+        if (isReadOnly || isEditing || isReaderMarker(event.target)) return;
+        useGridStore.getState().beginEdit(row.id, column.id);
       }}
       style={widthStyle(column.id, column.isPrimary)}
       className={cn(
@@ -217,7 +256,7 @@ export const GridCell = memo(function GridCell({
             column={column}
             context={shared.context}
             mode={shared.displayModes[column.id] ?? "compact"}
-            isInteractive={!isReadOnly}
+            hasReader
           />
         </div>
       )}

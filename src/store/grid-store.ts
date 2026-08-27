@@ -71,6 +71,14 @@ interface GridState {
    * the far right is reached exactly like one added in the middle.
    */
   readonly renamingColumnId: string | null;
+  /**
+   * The cell open in the detail reader.
+   *
+   * One dialog for the whole grid, addressed by cell, rather than one mounted
+   * per cell — five thousand rows must not carry five thousand dialogs to
+   * serve the one somebody clicked.
+   */
+  readonly detailCell: { readonly rowId: string; readonly columnId: string } | null;
 }
 
 interface GridActions {
@@ -93,6 +101,10 @@ interface GridActions {
   beginColumnRename: (columnId: string) => void;
   endColumnRename: () => void;
 
+  /** Read one cell in full. Never a write, so it is open to everyone. */
+  openDetail: (rowId: string, columnId: string) => void;
+  closeDetail: () => void;
+
   toggleRowSelection: (rowId: string) => void;
   /** Shift-click: tick everything between the anchor and `rowId` in view order. */
   extendRowSelection: (orderedRowIds: readonly string[], rowId: string) => void;
@@ -114,6 +126,7 @@ const INITIAL: GridState = {
   selectedRowIds: {},
   lastSelectedRowId: null,
   renamingColumnId: null,
+  detailCell: null,
 };
 
 export const useGridStore = create<GridStore>()((set, get) => ({
@@ -218,6 +231,10 @@ export const useGridStore = create<GridStore>()((set, get) => ({
   // Renaming and cell editing are two cursors; only one of them can be live.
   beginColumnRename: (columnId) => set({ renamingColumnId: columnId, editing: null }),
   endColumnRename: () => set({ renamingColumnId: null }),
+
+  // Reading closes any editor: the reader is what you opened instead.
+  openDetail: (rowId, columnId) => set({ detailCell: { rowId, columnId }, editing: null }),
+  closeDetail: () => set({ detailCell: null }),
 
   reset: () => set(INITIAL),
 }));

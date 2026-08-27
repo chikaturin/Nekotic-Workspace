@@ -219,6 +219,9 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
                       }
                       onCommit={(value) => commit(column.id, value)}
                       onCreateOption={(label) => createOption(column.id, label)}
+                      recordLabel={row.displayId}
+                      isFrozen={isArchived}
+                      canEdit={isEditable}
                     />
                   ))}
                 </div>

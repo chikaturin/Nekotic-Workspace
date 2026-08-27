@@ -8,14 +8,16 @@ import { GridRow } from "@/components/board/table/grid-row";
 import { GroupHeader } from "@/components/board/table/group-header";
 import { GUTTER_WIDTH, widthVar, type GridShared } from "@/components/board/table/grid-shared";
 import { ConvertColumnDialog } from "@/components/board/table/convert-column-dialog";
+import { CellDetailDialog } from "@/components/board/cells/cell-detail-dialog";
 import { useBulkActions } from "@/hooks/use-bulk-actions";
 import { useGridClipboard } from "@/hooks/use-grid-clipboard";
 import { useGridKeyboard } from "@/hooks/use-grid-keyboard";
 import { useVirtualRows } from "@/hooks/use-virtual-rows";
 import type { BoardViewModel } from "@/hooks/use-board-view";
 import { flattenGroups, flattenUngrouped, type RowExpander } from "@/lib/board-grouping";
+import { isRowArchived } from "@/lib/archive";
 import { autoFitWidth, estimateLines, heightForLines, isFlexibleColumn } from "@/lib/cell-display";
-import { cellOf, cellText } from "@/lib/cell-values";
+import { cellOf, cellText, type CellContext } from "@/lib/cell-values";
 import { GRID_SCROLLER_ATTR } from "@/lib/dom/grid-scroll";
 import { layoutHierarchy } from "@/lib/board-hierarchy";
 import { ROW_HEIGHTS } from "@/lib/grid-geometry";
@@ -28,6 +30,7 @@ import {
 } from "@/store/grid-store";
 import type {
   BoardColumn,
+  BoardRow,
   CellDisplayMode,
   CellValue,
   ColumnType,
@@ -95,6 +98,8 @@ export function TableGrid({
 
   const bulk = useBulkActions(model);
   const isReadOnly = !can("row.update");
+
+
 
   /**
    * Grouped and ungrouped take the same path: one flat, uniform-height list of
@@ -446,6 +451,13 @@ export function TableGrid({
         onExport={onExportSelection}
       />
 
+      <GridDetailReader
+        rowsById={rowsById}
+        columns={columnsShown}
+        context={context}
+        isReadOnly={isReadOnly}
+      />
+
       <ConvertColumnDialog
         column={conversion?.column ?? null}
         targetType={conversion?.type ?? null}
@@ -454,5 +466,63 @@ export function TableGrid({
         onClose={() => setConversion(null)}
       />
     </div>
+  );
+}
+
+interface GridDetailReaderProps {
+  readonly rowsById: Readonly<Record<string, BoardRow>>;
+  readonly columns: readonly BoardColumn[];
+  readonly context: CellContext;
+  readonly isReadOnly: boolean;
+}
+
+/**
+ * The grid's one detail reader.
+ *
+ * A separate component purely so the subscription lives here: opening a reader
+ * changes `detailCell`, and had `TableGrid` been the subscriber every mounted
+ * row would have re-rendered to show a dialog none of them draw.
+ */
+function GridDetailReader({ rowsById, columns, context, isReadOnly }: GridDetailReaderProps) {
+  const detailCell = useGridStore((state) => state.detailCell);
+  const closeDetail = useGridStore((state) => state.closeDetail);
+
+  const row = detailCell ? rowsById[detailCell.rowId] : undefined;
+  const column = detailCell
+    ? columns.find((candidate) => candidate.id === detailCell.columnId)
+    : undefined;
+
+  /**
+   * A reader whose record or column has gone — deleted, filtered away, or on a
+   * board that has since been swapped — is closed rather than left pointing at
+   * nothing. Otherwise it renders shut while still "open", and reappears by
+   * itself the moment a filter brings the row back.
+   */
+  const isOrphaned = detailCell !== null && (!row || !column);
+
+  useEffect(() => {
+    if (isOrphaned) closeDetail();
+  }, [isOrphaned, closeDetail]);
+
+  // Archived records are read-only however writable the board is, so the
+  // hand-over to an editor is offered against the record, not the board.
+  const canEdit = Boolean(row) && !isReadOnly && !isRowArchived(row!);
+
+  return (
+    <CellDetailDialog
+      column={column ?? null}
+      value={row && column ? cellOf(row, column) : null}
+      context={context}
+      recordLabel={row?.displayId ?? ""}
+      onClose={closeDetail}
+      onEdit={
+        canEdit && detailCell
+          ? () => {
+              closeDetail();
+              useGridStore.getState().beginEdit(detailCell.rowId, detailCell.columnId);
+            }
+          : undefined
+      }
+    />
   );
 }

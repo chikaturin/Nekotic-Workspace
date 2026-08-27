@@ -91,7 +91,10 @@ export function useGridKeyboard({
 
         case "Enter": {
           event.preventDefault();
-          if (!isReadOnly && rowId && column) grid.beginEdit(rowId, column.id);
+          // Asked unconditionally: the cell itself knows whether it can be
+          // edited — the board may be writable while *this record* is archived
+          // — and it answers a request it cannot honour by opening the reader.
+          if (rowId && column) grid.beginEdit(rowId, column.id);
           return;
         }
 

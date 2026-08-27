@@ -8,23 +8,23 @@ interface TextViewProps {
   readonly value: Extract<CellValue, { kind: "text" }>;
   readonly isPrimary?: boolean;
   readonly mode?: CellDisplayMode;
-  readonly isInteractive?: boolean;
   readonly width: number;
+  readonly hasReader?: boolean;
 }
 
 export function TextCellView({
   value,
   isPrimary = false,
   mode = "compact",
-  isInteractive = true,
   width,
+  hasReader = false,
 }: TextViewProps) {
   return (
     <FlowedText
       text={value.value}
       mode={mode}
       width={width}
-      isInteractive={isInteractive}
+      hasReader={hasReader}
       className={
         isPrimary ? "text-lead font-medium text-foreground" : "text-lead text-muted-foreground"
       }

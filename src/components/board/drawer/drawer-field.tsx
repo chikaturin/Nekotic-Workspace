@@ -1,8 +1,12 @@
 "use client";
 
-import { useId } from "react";
+import { Maximize2 } from "lucide-react";
+import { useId, useState } from "react";
+import { CellDetailDialog } from "@/components/board/cells/cell-detail-dialog";
 import { CellEditor } from "@/components/board/cells/cell-editor";
 import { CellRenderer } from "@/components/board/cells/cell-renderer";
+import { estimateLines, isFlexibleColumn, WRAP_MAX_LINES } from "@/lib/cell-display";
+import { cellText } from "@/lib/cell-values";
 import { Label } from "@/components/ui/field";
 import { columnVisual } from "@/lib/board-visuals";
 import type { CellContext } from "@/lib/cell-values";
@@ -29,6 +33,20 @@ interface DrawerFieldProps {
   readonly onEditingChange: (isEditing: boolean) => void;
   readonly onCommit: (value: CellValue) => void;
   readonly onCreateOption: (label: string) => Promise<SelectOption | null>;
+  /** What the record is called, shown in the reader so it names its record. */
+  readonly recordLabel?: string;
+  /**
+   * The record is archived. Its fields are `inert`, so nothing inside them can
+   * be clicked or tabbed to — including a reader button. They are shown in
+   * full instead, which is what a frozen record wants anyway.
+   */
+  readonly isFrozen?: boolean;
+  /**
+   * Whether this record accepts writes at all. The drawer already refuses to
+   * commit without it; without it here the field still opened an editor, and
+   * an editor whose commits are dropped is worse than no editor.
+   */
+  readonly canEdit?: boolean;
 }
 
 /**
@@ -50,11 +68,40 @@ export function DrawerField({
   onEditingChange,
   onCommit,
   onCreateOption,
+  recordLabel,
+  isFrozen = false,
+  canEdit = true,
 }: DrawerFieldProps) {
   const visual = columnVisual(column.type);
   const fieldId = useId();
   const labelId = `${fieldId}-label`;
   const valueId = `${fieldId}-value`;
+
+  const [isReading, setIsReading] = useState(false);
+
+  /**
+   * The drawer is where a record is read, so its text fields wrap instead of
+   * being clipped to a line — the panel has the width, and a step shown as
+   * `B1: Bấm vào đổi số điện…` is the one thing this surface exists to avoid.
+   *
+   * Past a few lines it still has to stop, which is what the reader is for.
+   */
+  const isWrapped = isFlexibleColumn(column);
+
+  /**
+   * Whether the wrap clamp is actually hiding something.
+   *
+   * Measured the way the clamp measures — lines the text *takes at this width*,
+   * not the newlines in it. An 800-character paragraph with no newlines is one
+   * "line" by that reading and sixteen on screen, so counting newlines put the
+   * reader button exactly where it was not needed and withheld it exactly where
+   * it was.
+   */
+  const mode: "full" | "wrap" | "compact" = isWrapped ? (isFrozen ? "full" : "wrap") : "compact";
+  const hasMore =
+    isWrapped &&
+    !isFrozen &&
+    estimateLines(cellText(value, column, context), DRAWER_FIELD_WIDTH, "full") > WRAP_MAX_LINES;
 
   return (
     <div
@@ -75,7 +122,7 @@ export function DrawerField({
         <span className="truncate">{column.name}</span>
       </Label>
 
-      <div className="relative min-w-0">
+      <div className="group/field relative min-w-0">
         {isEditing ? (
           <CellEditor
             value={value}
@@ -103,6 +150,7 @@ export function DrawerField({
             // field without its value, and from the value alone — which is
             // what a bare button does — without saying which field it is.
             aria-labelledby={`${labelId} ${valueId}`}
+            disabled={!canEdit}
             onClick={() => onEditingChange(true)}
             className={cn(
               // The floor is the control ladder's own 32px step rather than a
@@ -110,13 +158,69 @@ export function DrawerField({
               // editor that replaces it and the row never jumps on open.
               "flex min-h-[var(--control-md)] w-full items-center rounded-md text-left",
               "border border-transparent outline-none transition-colors",
-              "hover:border-border hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring",
+              canEdit && "hover:border-border hover:bg-hover",
+              "focus-visible:ring-2 focus-visible:ring-ring",
             )}
           >
-            <CellRenderer value={value} column={column} context={context} />
+            <CellRenderer
+              value={value}
+              column={column}
+              context={context}
+              mode={mode}
+              // The drawer's own column, not the table's: a field laid out at
+              // the width of the cell it came from would wrap at 180px inside
+              // a 360px panel.
+              width={DRAWER_FIELD_WIDTH}
+            />
+          </button>
+        )}
+
+        {/*
+          Reading the whole of a long value, without opening an editor for it.
+          Only where there is more than one line to read, and never while the
+          field is being edited — the editor already shows all of it.
+        */}
+        {!isEditing && hasMore && (
+          <button
+            type="button"
+            aria-label={`Read all of ${column.name}`}
+            title="Read the whole value"
+            onClick={() => setIsReading(true)}
+            // Faded rather than `hidden`: a display:none button cannot be
+            // tabbed to, so `focus-visible` on one is dead CSS and the only
+            // way to the reader would be a pointer. Opaque because it sits
+            // over the end of a line, and text showing through a button reads
+            // worse than the button does.
+            className="absolute right-1 top-1 rounded bg-elevated p-1 text-faint-foreground opacity-0 shadow-raise transition-opacity hover:bg-hover hover:text-foreground focus-visible:opacity-100 group-hover/field:opacity-100"
+          >
+            <Maximize2 className="size-3" />
           </button>
         )}
       </div>
+
+      <CellDetailDialog
+        column={isReading ? column : null}
+        value={isReading ? value : null}
+        context={context}
+        {...(recordLabel ? { recordLabel } : {})}
+        onClose={() => setIsReading(false)}
+        onEdit={
+          canEdit
+            ? () => {
+                setIsReading(false);
+                onEditingChange(true);
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }
+
+/**
+ * How wide the drawer's value column is, near enough.
+ *
+ * Only ever used to decide where text *would* wrap, never to size anything, so
+ * a few pixels either way changes nothing that is rendered.
+ */
+const DRAWER_FIELD_WIDTH = 360;

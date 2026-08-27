@@ -21,20 +21,20 @@ import type { CellDisplayMode, CellValue, StepNumbering } from "@/types";
 export function LongTextCellView({
   value,
   mode = "compact",
-  isInteractive = true,
   width,
+  hasReader = false,
 }: {
   readonly value: Extract<CellValue, { kind: "longText" }>;
   readonly mode?: CellDisplayMode;
-  readonly isInteractive?: boolean;
   readonly width: number;
+  readonly hasReader?: boolean;
 }) {
   return (
     <FlowedText
       text={value.value}
       mode={mode}
       width={width}
-      isInteractive={isInteractive}
+      hasReader={hasReader}
       className="text-lead text-muted-foreground"
     />
   );

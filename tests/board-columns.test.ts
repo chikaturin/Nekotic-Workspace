@@ -762,6 +762,60 @@ describe("the display mode belongs to the view", () => {
   });
 });
 
+describe("reading a cell in full", () => {
+  test("the reader is one dialog for the grid, addressed by cell", () => {
+    const grid = useGridStore.getState();
+
+    expect(grid.detailCell).toBeNull();
+
+    grid.openDetail("row_1", "col_steps");
+    expect(useGridStore.getState().detailCell).toEqual({
+      rowId: "row_1",
+      columnId: "col_steps",
+    });
+
+    useGridStore.getState().closeDetail();
+    expect(useGridStore.getState().detailCell).toBeNull();
+  });
+
+  test("opening the reader closes whatever editor was open", () => {
+    const grid = useGridStore.getState();
+    grid.beginEdit("row_1", "col_steps");
+    expect(useGridStore.getState().editing).not.toBeNull();
+
+    useGridStore.getState().openDetail("row_1", "col_steps");
+    expect(useGridStore.getState().editing).toBeNull();
+    expect(useGridStore.getState().detailCell).not.toBeNull();
+  });
+
+  test("a value that fits on one line has nothing to expand", () => {
+    // What decides whether the affordance is drawn at all.
+    expect(estimateLines("short", 180, "full")).toBe(1);
+    expect(estimateLines("x".repeat(400), 180, "full")).toBeGreaterThan(1);
+    expect(estimateLines("B1: one\nB2: two", 400, "full")).toBe(2);
+  });
+
+  test("the drawer knows when its clamp is hiding something", () => {
+    // The clamp counts lines the text *takes*, so the test that decides
+    // whether to offer the reader has to as well: a long paragraph with no
+    // newlines is one newline-delimited line and sixteen rendered ones.
+    const paragraph = "x".repeat(800);
+    const twoLines = "B1: one\nB2: two";
+
+    expect(paragraph.split("\n")).toHaveLength(1);
+    expect(estimateLines(paragraph, 360, "full")).toBeGreaterThan(WRAP_MAX_LINES);
+    expect(estimateLines(twoLines, 360, "full")).toBeLessThanOrEqual(WRAP_MAX_LINES);
+  });
+
+  test("a wide reader wraps a step less often than the column did", () => {
+    const step = "B1: Bấm vào đổi số điện thoại rồi nhập số mới và xác nhận OTP";
+
+    expect(estimateLines(step, 640, "full")).toBeLessThanOrEqual(
+      estimateLines(step, 180, "full"),
+    );
+  });
+});
+
 describe("editing one cell does not disturb the schema", () => {
   test("a cell edit leaves every column object identical", async () => {
     const board = await loadBoard();
