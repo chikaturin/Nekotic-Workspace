@@ -26,7 +26,21 @@ const mergeClasses = extendTailwindMerge({
         },
       ],
       shadow: [{ shadow: ["raise", "pop", "float"] }],
-      z: [{ z: ["base", "raised", "sticky", "overlay", "dropdown", "modal", "toast", "tooltip"] }],
+      z: [
+        {
+          z: [
+            "base",
+            "raised",
+            "sticky",
+            "sticky-header",
+            "overlay",
+            "dropdown",
+            "modal",
+            "toast",
+            "tooltip",
+          ],
+        },
+      ],
       opacity: ["is-disabled", "is-dragging", "is-pending", "is-frozen"],
     },
   },

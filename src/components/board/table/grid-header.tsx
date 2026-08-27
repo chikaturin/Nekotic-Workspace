@@ -80,7 +80,11 @@ export const GridHeader = memo(function GridHeader({
     <div
       role="row"
       aria-rowindex={1}
-      className="sticky top-0 z-sticky flex w-max border-b border-border bg-elevated"
+      // A rung above the frozen column and the row gutter, which are `z-sticky`
+      // and come later in the DOM: on the same rung the rows won the tie and
+      // painted straight over the first two header cells, so scrolling looked
+      // like the header's own left edge was being carried away with them.
+      className="sticky top-0 z-sticky-header flex w-max border-b border-border bg-elevated"
     >
       <div
         style={{ width: GUTTER_WIDTH }}

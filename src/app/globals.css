@@ -18,12 +18,20 @@
    */
   --z-base: 0;
   --z-raised: 10;          /* a focused grid cell, a sticky column     */
-  --z-sticky: 20;          /* sticky headers, the frozen first column  */
+  --z-sticky: 20;          /* a frozen column or row gutter            */
+  --z-sticky-header: 25;   /* the header the frozen column slides under */
   --z-overlay: 30;         /* the grid's own in-flow cell editor       */
   --z-modal: 40;           /* dialogs, drawers, their overlays         */
   --z-dropdown: 50;        /* menus, popovers, listboxes               */
   --z-toast: 60;           /* above a modal, on purpose                */
   --z-tooltip: 70;         /* above everything, including a toast      */
+
+  /* A table has two sticky planes and they are not peers: the frozen column
+   * sticks sideways, the header sticks downwards, and the column scrolls
+   * *under* the header rather than over it. Sharing one rung left that to DOM
+   * order, which puts the rows last — so the first two header cells were
+   * painted over by the very rows that should have been passing beneath them.
+   * This is the one-off the ten-apart spacing above was left room for. */
 
   /* Dropdown sits ABOVE modal, which looks wrong in a list and is right in
    * practice: a menu is always opened *from* something, so it has to paint
@@ -427,6 +435,7 @@
   .z-base { z-index: var(--z-base); }
   .z-raised { z-index: var(--z-raised); }
   .z-sticky { z-index: var(--z-sticky); }
+  .z-sticky-header { z-index: var(--z-sticky-header); }
   .z-overlay { z-index: var(--z-overlay); }
   .z-dropdown { z-index: var(--z-dropdown); }
   .z-modal { z-index: var(--z-modal); }

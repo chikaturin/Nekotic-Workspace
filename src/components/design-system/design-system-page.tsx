@@ -83,6 +83,7 @@ const LAYERS = [
   ["z-base", "0"],
   ["z-raised", "10"],
   ["z-sticky", "20"],
+  ["z-sticky-header", "25"],
   ["z-overlay", "30"],
   ["z-modal", "40"],
   ["z-dropdown", "50"],

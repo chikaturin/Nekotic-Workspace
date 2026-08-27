@@ -119,6 +119,7 @@ describe("token scales", () => {
     "base",
     "raised",
     "sticky",
+    "sticky-header",
     "overlay",
     "modal",
     "dropdown",
@@ -165,6 +166,31 @@ describe("token scales", () => {
     expect(layer("dropdown")).toBeGreaterThan(layer("modal"));
     expect(layer("toast")).toBeGreaterThan(layer("dropdown"));
     expect(layer("tooltip")).toBeGreaterThan(layer("toast"));
+  });
+
+  /**
+   * A table's two sticky planes are not peers. The frozen column sticks
+   * sideways and the header sticks downwards, and the column passes *under*
+   * the header — so on a shared rung the rows, which come later in the DOM,
+   * won the tie and painted over the first two header cells.
+   */
+  test("a sticky header outranks the frozen column that scrolls under it", () => {
+    const layer = (name: string) => Number(new RegExp(`--z-${name}:\\s*(\\d+)`).exec(CSS)?.[1]);
+
+    expect(layer("sticky-header")).toBeGreaterThan(layer("sticky"));
+    // And still below the editor layer, so a cell editor is not trapped under
+    // a header it has nothing to do with.
+    expect(layer("sticky-header")).toBeLessThan(layer("overlay"));
+  });
+
+  /** A layer nothing can spell is a layer nobody can use. */
+  test("every layer has a utility class, and `cn` knows it is one", () => {
+    for (const layer of LAYERS) {
+      expect(CSS).toContain(`.z-${layer} { z-index: var(--z-${layer}); }`);
+    }
+
+    expect(cn("z-sticky", "z-sticky-header")).toBe("z-sticky-header");
+    expect(cn("z-sticky-header", "z-sticky")).toBe("z-sticky");
   });
 
   test("the control ladder binds a padding to every height", () => {
