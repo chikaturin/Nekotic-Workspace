@@ -16,7 +16,7 @@ export function ApiDuplicateBanner({ report }: { report: DuplicateReport }) {
 
   return (
     <div className="shrink-0 border-b border-warning/30 bg-warning/10 px-4 py-2">
-      <p className="flex items-center gap-1.5 text-[12px] font-medium text-warning">
+      <p className="flex items-center gap-1.5 text-ui font-medium text-warning">
         <TriangleAlert className="size-3.5" />
         {report.groups.length} endpoint {report.groups.length === 1 ? "pair is" : "pairs are"}{" "}
         documented more than once
@@ -31,7 +31,7 @@ export function ApiDuplicateBanner({ report }: { report: DuplicateReport }) {
                 const first = group.rowIds[0];
                 if (first) openDrawer(first);
               }}
-              className="flex items-center gap-1.5 rounded-full border border-warning/40 bg-background px-2 py-0.5 text-[11px] hover:border-warning"
+              className="flex items-center gap-1.5 rounded-full border border-warning/40 bg-background px-2 py-0.5 text-body hover:border-warning"
             >
               <Badge variant="default" className="border-0 bg-transparent p-0">
                 {group.method}

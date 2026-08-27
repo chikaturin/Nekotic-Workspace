@@ -30,7 +30,7 @@ export function GanttTimelineHeader({ scale, height }: GanttTimelineHeaderProps)
             style={{ left: band.offset * dayWidth, width: band.days * dayWidth }}
             className="absolute inset-y-0 flex items-center overflow-hidden border-l border-border px-1.5"
           >
-            <span className="truncate text-[11px] font-medium text-foreground">{band.label}</span>
+            <span className="truncate text-body font-medium text-foreground">{band.label}</span>
           </div>
         ))}
       </div>
@@ -41,7 +41,7 @@ export function GanttTimelineHeader({ scale, height }: GanttTimelineHeaderProps)
             key={tick.iso}
             style={{ left: tick.offset * dayWidth }}
             className={cn(
-              "absolute inset-y-0 flex items-center whitespace-nowrap border-l pl-1 text-[10px]",
+              "absolute inset-y-0 flex items-center whitespace-nowrap border-l pl-1 text-micro",
               tick.isMajor ? "border-border text-muted-foreground" : "border-hairline text-faint-foreground",
             )}
           >

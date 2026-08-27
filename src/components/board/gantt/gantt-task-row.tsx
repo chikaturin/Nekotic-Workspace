@@ -68,15 +68,15 @@ export const GanttTaskRow = memo(function GanttTaskRow({
         onClick={() => useGridStore.getState().openDrawer(row.rowId)}
         className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
       >
-        <span className="metric shrink-0 text-[10px] text-faint-foreground">
+        <span className="metric shrink-0 text-micro text-faint-foreground">
           {record.displayId}
         </span>
-        <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">
+        <span className="min-w-0 flex-1 truncate text-ui text-foreground">
           {label || "Untitled"}
         </span>
 
         {row.progress && (
-          <span className="metric shrink-0 text-[10px] text-faint-foreground">
+          <span className="metric shrink-0 text-micro text-faint-foreground">
             {row.progress.percent}%
           </span>
         )}

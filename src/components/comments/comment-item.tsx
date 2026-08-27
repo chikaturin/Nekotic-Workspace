@@ -53,29 +53,29 @@ export function CommentItem({
       <div
         className={cn(
           "min-w-0 flex-1 rounded-lg border border-border bg-surface px-2.5 py-2",
-          comment.isPending && "opacity-60",
+          comment.isPending && "is-pending",
         )}
       >
         <header className="flex items-baseline gap-2">
-          <span className="truncate text-[12px] font-medium text-foreground">
+          <span className="truncate text-ui font-medium text-foreground">
             {comment.author.name}
           </span>
           {!comment.author.isActive && (
-            <span className="metric text-[10px] text-faint-foreground">former member</span>
+            <span className="metric text-micro text-faint-foreground">former member</span>
           )}
-          <span className="metric text-[10px] text-faint-foreground">
+          <span className="metric text-micro text-faint-foreground">
             {formatRelativeTime(comment.createdAt)}
           </span>
           {comment.isEdited && (
             <span
-              className="metric text-[10px] text-faint-foreground"
+              className="metric text-micro text-faint-foreground"
               title={`Edited ${formatRelativeTime(comment.updatedAt)}`}
             >
               · edited
             </span>
           )}
           {comment.isPending && (
-            <span className="metric text-[10px] text-faint-foreground">· sending…</span>
+            <span className="metric text-micro text-faint-foreground">· sending…</span>
           )}
         </header>
 
@@ -95,7 +95,7 @@ export function CommentItem({
               <Button
                 size="sm"
                 variant="default"
-                className="h-6 px-2 text-[11px]"
+                className="h-6 px-2 text-body"
                 disabled={isBusy || editValue.trim().length === 0}
                 onClick={() => void save()}
               >
@@ -104,7 +104,7 @@ export function CommentItem({
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-6 px-2 text-[11px]"
+                className="h-6 px-2 text-body"
                 onClick={() => setEditValue(null)}
               >
                 Cancel
@@ -122,7 +122,7 @@ export function CommentItem({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-5 gap-1 px-1.5 text-[10px]"
+                    className="h-5 gap-1 px-1.5 text-micro"
                     onClick={onReply}
                   >
                     <Reply />
@@ -133,7 +133,7 @@ export function CommentItem({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-5 gap-1 px-1.5 text-[10px]"
+                    className="h-5 gap-1 px-1.5 text-micro"
                     onClick={() => setEditValue(comment.body)}
                   >
                     <Pencil />

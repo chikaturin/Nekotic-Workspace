@@ -44,7 +44,7 @@ export function EmbedBlock({ block, onChange, isEditable }: EmbedBlockProps) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-surface/60 p-5 text-center">
         <LayoutGrid className="mx-auto size-6 text-faint-foreground" strokeWidth={1.5} />
-        <p className="mt-2 text-[13px] text-muted-foreground">Choose a board to embed</p>
+        <p className="mt-2 text-lead text-muted-foreground">Choose a board to embed</p>
 
         <SelectField
           aria-label="Board to embed"
@@ -79,11 +79,11 @@ export function EmbedBlock({ block, onChange, isEditable }: EmbedBlockProps) {
   if (embed.status === "missing") {
     return (
       <div className="rounded-lg border border-danger/30 bg-danger/10 p-4">
-        <p className="flex items-center gap-1.5 text-[13px] font-medium text-danger">
+        <p className="flex items-center gap-1.5 text-lead font-medium text-danger">
           <TriangleAlert className="size-4" />
           This board no longer exists
         </p>
-        <p className="mt-1 text-[12px] text-muted-foreground">
+        <p className="mt-1 text-ui text-muted-foreground">
           The embedded view points at a board that has been deleted or moved out of reach. The
           page itself is unaffected.
         </p>
@@ -105,7 +105,7 @@ export function EmbedBlock({ block, onChange, isEditable }: EmbedBlockProps) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-border bg-surface p-3">
         <TriangleAlert className="size-4 shrink-0 text-warning" />
-        <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
+        <span className="min-w-0 flex-1 truncate text-ui text-muted-foreground">
           {embed.message ?? "The board could not be loaded"}
         </span>
         <Button size="sm" variant="ghost" className="gap-1.5" onClick={embed.reload}>
@@ -124,14 +124,14 @@ export function EmbedBlock({ block, onChange, isEditable }: EmbedBlockProps) {
     <div className="overflow-hidden rounded-lg border border-border bg-surface">
       <header className="flex flex-wrap items-center gap-2 border-b border-hairline px-3 py-2">
         <LayoutGrid className="size-3.5 shrink-0 text-faint-foreground" />
-        <span className="text-[12px] font-medium text-foreground">{embed.board?.name}</span>
+        <span className="text-ui font-medium text-foreground">{embed.board?.name}</span>
 
         <SelectField
           aria-label="Saved view"
           value={embed.view?.id ?? ""}
           disabled={!isEditable}
           onChange={(event) => onChange({ ...block, viewId: event.target.value })}
-          className="h-6 text-[11px]"
+          className="h-6 text-body"
         >
           {embed.board?.views.map((view) => (
             <option key={view.id} value={view.id}>
@@ -144,7 +144,7 @@ export function EmbedBlock({ block, onChange, isEditable }: EmbedBlockProps) {
 
         <Link
           href={href}
-          className="ml-auto flex items-center gap-1 text-[11px] text-accent no-underline hover:underline"
+          className="ml-auto flex items-center gap-1 text-body text-accent no-underline hover:underline"
         >
           Open board
           <ExternalLink className="size-3" />
@@ -152,14 +152,14 @@ export function EmbedBlock({ block, onChange, isEditable }: EmbedBlockProps) {
       </header>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-[12px]">
+        <table className="w-full border-collapse text-ui">
           <thead>
             <tr>
               {embed.columns.map((column) => (
                 <th
                   key={column.id}
                   scope="col"
-                  className="border-b border-hairline px-2 py-1.5 text-left text-[10px] font-medium uppercase tracking-wider text-faint-foreground"
+                  className="border-b border-hairline px-2 py-1.5 text-left text-micro font-medium uppercase tracking-wider text-faint-foreground"
                 >
                   {column.name}
                 </th>
@@ -225,11 +225,11 @@ export function EmbedBlock({ block, onChange, isEditable }: EmbedBlockProps) {
       </div>
 
       <footer className="flex items-center gap-2 border-t border-hairline px-3 py-1.5">
-        <span className="metric text-[10px] text-faint-foreground">
+        <span className="metric text-micro text-faint-foreground">
           Live from the board · edits here write to the source
         </span>
         {hidden > 0 && (
-          <Link href={href} className="metric ml-auto text-[10px] text-accent no-underline">
+          <Link href={href} className="metric ml-auto text-micro text-accent no-underline">
             {hidden} more in the board
           </Link>
         )}

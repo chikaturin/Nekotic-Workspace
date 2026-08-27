@@ -33,10 +33,10 @@ export function OnboardingPanel() {
       </span>
 
       <div className="space-y-1.5">
-        <h2 className="text-base font-semibold tracking-tight text-foreground">
+        <h2 className="text-title font-semibold tracking-tight text-foreground">
           Nothing to report yet
         </h2>
-        <p className="text-[13px] text-muted-foreground">
+        <p className="text-lead text-muted-foreground">
           The dashboard reads your boards. Start one and its first task will show
           up here as soon as it has a status.
         </p>
@@ -56,7 +56,7 @@ export function OnboardingPanel() {
       </Button>
 
       {!canCreate && (
-        <p className="text-[11px] text-faint-foreground">{requirementFor("board.create")}</p>
+        <p className="text-body text-faint-foreground">{requirementFor("board.create")}</p>
       )}
     </motion.section>
   );

@@ -38,10 +38,10 @@ export function UploadTaskRow({ task, onCancel, onRetry, onRemove }: UploadTaskR
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <p className="min-w-0 flex-1 truncate text-[13px] text-foreground">{task.fileName}</p>
+          <p className="min-w-0 flex-1 truncate text-lead text-foreground">{task.fileName}</p>
           <span
             className={cn(
-              "metric shrink-0 text-[10px]",
+              "metric shrink-0 text-micro",
               task.status === "error" ? "text-danger" : "text-faint-foreground",
             )}
           >
@@ -57,7 +57,7 @@ export function UploadTaskRow({ task, onCancel, onRetry, onRemove }: UploadTaskR
           />
         )}
 
-        <p className="metric mt-1 truncate text-[10px] text-faint-foreground">
+        <p className="metric mt-1 truncate text-micro text-faint-foreground">
           {task.status === "error" && task.error
             ? task.error.message
             : `${kind.toUpperCase()} · ${formatBytes(task.sizeBytes)}`}

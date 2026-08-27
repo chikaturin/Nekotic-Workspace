@@ -56,15 +56,15 @@ export function ExportDialog({
     >
       <DialogContent className="max-w-lg p-0">
         <header className="border-b border-border px-5 py-4 pr-12">
-          <DialogTitle className="text-sm font-semibold text-foreground">Export records</DialogTitle>
-          <DialogDescription className="mt-1 text-[12px] text-muted-foreground">
+          <DialogTitle className="text-lead font-semibold text-foreground">Export records</DialogTitle>
+          <DialogDescription className="mt-1 text-ui text-muted-foreground">
             Every format is written from the same values, so the three files always agree.
           </DialogDescription>
         </header>
 
         <div className="space-y-4 px-5 py-4">
           <fieldset>
-            <legend className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-faint-foreground">
+            <legend className="mb-1.5 text-body font-semibold uppercase tracking-wider text-faint-foreground">
               Format
             </legend>
             <div className="grid grid-cols-3 gap-2">
@@ -86,10 +86,10 @@ export function ExportDialog({
                     )}
                   >
                     <Icon className={cn("size-4", isActive ? "text-accent" : "text-faint-foreground")} />
-                    <span className="text-[12px] font-medium text-foreground">
+                    <span className="text-ui font-medium text-foreground">
                       {EXPORT_FORMAT_LABELS[candidate]}
                     </span>
-                    <span className="text-[10px] leading-snug text-faint-foreground">
+                    <span className="text-micro leading-snug text-faint-foreground">
                       {FORMAT_HINTS[candidate]}
                     </span>
                   </button>
@@ -99,7 +99,7 @@ export function ExportDialog({
           </fieldset>
 
           <fieldset>
-            <legend className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-faint-foreground">
+            <legend className="mb-1.5 text-body font-semibold uppercase tracking-wider text-faint-foreground">
               Scope
             </legend>
             <div className="space-y-1">
@@ -127,10 +127,10 @@ export function ExportDialog({
                       onChange={() => setScope(candidate)}
                       className="size-3.5 accent-[var(--accent)]"
                     />
-                    <span className="flex-1 text-[12px] text-foreground">
+                    <span className="flex-1 text-ui text-foreground">
                       {EXPORT_SCOPE_LABELS[candidate]}
                     </span>
-                    <span className="metric text-[11px] text-faint-foreground">
+                    <span className="metric text-body text-faint-foreground">
                       {formatCount(count, "record")}
                     </span>
                   </label>
@@ -140,7 +140,7 @@ export function ExportDialog({
           </fieldset>
 
           {controller.omittedColumns.length > 0 && (
-            <p className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] leading-relaxed text-foreground">
+            <p className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-body leading-relaxed text-foreground">
               <ShieldOff className="mt-px size-3.5 shrink-0 text-warning" />
               <span>
                 {controller.omittedColumns.join(", ")}{" "}

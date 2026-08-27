@@ -67,7 +67,7 @@ export function AppSidebar() {
       initial={false}
       animate={{ width: isCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED }}
       transition={{ type: "spring", stiffness: 420, damping: 40, mass: 0.7 }}
-      className="relative z-20 flex h-full shrink-0 flex-col border-r border-border bg-surface"
+      className="relative z-sticky flex h-full shrink-0 flex-col border-r border-border bg-surface"
       aria-label="Workspace navigation"
     >
       <div className={cn("flex h-14 shrink-0 items-center px-2", isCollapsed && "justify-center px-1")}>

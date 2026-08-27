@@ -94,7 +94,7 @@ export function ColumnMenu({ column, columns, can, onRename, onConvert }: Column
               >
                 {COLUMN_TYPE_LABELS[type]}
                 {type === column.type && (
-                  <span className="ml-auto text-[10px] text-faint-foreground">current</span>
+                  <span className="ml-auto text-micro text-faint-foreground">current</span>
                 )}
               </DropdownMenuItem>
             ))}
@@ -128,7 +128,7 @@ export function ColumnMenu({ column, columns, can, onRename, onConvert }: Column
                 >
                   {board.name}
                   {column.config.boardId === board.boardId && (
-                    <span className="ml-auto text-[10px] text-faint-foreground">linked</span>
+                    <span className="ml-auto text-micro text-faint-foreground">linked</span>
                   )}
                 </DropdownMenuItem>
               ))}

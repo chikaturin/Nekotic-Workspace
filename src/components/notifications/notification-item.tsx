@@ -46,12 +46,12 @@ export function NotificationItem({
       <UserAvatar user={notification.actor} className={isCompact ? "size-6" : "size-7"} />
 
       <span className="min-w-0 flex-1">
-        <span className="block text-[13px] font-medium text-foreground">{notification.title}</span>
-        <span className="mt-0.5 line-clamp-2 block text-[12px] text-muted-foreground">
+        <span className="block text-lead font-medium text-foreground">{notification.title}</span>
+        <span className="mt-0.5 line-clamp-2 block text-ui text-muted-foreground">
           {notification.body}
         </span>
 
-        <span className="metric mt-1 flex items-center gap-1.5 text-[10px] text-faint-foreground">
+        <span className="metric mt-1 flex items-center gap-1.5 text-micro text-faint-foreground">
           <Icon className="size-3" />
           {formatRelativeTime(notification.createdAt)}
           {notification.target && (

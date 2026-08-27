@@ -62,7 +62,7 @@ export function BlockEditor({ blocks, api, isEditable, folderId }: BlockEditorPr
           type="button"
           onClick={() => api.appendBlock()}
           className={cn(
-            "mt-1 h-16 rounded-md pl-12 text-left text-[13px] text-transparent transition-colors",
+            "mt-1 h-16 rounded-md pl-12 text-left text-lead text-transparent transition-colors",
             "hover:text-faint-foreground focus-visible:text-faint-foreground focus-visible:outline-none",
           )}
         >

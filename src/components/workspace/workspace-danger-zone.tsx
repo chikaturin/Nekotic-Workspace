@@ -40,15 +40,15 @@ export function WorkspaceDangerZone({ onDeleted }: { readonly onDeleted: () => v
   return (
     <div className="max-w-lg space-y-3 rounded-md border border-danger/40 bg-danger/5 p-4">
       <div>
-        <h3 className="text-[13px] font-semibold text-foreground">Delete this workspace</h3>
-        <p className="mt-1 text-[12px] text-muted-foreground">
+        <h3 className="text-lead font-semibold text-foreground">Delete this workspace</h3>
+        <p className="mt-1 text-ui text-muted-foreground">
           Every folder, board, page and file in {workspace.name} goes with it, for everybody.
           This cannot be undone.
         </p>
       </div>
 
       <label className="block">
-        <span className="mb-1 block text-[11px] font-medium text-muted-foreground">
+        <span className="mb-1 block text-body font-medium text-muted-foreground">
           Type <span className="text-foreground">{workspace.name}</span> to confirm
         </span>
         <Input

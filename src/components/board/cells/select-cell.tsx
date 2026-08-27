@@ -23,7 +23,7 @@ export function SelectChip({ option, onRemove }: { option: SelectOption; onRemov
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+        "inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-body font-medium",
         SELECT_COLOR_CLASSES[option.color],
       )}
     >
@@ -181,7 +181,7 @@ export function SelectCellEditor({
               else if (canCreate) void create();
             }
           }}
-          className="h-7 text-[12px]"
+          className="h-7 text-ui"
         />
       </div>
 
@@ -201,7 +201,7 @@ export function SelectCellEditor({
                 onClick={() => toggle(entry)}
                 className={cn(
                   "flex w-full items-center gap-2 rounded px-1.5 py-1 text-left hover:bg-hover",
-                  !isAvailable && "cursor-not-allowed opacity-55 hover:bg-transparent",
+                  !isAvailable && "cursor-not-allowed is-disabled hover:bg-transparent",
                 )}
               >
                 <SelectChip option={option} />
@@ -212,7 +212,7 @@ export function SelectCellEditor({
               {!isAvailable && (
                 <p
                   className={cn(
-                    "px-1.5 pb-1 text-[10px]",
+                    "px-1.5 pb-1 text-micro",
                     isBlocked ? "text-danger" : "text-faint-foreground",
                   )}
                 >
@@ -224,7 +224,7 @@ export function SelectCellEditor({
         })}
 
         {matches.length === 0 && !canCreate && (
-          <li className="px-1.5 py-2 text-[11px] text-faint-foreground">
+          <li className="px-1.5 py-2 text-body text-faint-foreground">
             {behavior === "hidden"
               ? "No option is available for this record right now."
               : "No match."}
@@ -237,7 +237,7 @@ export function SelectCellEditor({
               type="button"
               disabled={isCreating}
               onClick={() => void create()}
-              className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-[12px] text-accent hover:bg-hover"
+              className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-ui text-accent hover:bg-hover"
             >
               <Plus className="size-3.5" />
               Create “{query.trim()}”
@@ -251,7 +251,7 @@ export function SelectCellEditor({
           <button
             type="button"
             onClick={() => onCommit({ kind: "select", optionIds: selected })}
-            className="rounded bg-accent px-2 py-1 text-[11px] font-medium text-accent-foreground"
+            className="rounded bg-accent px-2 py-1 text-body font-medium text-accent-foreground"
           >
             Apply
           </button>

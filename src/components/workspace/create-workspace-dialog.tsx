@@ -69,8 +69,8 @@ export function CreateWorkspaceDialog({ isOpen, onClose }: CreateWorkspaceDialog
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
       <DialogContent className="max-w-md p-5">
-        <DialogTitle className="text-[15px]">Create workspace</DialogTitle>
-        <DialogDescription className="mt-1 text-[12px] text-muted-foreground">
+        <DialogTitle className="text-title">Create workspace</DialogTitle>
+        <DialogDescription className="mt-1 text-ui text-muted-foreground">
           A workspace holds its own drive, its own people and its own permissions.
           Nothing is shared with the ones you are already in.
         </DialogDescription>
@@ -83,7 +83,7 @@ export function CreateWorkspaceDialog({ isOpen, onClose }: CreateWorkspaceDialog
           }}
         >
           <label className="block">
-            <span className="mb-1 block text-[11px] font-medium text-muted-foreground">
+            <span className="mb-1 block text-body font-medium text-muted-foreground">
               Workspace name <span className="text-danger">*</span>
             </span>
             <Input
@@ -101,7 +101,7 @@ export function CreateWorkspaceDialog({ isOpen, onClose }: CreateWorkspaceDialog
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-[11px] font-medium text-muted-foreground">
+            <span className="mb-1 block text-body font-medium text-muted-foreground">
               Description
             </span>
             <textarea
@@ -111,24 +111,24 @@ export function CreateWorkspaceDialog({ isOpen, onClose }: CreateWorkspaceDialog
               placeholder="Development workspace for NexDrop products."
               aria-label="Workspace description"
               onChange={(event) => setDescription(event.target.value)}
-              className="w-full resize-none rounded-md border border-border bg-surface px-2 py-1.5 text-[12px] text-foreground outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring"
+              className="w-full resize-none rounded-md border border-border bg-surface px-2 py-1.5 text-ui text-foreground outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring"
             />
           </label>
 
           <div className="flex items-center gap-2 rounded-md border border-hairline bg-surface px-2.5 py-2">
             <span
-              className="metric flex size-7 shrink-0 items-center justify-center rounded-md bg-accent-soft text-[11px] font-bold text-accent"
+              className="metric flex size-7 shrink-0 items-center justify-center rounded-md bg-accent-soft text-body font-bold text-accent"
               aria-hidden
             >
               {badgeFor(name || "Workspace")}
             </span>
-            <span className="text-[11px] text-faint-foreground">
+            <span className="text-body text-faint-foreground">
               The tile the switcher shows. Taken from the name.
             </span>
           </div>
 
           {error && (
-            <p role="alert" className="text-[11px] text-danger">
+            <p role="alert" className="text-body text-danger">
               {error}
             </p>
           )}

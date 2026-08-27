@@ -58,7 +58,7 @@ export function EditorToolbar({ onInsert, isDisabled, className }: EditorToolbar
       onKeyDown={handleKeyDown}
       className={cn(
         "flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-surface p-1",
-        isDisabled && "opacity-60",
+        isDisabled && "is-disabled",
         className,
       )}
     >

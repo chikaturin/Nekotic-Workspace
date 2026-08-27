@@ -26,7 +26,7 @@ export function NotificationTabs({ tab, unreadPerTab, onSelect }: NotificationTa
             aria-selected={isActive}
             onClick={() => onSelect(definition.id)}
             className={cn(
-              "flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] transition-colors",
+              "flex items-center gap-1.5 rounded-md px-2 py-1 text-ui transition-colors",
               isActive
                 ? "bg-accent-soft text-accent"
                 : "text-muted-foreground hover:bg-hover hover:text-foreground",
@@ -36,7 +36,7 @@ export function NotificationTabs({ tab, unreadPerTab, onSelect }: NotificationTa
             {unread > 0 && (
               <span
                 className={cn(
-                  "metric rounded-full px-1 text-[10px]",
+                  "metric rounded-full px-1 text-micro",
                   isActive ? "bg-accent text-accent-foreground" : "bg-hover text-faint-foreground",
                 )}
               >

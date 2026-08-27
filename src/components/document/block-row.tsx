@@ -207,7 +207,7 @@ export function BlockRow({
       className={cn(
         "group/block relative flex gap-1 rounded-md outline-none transition-opacity",
         "focus-visible:ring-2 focus-visible:ring-ring",
-        isDragging && "opacity-40",
+        isDragging && "is-dragging",
       )}
     >
       {showIndicatorBefore && <DropLine position="top" />}

@@ -78,7 +78,7 @@ export const GridRow = memo(function GridRow({
       <div
         style={{ width: GUTTER_WIDTH }}
         className={cn(
-          "sticky left-0 z-20 flex shrink-0 items-center gap-1 border-b border-r border-hairline px-1.5",
+          "sticky left-0 z-sticky flex shrink-0 items-center gap-1 border-b border-r border-hairline px-1.5",
           isWarned ? "border-l-2 border-l-warning bg-warning/10" : "bg-surface",
           isSelected && "bg-selection",
         )}
@@ -96,7 +96,7 @@ export const GridRow = memo(function GridRow({
 
         <span
           className={cn(
-            "metric w-5 shrink-0 text-right text-[10px] text-faint-foreground",
+            "metric w-5 shrink-0 text-right text-micro text-faint-foreground",
             "group-hover/row:hidden",
           )}
         >
@@ -129,7 +129,7 @@ export const GridRow = memo(function GridRow({
         )}
       </div>
 
-      <div className={cn("flex", isArchived && "opacity-60")}>
+      <div className={cn("flex", isArchived && "is-frozen")}>
         {shared.columns.map((column, columnIndex) => (
           <GridCell
             key={column.id}

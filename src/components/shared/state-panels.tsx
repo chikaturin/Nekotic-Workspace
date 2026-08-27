@@ -60,8 +60,8 @@ export function StatePanel({
       </span>
 
       <div className="space-y-1">
-        <p className="text-sm font-medium text-foreground">{title}</p>
-        <p className="mx-auto max-w-sm text-[13px] text-muted-foreground">{description}</p>
+        <p className="text-lead font-medium text-foreground">{title}</p>
+        <p className="mx-auto max-w-sm text-lead text-muted-foreground">{description}</p>
       </div>
 
       {action &&
@@ -103,7 +103,7 @@ export function PermissionDeniedState({ error }: { error: AppError }) {
 
 export function InlineSpinner({ label }: { label: string }) {
   return (
-    <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+    <span className="flex items-center gap-1.5 text-body text-muted-foreground">
       <LoaderCircle className="size-3 animate-spin" />
       {label}
     </span>

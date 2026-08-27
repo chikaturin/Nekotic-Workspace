@@ -16,7 +16,7 @@ export function CommentBody({ body, className }: { body: string; className?: str
   const segments = useMemo(() => parseBody(body), [body]);
 
   return (
-    <p className={cn("whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground", className)}>
+    <p className={cn("whitespace-pre-wrap text-lead leading-relaxed text-muted-foreground", className)}>
       {segments.map((segment, index) => {
         if (segment.kind === "text") return <span key={index}>{segment.text}</span>;
 
@@ -24,7 +24,7 @@ export function CommentBody({ body, className }: { body: string; className?: str
           return (
             <span
               key={index}
-              className="metric rounded bg-hover px-1 text-[12px] text-foreground"
+              className="metric rounded bg-hover px-1 text-ui text-foreground"
             >
               {segment.displayId}
             </span>
@@ -36,7 +36,7 @@ export function CommentBody({ body, className }: { body: string; className?: str
           <span
             key={index}
             className={cn(
-              "rounded px-1 text-[12px] font-medium",
+              "rounded px-1 text-ui font-medium",
               isMe ? "bg-accent text-accent-foreground" : "bg-accent-soft text-accent",
             )}
           >

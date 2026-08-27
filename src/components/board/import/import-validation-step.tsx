@@ -42,12 +42,12 @@ export function ImportValidationStep({ plan, policy, onSetPolicy }: ImportValida
         </span>
 
         <div className="min-w-0">
-          <p className="text-[13px] font-medium text-foreground">
+          <p className="text-lead font-medium text-foreground">
             {isClean
               ? `${formatCount(plan.validCount, "row")} ready to import`
               : `${formatCount(plan.invalidCount, "row")} ${plan.invalidCount === 1 ? "needs" : "need"} a decision`}
           </p>
-          <p className="metric text-[11px] text-faint-foreground">
+          <p className="metric text-body text-faint-foreground">
             {plan.validCount} clean · {plan.invalidCount} flagged
             {plan.blankCount > 0 && ` · ${formatCount(plan.blankCount, "empty row")} ignored`}
           </p>
@@ -57,7 +57,7 @@ export function ImportValidationStep({ plan, policy, onSetPolicy }: ImportValida
       {!isClean && (
         <>
           <fieldset className="space-y-1">
-            <legend className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-faint-foreground">
+            <legend className="mb-1 text-body font-semibold uppercase tracking-wider text-faint-foreground">
               Rows with a value the column cannot read
             </legend>
 
@@ -65,7 +65,7 @@ export function ImportValidationStep({ plan, policy, onSetPolicy }: ImportValida
               <label
                 key={candidate}
                 className={cn(
-                  "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-[12px] transition-colors",
+                  "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-ui transition-colors",
                   policy === candidate
                     ? "border-accent bg-accent-soft text-foreground"
                     : "border-border text-muted-foreground hover:bg-hover",
@@ -84,7 +84,7 @@ export function ImportValidationStep({ plan, policy, onSetPolicy }: ImportValida
           </fieldset>
 
           <div className="max-h-64 overflow-auto rounded-lg border border-border">
-            <table className="w-full border-collapse text-left text-[11px]">
+            <table className="w-full border-collapse text-left text-body">
               <thead className="sticky top-0 bg-surface">
                 <tr className="border-b border-border">
                   <th className="w-14 p-2 font-medium text-faint-foreground">Row</th>
@@ -114,7 +114,7 @@ export function ImportValidationStep({ plan, policy, onSetPolicy }: ImportValida
           </div>
 
           {plan.issues.length > shown.length && (
-            <p className="metric text-[11px] text-faint-foreground">
+            <p className="metric text-body text-faint-foreground">
               …and {plan.issues.length - shown.length} more findings across the file.
             </p>
           )}

@@ -96,7 +96,7 @@ export function ImageBlock({ block, onChange, isEditable, folderId }: ImageBlock
                   {brokenUrls.includes(image.url) ? (
                     <span className="flex aspect-4/3 flex-col items-center justify-center gap-1.5 p-4 text-center">
                       <ImageOff className="size-5 text-faint-foreground" />
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-body text-muted-foreground">
                         No longer available in this session
                       </span>
                     </span>
@@ -117,7 +117,7 @@ export function ImageBlock({ block, onChange, isEditable, folderId }: ImageBlock
                     variant="outline"
                     aria-label={`Remove image ${index + 1}`}
                     onClick={() => removeAt(index)}
-                    className="absolute right-1.5 top-1.5 opacity-0 shadow-md transition-opacity focus-visible:opacity-100 group-hover/tile:opacity-100"
+                    className="absolute right-1.5 top-1.5 opacity-0 shadow-pop transition-opacity focus-visible:opacity-100 group-hover/tile:opacity-100"
                   >
                     <X />
                   </Button>
@@ -138,7 +138,7 @@ export function ImageBlock({ block, onChange, isEditable, folderId }: ImageBlock
                   ) : (
                     <Plus className="size-5" />
                   )}
-                  <span className="text-[11px]">{isUploading ? "Uploading…" : "Add more"}</span>
+                  <span className="text-body">{isUploading ? "Uploading…" : "Add more"}</span>
                 </button>
               </li>
             )}
@@ -147,11 +147,11 @@ export function ImageBlock({ block, onChange, isEditable, folderId }: ImageBlock
           <div
             className={cn(
               "flex flex-col items-center gap-2.5 rounded-lg border border-dashed border-border bg-surface/60 p-8 text-center",
-              !isEditable && "opacity-70",
+              !isEditable && "is-disabled",
             )}
           >
             <ImagePlus className="size-7 text-faint-foreground" strokeWidth={1.5} />
-            <p className="text-[13px] text-muted-foreground">
+            <p className="text-lead text-muted-foreground">
               {isEditable ? "Drop images here, or add them from your computer" : "No images yet"}
             </p>
             {isEditable && (
@@ -177,10 +177,10 @@ export function ImageBlock({ block, onChange, isEditable, folderId }: ImageBlock
           onChange={(event) => onChange({ ...block, caption: event.target.value })}
           placeholder="Add a caption…"
           aria-label="Image caption"
-          className="h-7 border-transparent bg-transparent px-1 text-[12px] text-muted-foreground hover:border-border"
+          className="h-7 border-transparent bg-transparent px-1 text-ui text-muted-foreground hover:border-border"
         />
         {hasImages && (
-          <span className="metric shrink-0 text-[10px] text-faint-foreground">
+          <span className="metric shrink-0 text-micro text-faint-foreground">
             {images.length} {images.length === 1 ? "image" : "images"}
           </span>
         )}

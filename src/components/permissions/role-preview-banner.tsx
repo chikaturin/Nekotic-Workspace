@@ -29,7 +29,7 @@ export function RolePreviewBanner() {
           className="flex shrink-0 items-center gap-2 border-b border-accent/30 bg-accent-soft px-4 py-1.5"
         >
           <Eye className="size-3.5 shrink-0 text-accent" />
-          <p className="min-w-0 flex-1 truncate text-[12px] text-foreground">
+          <p className="min-w-0 flex-1 truncate text-ui text-foreground">
             Previewing as <strong className="font-medium">{ROLE_LABELS[previewRole]}</strong> — the
             interface is narrowed to what that role may do.
           </p>

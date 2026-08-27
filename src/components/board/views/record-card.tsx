@@ -92,15 +92,15 @@ export const RecordCard = memo(function RecordCard({
         isOpen ? "border-accent ring-1 ring-accent" : "border-border",
         canDrag && "active:cursor-grabbing",
         density === "card" ? "p-2.5" : "px-1.5 py-1",
-        row.isPending && "opacity-60",
+        row.isPending && "is-pending",
       )}
     >
       <div className="flex items-baseline gap-1.5">
-        <span className="metric shrink-0 text-[10px] text-faint-foreground">{row.displayId}</span>
+        <span className="metric shrink-0 text-micro text-faint-foreground">{row.displayId}</span>
         <span
           className={cn(
             "min-w-0 flex-1 text-foreground",
-            density === "card" ? "line-clamp-2 text-[13px]" : "truncate text-[11px]",
+            density === "card" ? "line-clamp-2 text-lead" : "truncate text-body",
           )}
         >
           {label || "Untitled"}
@@ -110,7 +110,7 @@ export const RecordCard = memo(function RecordCard({
       {density === "card" && (childIds.length > 0 || isChild) && (
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
           {childIds.length > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-1.5 py-px text-[10px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-1.5 py-px text-micro text-muted-foreground">
               <ListTree className="size-2.5" />
               {childIds.length} subtask{childIds.length === 1 ? "" : "s"}
               {progress?.isMeasurable && (
@@ -122,7 +122,7 @@ export const RecordCard = memo(function RecordCard({
           )}
 
           {isChild && (
-            <span className="rounded-full border border-hairline px-1.5 py-px text-[10px] text-faint-foreground">
+            <span className="rounded-full border border-hairline px-1.5 py-px text-micro text-faint-foreground">
               subtask
             </span>
           )}

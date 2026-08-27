@@ -74,7 +74,7 @@ export function LinkBlock({ block, onChange, isEditable }: LinkBlockProps) {
         </div>
 
         {error && (
-          <p className="flex items-center gap-1.5 text-[12px] text-danger">
+          <p className="flex items-center gap-1.5 text-ui text-danger">
             <TriangleAlert className="size-3.5 shrink-0" />
             {error.message}
           </p>
@@ -99,15 +99,15 @@ export function LinkBlock({ block, onChange, isEditable }: LinkBlockProps) {
 
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
-          <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
+          <span className="min-w-0 truncate text-lead font-medium text-foreground">
             {block.title}
           </span>
           <ExternalLink className="size-3 shrink-0 text-faint-foreground opacity-0 transition-opacity group-hover/link:opacity-100" />
         </span>
-        <span className="mt-0.5 block line-clamp-2 text-[12px] text-muted-foreground">
+        <span className="mt-0.5 block line-clamp-2 text-ui text-muted-foreground">
           {block.description}
         </span>
-        <span className="metric mt-1 block truncate text-[10px] text-faint-foreground">
+        <span className="metric mt-1 block truncate text-micro text-faint-foreground">
           {block.siteName}
         </span>
       </span>

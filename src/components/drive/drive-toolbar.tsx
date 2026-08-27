@@ -74,13 +74,13 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-border bg-background/80 px-4 py-3 backdrop-blur">
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-base font-semibold tracking-tight text-foreground">{title}</h1>
-        <p className="metric truncate text-[11px] text-faint-foreground">{subtitle}</p>
+        <h1 className="truncate text-title font-semibold tracking-tight text-foreground">{title}</h1>
+        <p className="metric truncate text-body text-faint-foreground">{subtitle}</p>
       </div>
 
       {hasSelection ? (
         <div className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-1.5 py-1">
-          <span className="metric px-1 text-[11px] text-accent">{selectedIds.length} selected</span>
+          <span className="metric px-1 text-body text-accent">{selectedIds.length} selected</span>
           <Button
             size="icon-sm"
             variant="ghost"

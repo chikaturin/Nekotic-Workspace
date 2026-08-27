@@ -145,11 +145,11 @@ export function SelectColumnDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="flex max-h-[85dvh] w-[52rem] max-w-[calc(100vw-2rem)] flex-col p-0">
         <header className="shrink-0 border-b border-border px-5 py-4 pr-12">
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+          <DialogTitle className="flex items-center gap-2 text-title font-semibold text-foreground">
             <SlidersHorizontal className="size-4 text-faint-foreground" />
             {column.name} options &amp; rules
           </DialogTitle>
-          <DialogDescription className="mt-0.5 text-[12px] text-muted-foreground">
+          <DialogDescription className="mt-0.5 text-ui text-muted-foreground">
             Options, their order and colour, when each may be chosen, and which status changes the
             board permits.
           </DialogDescription>
@@ -158,12 +158,12 @@ export function SelectColumnDialog({
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
           <section className="space-y-2">
             <div className="flex items-center gap-2">
-              <h3 className="text-[12px] font-medium text-foreground">Options</h3>
+              <h3 className="text-ui font-medium text-foreground">Options</h3>
               <Badge variant="default">{draft.options.length}</Badge>
               <Button
                 size="sm"
                 variant="ghost"
-                className="ml-auto h-6 gap-1 px-1.5 text-[11px]"
+                className="ml-auto h-6 gap-1 px-1.5 text-body"
                 onClick={addOption}
               >
                 <Plus />
@@ -186,7 +186,7 @@ export function SelectColumnDialog({
                           aria-label={`Move ${option.label} up`}
                           disabled={index === 0}
                           onClick={() => move(index, -1)}
-                          className="text-faint-foreground hover:text-foreground disabled:opacity-30"
+                          className="text-faint-foreground hover:text-foreground disabled:opacity-[var(--disabled-opacity)]"
                         >
                           <ArrowUp className="size-3" />
                         </button>
@@ -195,7 +195,7 @@ export function SelectColumnDialog({
                           aria-label={`Move ${option.label} down`}
                           disabled={index === draft.options.length - 1}
                           onClick={() => move(index, 1)}
-                          className="text-faint-foreground hover:text-foreground disabled:opacity-30"
+                          className="text-faint-foreground hover:text-foreground disabled:opacity-[var(--disabled-opacity)]"
                         >
                           <ArrowDown className="size-3" />
                         </button>
@@ -205,7 +205,7 @@ export function SelectColumnDialog({
                         value={option.label}
                         aria-label="Option label"
                         onChange={(event) => patchOption(option.id, { label: event.target.value })}
-                        className={cn("h-7 w-40 text-[12px]", option.isDisabled && "opacity-60")}
+                        className={cn("h-7 w-40 text-ui", option.isDisabled && "is-disabled")}
                       />
 
                       <SelectField
@@ -223,7 +223,7 @@ export function SelectColumnDialog({
                         ))}
                       </SelectField>
 
-                      <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <label className="flex items-center gap-1 text-body text-muted-foreground">
                         <Checkbox
                           checked={!option.isDisabled}
                           aria-label={`Enable ${option.label}`}
@@ -235,7 +235,7 @@ export function SelectColumnDialog({
                       </label>
 
                       <label
-                        className="flex items-center gap-1 text-[11px] text-muted-foreground"
+                        className="flex items-center gap-1 text-body text-muted-foreground"
                         title="Subtask progress counts records sitting on a completed option"
                       >
                         <Checkbox
@@ -252,7 +252,7 @@ export function SelectColumnDialog({
                       <Button
                         size="sm"
                         variant={isExpanded ? "subtle" : "ghost"}
-                        className="ml-auto h-6 gap-1 px-1.5 text-[11px]"
+                        className="ml-auto h-6 gap-1 px-1.5 text-body"
                         onClick={() => setExpandedId(isExpanded ? null : option.id)}
                       >
                         <Settings2 />
@@ -270,14 +270,14 @@ export function SelectColumnDialog({
                     </div>
 
                     {rule && !isExpanded && (
-                      <p className="border-t border-hairline px-2 py-1 text-[11px] text-muted-foreground">
+                      <p className="border-t border-hairline px-2 py-1 text-body text-muted-foreground">
                         Available when {rule}
                       </p>
                     )}
 
                     {isExpanded && (
                       <div className="space-y-1.5 border-t border-hairline p-2">
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-body text-muted-foreground">
                           “{option.label}” is only offered when these hold for the record being
                           edited.
                         </p>
@@ -295,14 +295,14 @@ export function SelectColumnDialog({
             </ul>
 
             {draft.options.length === 0 && (
-              <p className="text-[12px] text-faint-foreground">
+              <p className="text-ui text-faint-foreground">
                 No options yet. Add the first one to start.
               </p>
             )}
           </section>
 
           <section className="space-y-1.5">
-            <h3 className="text-[12px] font-medium text-foreground">
+            <h3 className="text-ui font-medium text-foreground">
               Options a record does not qualify for
             </h3>
             <SelectField
@@ -316,14 +316,14 @@ export function SelectColumnDialog({
               <option value="disabled">Show them, disabled, with the reason</option>
               <option value="hidden">Hide them entirely</option>
             </SelectField>
-            <p className="text-[11px] text-faint-foreground">
+            <p className="text-body text-faint-foreground">
               Disabled is usually kinder: it tells the reader what is missing instead of leaving
               them wondering where an option went.
             </p>
           </section>
 
           <section className="space-y-1.5">
-            <h3 className="text-[12px] font-medium text-foreground">Transition rules</h3>
+            <h3 className="text-ui font-medium text-foreground">Transition rules</h3>
             <TransitionRulesEditor
               options={draft.options}
               rules={draft.transitionRules}
@@ -334,7 +334,7 @@ export function SelectColumnDialog({
         </div>
 
         <footer className="flex shrink-0 items-center gap-2 border-t border-border px-5 py-3">
-          <span className="metric text-[11px] text-faint-foreground">
+          <span className="metric text-body text-faint-foreground">
             Rules apply wherever the value is written — the grid, the drawer and Kanban alike.
           </span>
           <Button

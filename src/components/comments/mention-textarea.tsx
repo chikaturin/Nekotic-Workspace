@@ -114,7 +114,7 @@ export function MentionTextarea({
         <ul
           role="listbox"
           aria-label="Mention a teammate"
-          className="absolute bottom-full left-0 z-40 mb-1 w-64 overflow-hidden rounded-lg border border-border bg-elevated p-1 shadow-2xl"
+          className="absolute bottom-full left-0 z-dropdown mb-1 w-64 overflow-hidden rounded-lg border border-border bg-elevated p-1 shadow-float"
         >
           {picker.candidates.map((person, index) => (
             <li key={person.id}>

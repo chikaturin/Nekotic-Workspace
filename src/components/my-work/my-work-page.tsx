@@ -34,8 +34,8 @@ export function MyWorkPage() {
           <Briefcase className="size-4 text-accent" />
         </span>
         <div className="min-w-0">
-          <h1 className="text-base font-semibold tracking-tight text-foreground">My Work</h1>
-          <p className="metric truncate text-[11px] text-faint-foreground">
+          <h1 className="text-title font-semibold tracking-tight text-foreground">My Work</h1>
+          <p className="metric truncate text-body text-faint-foreground">
             Everything with your name on it, across every board you can open
           </p>
         </div>

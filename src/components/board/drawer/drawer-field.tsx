@@ -58,7 +58,7 @@ export function DrawerField({
     >
       <div className="flex items-center gap-1.5 pt-1.5">
         <visual.Icon className="size-3.5 shrink-0 text-faint-foreground" />
-        <span className="truncate text-[12px] text-muted-foreground">{column.name}</span>
+        <span className="truncate text-ui text-muted-foreground">{column.name}</span>
       </div>
 
       <div className="relative min-w-0">

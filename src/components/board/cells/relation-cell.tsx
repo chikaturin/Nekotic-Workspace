@@ -40,7 +40,7 @@ export function RelationCellView({
             <span
               key={rowId}
               className={cn(
-                "metric inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-[10px]",
+                "metric inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-micro",
                 isDeleted
                   ? "border-danger/40 bg-danger/10 text-danger"
                   : "border-border bg-surface text-muted-foreground",
@@ -120,7 +120,7 @@ export function RelationCellEditor({
               onCancel();
             }
           }}
-          className="h-7 text-[12px]"
+          className="h-7 text-ui"
         />
       </div>
 
@@ -129,7 +129,7 @@ export function RelationCellEditor({
           {selected.map((rowId) => (
             <span
               key={rowId}
-              className="metric inline-flex items-center gap-1 rounded border border-border bg-surface px-1.5 py-0.5 text-[10px]"
+              className="metric inline-flex items-center gap-1 rounded border border-border bg-surface px-1.5 py-0.5 text-micro"
             >
               {results.find((row) => row.id === rowId)?.displayId ?? rowId}
               <button
@@ -146,13 +146,13 @@ export function RelationCellEditor({
 
       <div className="max-h-52 overflow-y-auto p-1">
         {isLoading && (
-          <p className="flex items-center gap-1.5 px-1.5 py-2 text-[11px] text-faint-foreground">
+          <p className="flex items-center gap-1.5 px-1.5 py-2 text-body text-faint-foreground">
             <Loader2 className="size-3 animate-spin" />
             Searching…
           </p>
         )}
 
-        {error && <p className="px-1.5 py-2 text-[11px] text-danger">{error}</p>}
+        {error && <p className="px-1.5 py-2 text-body text-danger">{error}</p>}
 
         {!isLoading &&
           !error &&
@@ -166,19 +166,19 @@ export function RelationCellEditor({
                 onClick={() => toggle(row.id)}
                 className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left hover:bg-hover"
               >
-                <span className="metric shrink-0 text-[10px] text-faint-foreground">
+                <span className="metric shrink-0 text-micro text-faint-foreground">
                   {row.displayId}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">
+                <span className="min-w-0 flex-1 truncate text-ui text-foreground">
                   {title && title.kind === "text" ? title.value : "Untitled"}
                 </span>
-                {chosen.has(row.id) && <span className="text-[10px] text-accent">linked</span>}
+                {chosen.has(row.id) && <span className="text-micro text-accent">linked</span>}
               </button>
             );
           })}
 
         {!isLoading && !error && results.length === 0 && (
-          <p className="px-1.5 py-2 text-[11px] text-faint-foreground">No records match.</p>
+          <p className="px-1.5 py-2 text-body text-faint-foreground">No records match.</p>
         )}
       </div>
 
@@ -187,7 +187,7 @@ export function RelationCellEditor({
           <button
             type="button"
             onClick={() => onCommit({ kind: "relation", rowIds: selected })}
-            className="rounded bg-accent px-2 py-1 text-[11px] font-medium text-accent-foreground"
+            className="rounded bg-accent px-2 py-1 text-body font-medium text-accent-foreground"
           >
             Apply
           </button>

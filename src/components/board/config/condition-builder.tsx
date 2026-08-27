@@ -80,7 +80,7 @@ export function ConditionBuilder({
     >
       {depth > 0 && (
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-faint-foreground">Group</span>
+          <span className="text-body text-faint-foreground">Group</span>
           <Button
             size="icon-sm"
             variant="ghost"
@@ -94,7 +94,7 @@ export function ConditionBuilder({
       )}
 
       {isEmpty && (
-        <p className="text-[11px] text-faint-foreground">
+        <p className="text-body text-faint-foreground">
           No conditions — this option is always available.
         </p>
       )}
@@ -181,14 +181,14 @@ export function ConditionBuilder({
       ))}
 
       <div className="flex items-center gap-1">
-        <Button size="sm" variant="ghost" className="h-6 gap-1 px-1.5 text-[11px]" onClick={addCondition}>
+        <Button size="sm" variant="ghost" className="h-6 gap-1 px-1.5 text-body" onClick={addCondition}>
           <Plus />
           Add condition
         </Button>
         {/* One level of nesting is enough for `A and (B or C)`; more is a
             workflow engine, which this deliberately is not. */}
         {depth === 0 && (
-          <Button size="sm" variant="ghost" className="h-6 gap-1 px-1.5 text-[11px]" onClick={addGroup}>
+          <Button size="sm" variant="ghost" className="h-6 gap-1 px-1.5 text-body" onClick={addGroup}>
             <Plus />
             Add group
           </Button>
@@ -208,7 +208,7 @@ function Conjunction({
   readonly onChange: (conjunction: ConditionGroup["conjunction"]) => void;
 }) {
   if (index === 0) {
-    return <span className="w-14 shrink-0 text-[11px] text-muted-foreground">When</span>;
+    return <span className="w-14 shrink-0 text-body text-muted-foreground">When</span>;
   }
 
   if (index === 1) {
@@ -226,7 +226,7 @@ function Conjunction({
   }
 
   return (
-    <span className="w-14 shrink-0 pl-1.5 text-[11px] text-muted-foreground">
+    <span className="w-14 shrink-0 pl-1.5 text-body text-muted-foreground">
       {group.conjunction}
     </span>
   );
@@ -245,7 +245,7 @@ function ConditionValue({ condition, column, people, onChange }: ConditionValueP
 
   const arity = valueArityFor(condition.operator);
   if (arity === "none") {
-    return <span className="min-w-0 flex-1 text-[11px] text-faint-foreground">—</span>;
+    return <span className="min-w-0 flex-1 text-body text-faint-foreground">—</span>;
   }
 
   if (column.type === "select") {
@@ -301,7 +301,7 @@ function ConditionValue({ condition, column, people, onChange }: ConditionValueP
       value={condition.value}
       placeholder="Value"
       onChange={(event) => onChange({ value: event.target.value })}
-      className="h-7 min-w-0 flex-1 text-[12px]"
+      className="h-7 min-w-0 flex-1 text-ui"
     />
   );
 }

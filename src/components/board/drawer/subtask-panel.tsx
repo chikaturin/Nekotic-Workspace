@@ -84,7 +84,7 @@ export function SubtaskPanel({
     <section aria-label="Subtasks" className="space-y-2">
       <header className="flex items-center gap-2">
         <ListTree className="size-3.5 shrink-0 text-faint-foreground" />
-        <h3 className="text-[12px] font-medium text-foreground">Subtasks</h3>
+        <h3 className="text-ui font-medium text-foreground">Subtasks</h3>
 
         {entries.length > 0 && <Badge variant="default">{entries.length}</Badge>}
 
@@ -92,7 +92,7 @@ export function SubtaskPanel({
           <Button
             size="sm"
             variant="ghost"
-            className="ml-auto h-6 gap-1 px-1.5 text-[11px]"
+            className="ml-auto h-6 gap-1 px-1.5 text-body"
             onClick={() => setIsComposing(true)}
           >
             <Plus />
@@ -104,10 +104,10 @@ export function SubtaskPanel({
       {entries.length > 0 && progress.isMeasurable && (
         <div className="space-y-1">
           <div className="flex items-baseline gap-2">
-            <span className="metric text-[11px] text-muted-foreground">
+            <span className="metric text-body text-muted-foreground">
               {progress.completed} / {progress.total} completed
             </span>
-            <span className="metric ml-auto text-[11px] text-faint-foreground">
+            <span className="metric ml-auto text-body text-faint-foreground">
               {progress.percent}%
             </span>
           </div>
@@ -119,7 +119,7 @@ export function SubtaskPanel({
       )}
 
       {entries.length === 0 && !isComposing && (
-        <p className="text-[12px] text-faint-foreground">
+        <p className="text-ui text-faint-foreground">
           No subtasks yet. Break this record into smaller ones — each becomes a record of its own.
         </p>
       )}
@@ -147,12 +147,12 @@ export function SubtaskPanel({
                   onClick={() => openDrawer(row.id)}
                   className="flex min-w-0 flex-1 items-baseline gap-1.5 text-left"
                 >
-                  <span className="metric shrink-0 text-[10px] text-faint-foreground">
+                  <span className="metric shrink-0 text-micro text-faint-foreground">
                     {row.displayId}
                   </span>
                   <span
                     className={cn(
-                      "min-w-0 flex-1 truncate text-[12px]",
+                      "min-w-0 flex-1 truncate text-ui",
                       isCompleted ? "text-muted-foreground line-through" : "text-foreground",
                     )}
                   >

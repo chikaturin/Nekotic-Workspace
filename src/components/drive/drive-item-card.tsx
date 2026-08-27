@@ -61,7 +61,7 @@ export function DriveItemCard({ node, href, isSelected, onSelect }: DriveItemCar
           "hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring",
           isSelected ? "border-accent bg-selection" : "border-border",
           isOver && "border-accent bg-accent-soft ring-1 ring-accent",
-          isDragging && "opacity-40",
+          isDragging && "is-dragging",
         )}
         {...dragProps}
         {...dropProps}
@@ -92,7 +92,7 @@ export function DriveItemCard({ node, href, isSelected, onSelect }: DriveItemCar
                 "transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none",
               )}
             >
-              <span className="flex items-center gap-1.5 rounded-full border border-border bg-elevated px-2.5 py-1 text-[11px] font-medium text-foreground shadow-lg">
+              <span className="flex items-center gap-1.5 rounded-full border border-border bg-elevated px-2.5 py-1 text-body font-medium text-foreground shadow-pop">
                 <Expand className="size-3.5" />
                 Preview
               </span>
@@ -112,12 +112,12 @@ export function DriveItemCard({ node, href, isSelected, onSelect }: DriveItemCar
         <div className="flex min-w-0 flex-col gap-0.5 px-2.5 py-2">
           <div className="flex min-w-0 items-center gap-1.5">
             <Icon className={cn("size-3.5 shrink-0", colorClass)} />
-            <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
+            <span className="min-w-0 flex-1 truncate text-lead font-medium text-foreground">
               {node.name}
             </span>
             {node.isShared && <Users className="size-3 shrink-0 text-faint-foreground" />}
           </div>
-          <span className="metric truncate text-[10px] text-faint-foreground">{describeNode(node)}</span>
+          <span className="metric truncate text-micro text-faint-foreground">{describeNode(node)}</span>
         </div>
       </div>
     </motion.div>

@@ -72,7 +72,7 @@ export function GanttUnscheduled({
             <ChevronRight className="size-3 text-faint-foreground" />
           )}
           <CalendarPlus className="size-3.5 text-faint-foreground" />
-          <span className="text-[12px] text-foreground">Unscheduled</span>
+          <span className="text-ui text-foreground">Unscheduled</span>
           <Badge variant="default">{rows.length}</Badge>
           {invalid > 0 && <Badge variant="danger">{invalid} with the start after the end</Badge>}
         </button>
@@ -133,15 +133,15 @@ function UnscheduledRow({
         onClick={() => useGridStore.getState().openDrawer(row.rowId)}
         className="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-left hover:bg-hover"
       >
-        <span className="metric shrink-0 text-[10px] text-faint-foreground">
+        <span className="metric shrink-0 text-micro text-faint-foreground">
           {record.displayId}
         </span>
-        <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">
+        <span className="min-w-0 flex-1 truncate text-ui text-foreground">
           {label || "Untitled"}
         </span>
         <span
           className={cn(
-            "shrink-0 text-[10px]",
+            "shrink-0 text-micro",
             row.gap === "inverted" ? "text-danger" : "text-faint-foreground",
           )}
         >
@@ -155,7 +155,7 @@ function UnscheduledRow({
           title="Fill in the missing date"
           aria-label={`Fill in the missing date on ${record.displayId}`}
           onClick={onFill}
-          className="shrink-0 rounded px-1.5 py-1 text-[10px] text-muted-foreground hover:bg-hover hover:text-foreground"
+          className="shrink-0 rounded px-1.5 py-1 text-micro text-muted-foreground hover:bg-hover hover:text-foreground"
         >
           Fill
         </button>

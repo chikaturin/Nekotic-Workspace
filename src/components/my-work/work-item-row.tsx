@@ -30,16 +30,16 @@ export function WorkItemRow({ item, onOpen, isOverdue = false }: WorkItemRowProp
               {item.displayId}
             </Badge>
           )}
-          <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{item.title}</span>
+          <span className="min-w-0 flex-1 truncate text-lead text-foreground">{item.title}</span>
         </span>
 
-        <span className="metric mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-faint-foreground">
+        <span className="metric mt-0.5 flex flex-wrap items-center gap-1.5 text-micro text-faint-foreground">
           <span className="truncate">{item.boardName}</span>
 
           {item.statusLabel && (
             <span
               className={cn(
-                "rounded-full border px-1.5 text-[10px] font-medium normal-case",
+                "rounded-full border px-1.5 text-micro font-medium normal-case",
                 item.statusColor
                   ? SELECT_COLOR_CLASSES[item.statusColor]
                   : "border-border text-muted-foreground",

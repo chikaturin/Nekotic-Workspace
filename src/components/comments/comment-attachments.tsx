@@ -30,8 +30,8 @@ export function CommentAttachments({ attachments, onRemove }: CommentAttachments
           ) : (
             <span className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1">
               <Paperclip className="size-3 shrink-0 text-faint-foreground" />
-              <span className="max-w-40 truncate text-[11px] text-foreground">{file.name}</span>
-              <span className="metric text-[10px] text-faint-foreground">
+              <span className="max-w-40 truncate text-body text-foreground">{file.name}</span>
+              <span className="metric text-micro text-faint-foreground">
                 {formatBytes(file.sizeBytes)}
               </span>
             </span>

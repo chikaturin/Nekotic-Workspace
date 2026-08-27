@@ -62,7 +62,7 @@ export function GanttDependencies({
       aria-hidden
       width={width}
       height={rows.length * rowHeight}
-      className="pointer-events-none absolute top-0 left-0 z-10 overflow-visible"
+      className="pointer-events-none absolute top-0 left-0 z-overlay overflow-visible"
     >
       {visible.map((link) => {
         const fromIndex = positions.get(link.fromRowId);

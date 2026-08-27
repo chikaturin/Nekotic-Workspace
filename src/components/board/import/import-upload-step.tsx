@@ -60,10 +60,10 @@ export function ImportUploadStep({ error, isBusy, onFile }: ImportUploadStepProp
         </span>
 
         <div>
-          <p className="text-[13px] font-medium text-foreground">
+          <p className="text-lead font-medium text-foreground">
             {isBusy ? "Reading the file…" : "Drop a spreadsheet here"}
           </p>
-          <p className="metric mt-1 text-[11px] text-faint-foreground">
+          <p className="metric mt-1 text-body text-faint-foreground">
             XLSX, CSV or TSV · up to {IMPORT_MAX_ROWS.toLocaleString("en-GB")} rows per import
           </p>
         </div>
@@ -74,12 +74,12 @@ export function ImportUploadStep({ error, isBusy, onFile }: ImportUploadStepProp
       </div>
 
       {error && (
-        <p className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-foreground">
+        <p className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui text-foreground">
           <CircleAlert className="mt-px size-3.5 shrink-0 text-danger" />
           <span>
             {error.message}
             {error.detail && (
-              <span className="block text-[11px] text-muted-foreground">{error.detail}</span>
+              <span className="block text-body text-muted-foreground">{error.detail}</span>
             )}
           </span>
         </p>

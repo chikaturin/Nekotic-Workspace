@@ -75,20 +75,20 @@ export function BulkActionBar({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 16, opacity: 0 }}
             transition={{ type: "spring", stiffness: 420, damping: 32 }}
-            className="pointer-events-none absolute inset-x-0 bottom-4 z-40 flex justify-center px-4"
+            className="pointer-events-none absolute inset-x-0 bottom-4 z-dropdown flex justify-center px-4"
           >
             <div
               role="toolbar"
               aria-label="Bulk actions"
-              className="pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-xl border border-border bg-elevated/95 px-2 py-1.5 shadow-2xl backdrop-blur"
+              className="pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-xl border border-border bg-elevated/95 px-2 py-1.5 shadow-float backdrop-blur"
             >
               <span className="flex items-center gap-1.5 pl-1 pr-1.5">
                 <Badge variant="count">{count}</Badge>
-                <span className="text-[12px] text-foreground">
+                <span className="text-ui text-foreground">
                   {count === 1 ? "record" : "records"} selected
                 </span>
                 {archivedCount > 0 && !allArchived && (
-                  <span className="metric text-[10px] text-faint-foreground">
+                  <span className="metric text-micro text-faint-foreground">
                     · {archivedCount} archived will be skipped
                   </span>
                 )}

@@ -61,8 +61,8 @@ export function FavoritesPage() {
           <Star className="size-4 text-accent" />
         </span>
         <div className="min-w-0">
-          <h1 className="text-base font-semibold tracking-tight text-foreground">Favorites</h1>
-          <p className="metric truncate text-[11px] text-faint-foreground">
+          <h1 className="text-title font-semibold tracking-tight text-foreground">Favorites</h1>
+          <p className="metric truncate text-body text-faint-foreground">
             Projects, folders, boards, documents and files you starred ·{" "}
             {formatCount(total, "item")}
           </p>
@@ -81,7 +81,7 @@ export function FavoritesPage() {
           <div className="mx-auto flex max-w-3xl flex-col gap-5">
             {groups.map((group) => (
               <section key={group.type} className="space-y-1.5">
-                <h2 className="text-[11px] font-semibold uppercase tracking-wider text-faint-foreground">
+                <h2 className="text-body font-semibold uppercase tracking-wider text-faint-foreground">
                   {group.label}
                   <span className="metric ml-1.5 normal-case">· {group.nodes.length}</span>
                 </h2>

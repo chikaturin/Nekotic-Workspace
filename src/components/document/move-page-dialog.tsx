@@ -50,11 +50,11 @@ export function MovePageDialog({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-lg p-0">
         <header className="border-b border-border px-4 py-3 pr-12">
-          <DialogTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <DialogTitle className="flex items-center gap-2 text-lead font-semibold text-foreground">
             <FolderInput className="size-4 text-muted-foreground" />
             Move page
           </DialogTitle>
-          <DialogDescription className="text-[12px] text-muted-foreground">
+          <DialogDescription className="text-ui text-muted-foreground">
             Pick the folder this page should live in.
           </DialogDescription>
         </header>
@@ -95,7 +95,7 @@ export function MovePageDialog({
           ))}
 
           {destinations.length === 0 && (
-            <li className="px-2 py-6 text-center text-[13px] text-muted-foreground">
+            <li className="px-2 py-6 text-center text-lead text-muted-foreground">
               No folders match “{query}”
             </li>
           )}
@@ -118,14 +118,14 @@ function DestinationButton({ label, hint, isCurrent, onClick }: DestinationButto
       variant="ghost"
       disabled={isCurrent}
       onClick={onClick}
-      className={cn("h-auto w-full justify-start gap-2.5 px-2 py-2 text-left", isCurrent && "opacity-60")}
+      className={cn("h-auto w-full justify-start gap-2.5 px-2 py-2 text-left", isCurrent && "is-disabled")}
     >
       <Folder className="size-4 shrink-0 text-kind-folder" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] text-foreground">{label}</span>
-        <span className="metric block truncate text-[10px] text-faint-foreground">{hint}</span>
+        <span className="block truncate text-lead text-foreground">{label}</span>
+        <span className="metric block truncate text-micro text-faint-foreground">{hint}</span>
       </span>
-      {isCurrent && <span className="metric shrink-0 text-[10px] text-faint-foreground">current</span>}
+      {isCurrent && <span className="metric shrink-0 text-micro text-faint-foreground">current</span>}
     </Button>
   );
 }

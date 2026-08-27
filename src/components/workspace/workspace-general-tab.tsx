@@ -66,7 +66,7 @@ export function WorkspaceGeneralTab({ canEdit }: { readonly canEdit: boolean }) 
       }}
     >
       <label className="block">
-        <span className="mb-1 block text-[11px] font-medium text-muted-foreground">
+        <span className="mb-1 block text-body font-medium text-muted-foreground">
           Workspace name
         </span>
         <Input
@@ -82,7 +82,7 @@ export function WorkspaceGeneralTab({ canEdit }: { readonly canEdit: boolean }) 
       </label>
 
       <label className="block">
-        <span className="mb-1 block text-[11px] font-medium text-muted-foreground">
+        <span className="mb-1 block text-body font-medium text-muted-foreground">
           Description
         </span>
         <textarea
@@ -92,13 +92,13 @@ export function WorkspaceGeneralTab({ canEdit }: { readonly canEdit: boolean }) 
           maxLength={WORKSPACE_DESCRIPTION_MAX}
           aria-label="Workspace description"
           onChange={(event) => setDescription(event.target.value)}
-          className="w-full resize-none rounded-md border border-border bg-surface px-2 py-1.5 text-[12px] text-foreground outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+          className="w-full resize-none rounded-md border border-border bg-surface px-2 py-1.5 text-ui text-foreground outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-[var(--disabled-opacity)]"
         />
       </label>
 
       <div className="flex items-center gap-2 rounded-md border border-hairline bg-surface px-2.5 py-2">
         <span
-          className="metric flex size-8 shrink-0 items-center justify-center rounded-md text-[11px] font-bold"
+          className="metric flex size-8 shrink-0 items-center justify-center rounded-md text-body font-bold"
           style={{
             backgroundColor: `color-mix(in oklch, ${workspace.color} 22%, transparent)`,
             color: workspace.color,
@@ -107,13 +107,13 @@ export function WorkspaceGeneralTab({ canEdit }: { readonly canEdit: boolean }) 
         >
           {badgeFor(name || workspace.name)}
         </span>
-        <span className="text-[11px] text-faint-foreground">
+        <span className="text-body text-faint-foreground">
           Workspace tile. Taken from the name — there is no separate upload in this build.
         </span>
       </div>
 
       {error && (
-        <p role="alert" className="text-[11px] text-danger">
+        <p role="alert" className="text-body text-danger">
           {error}
         </p>
       )}
@@ -123,7 +123,7 @@ export function WorkspaceGeneralTab({ canEdit }: { readonly canEdit: boolean }) 
           Save changes
         </Button>
       ) : (
-        <p className="text-[11px] text-faint-foreground">
+        <p className="text-body text-faint-foreground">
           Only a workspace admin can change these.
         </p>
       )}

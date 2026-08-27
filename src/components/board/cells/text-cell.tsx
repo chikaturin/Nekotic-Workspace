@@ -15,8 +15,8 @@ export function TextCellView({ value, isPrimary = false }: TextViewProps) {
       <span
         className={
           isPrimary
-            ? "min-w-0 truncate text-[13px] font-medium text-foreground"
-            : "min-w-0 truncate text-[13px] text-muted-foreground"
+            ? "min-w-0 truncate text-lead font-medium text-foreground"
+            : "min-w-0 truncate text-lead text-muted-foreground"
         }
       >
         {value.value}
@@ -69,7 +69,7 @@ export function TextCellEditor({ value, initialText, onCommit, onCancel }: TextE
         if (!isCancelled.current) onCommit({ kind: "text", value: draft }, "none");
       }}
       aria-label="Edit cell"
-      className="h-full w-full bg-elevated px-2 text-[13px] text-foreground outline-none ring-2 ring-accent"
+      className="h-full w-full bg-elevated px-2 text-lead text-foreground outline-none ring-2 ring-accent"
     />
   );
 }

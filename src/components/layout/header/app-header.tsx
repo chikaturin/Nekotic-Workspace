@@ -60,7 +60,7 @@ export function AppHeader() {
   }, [pathname, breadcrumbs, workspace]);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface/85 px-3 backdrop-blur-md">
+    <header className="sticky top-0 z-sticky flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface/85 px-3 backdrop-blur-md">
       {isCollapsed && (
         <Button size="icon-sm" variant="ghost" onClick={toggleSidebar} aria-label="Expand sidebar">
           <PanelLeftOpen />

@@ -39,10 +39,10 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
               <span className="text-xl">{node.icon}</span>
 
               <div className="min-w-0">
-                <h1 className="truncate text-base font-semibold tracking-tight text-foreground">
+                <h1 className="truncate text-title font-semibold tracking-tight text-foreground">
                   {document.name}
                 </h1>
-                <p className="metric truncate text-[11px] text-faint-foreground">
+                <p className="metric truncate text-body text-faint-foreground">
                   {document.format.toUpperCase()} · v{document.version} · {document.updatedBy.name}
                 </p>
               </div>
@@ -101,10 +101,10 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
             {controller.problem && (
               <div className="flex shrink-0 items-center gap-2 border-b border-danger/30 bg-danger/10 px-4 py-1.5">
                 <TriangleAlert className="size-3.5 shrink-0 text-danger" />
-                <span className="min-w-0 flex-1 truncate text-[12px] text-danger">
+                <span className="min-w-0 flex-1 truncate text-ui text-danger">
                   {controller.problem.message}
                 </span>
-                <span className="metric shrink-0 text-[11px] text-danger/80">
+                <span className="metric shrink-0 text-body text-danger/80">
                   line {controller.problem.line}, column {controller.problem.column}
                 </span>
               </div>
@@ -113,7 +113,7 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
             {document.format === "json" && !controller.problem && controller.isDirty && (
               <div className="flex shrink-0 items-center gap-2 border-b border-success/30 bg-success/10 px-4 py-1.5">
                 <Braces className="size-3.5 shrink-0 text-success" />
-                <span className="text-[12px] text-success">Valid JSON</span>
+                <span className="text-ui text-success">Valid JSON</span>
               </div>
             )}
 

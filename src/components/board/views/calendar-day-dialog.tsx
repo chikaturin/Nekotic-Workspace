@@ -41,10 +41,10 @@ export function CalendarDayDialog({
         {day && (
           <>
             <header className="shrink-0 border-b border-border px-4 py-3 pr-12">
-              <DialogTitle className="text-[14px] font-semibold text-foreground">
+              <DialogTitle className="text-lead font-semibold text-foreground">
                 {longDayLabel(day.iso)}
               </DialogTitle>
-              <DialogDescription className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted-foreground">
+              <DialogDescription className="mt-0.5 flex items-center gap-1.5 text-ui text-muted-foreground">
                 {formatCount(day.rowIds.length, "record")}
                 <Badge variant="default">{day.rowIds.length}</Badge>
               </DialogDescription>
@@ -63,7 +63,7 @@ export function CalendarDayDialog({
               ))}
 
               {day.rowIds.length === 0 && (
-                <p className="py-6 text-center text-[12px] text-faint-foreground">
+                <p className="py-6 text-center text-ui text-faint-foreground">
                   Nothing scheduled on this day.
                 </p>
               )}

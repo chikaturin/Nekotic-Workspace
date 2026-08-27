@@ -65,10 +65,10 @@ export function AttachmentViewer({
           <>
             <header className="flex shrink-0 items-center gap-3 border-b border-border bg-surface px-4 py-2.5">
               <div className="min-w-0 flex-1">
-                <DialogTitle className="truncate text-[13px] font-medium text-foreground">
+                <DialogTitle className="truncate text-lead font-medium text-foreground">
                   {current.name}
                 </DialogTitle>
-                <DialogDescription className="metric text-[11px] text-faint-foreground">
+                <DialogDescription className="metric text-body text-faint-foreground">
                   {formatBytes(current.sizeBytes)} · {current.mimeType || "unknown type"}
                 </DialogDescription>
               </div>

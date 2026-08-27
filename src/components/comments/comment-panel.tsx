@@ -36,7 +36,7 @@ export function CommentPanel({ target, people, canComment, className }: CommentP
 
   return (
     <section className={cn("space-y-2", className)}>
-      <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-faint-foreground">
+      <h3 className="flex items-center gap-1.5 text-body font-semibold uppercase tracking-wider text-faint-foreground">
         <MessageSquare className="size-3.5" />
         Comments
         {controller.count > 0 && (
@@ -47,15 +47,15 @@ export function CommentPanel({ target, people, canComment, className }: CommentP
 
       {failure && (
         <div className="flex items-center gap-2 rounded-lg border border-danger/30 bg-danger/10 px-2.5 py-2">
-          <span className="min-w-0 flex-1 text-[12px] text-foreground">{failure.message}</span>
-          <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={controller.reload}>
+          <span className="min-w-0 flex-1 text-ui text-foreground">{failure.message}</span>
+          <Button size="sm" variant="ghost" className="h-6 px-2 text-body" onClick={controller.reload}>
             Try again
           </Button>
         </div>
       )}
 
       {!isLoading && !failure && controller.threads.length === 0 && (
-        <p className="text-[12px] text-faint-foreground">
+        <p className="text-ui text-faint-foreground">
           No comments yet. Mention a teammate with @ to pull them in.
         </p>
       )}
@@ -123,7 +123,7 @@ export function CommentPanel({ target, people, canComment, className }: CommentP
           onSubmit={(body, attachments) => controller.post({ body, attachments })}
         />
       ) : (
-        <p className="metric text-[10px] text-faint-foreground">
+        <p className="metric text-micro text-faint-foreground">
           You have read-only access to this thread.
         </p>
       )}

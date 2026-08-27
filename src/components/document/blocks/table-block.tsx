@@ -85,7 +85,7 @@ export function TableBlock({ block, onChange, isEditable }: TableBlockProps) {
 
   return (
     <div ref={containerRef} className="group/table overflow-x-auto pb-1">
-      <table className="border-separate border-spacing-0 text-[13px]">
+      <table className="border-separate border-spacing-0 text-lead">
         <tbody>
           {isEditable && (
             <tr>

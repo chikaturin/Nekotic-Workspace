@@ -42,8 +42,8 @@ export function ConfirmDialog({
           )}
 
           <div className="min-w-0 flex-1">
-            <DialogTitle className="text-sm font-semibold text-foreground">{title}</DialogTitle>
-            <DialogDescription className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            <DialogTitle className="text-lead font-semibold text-foreground">{title}</DialogTitle>
+            <DialogDescription className="mt-1 text-ui leading-relaxed text-muted-foreground">
               {description}
             </DialogDescription>
           </div>

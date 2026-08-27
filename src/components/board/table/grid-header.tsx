@@ -66,11 +66,11 @@ export const GridHeader = memo(function GridHeader({
     <div
       role="row"
       aria-rowindex={1}
-      className="sticky top-0 z-40 flex w-max border-b border-border bg-elevated"
+      className="sticky top-0 z-sticky flex w-max border-b border-border bg-elevated"
     >
       <div
         style={{ width: GUTTER_WIDTH }}
-        className="sticky left-0 z-10 flex shrink-0 items-center border-r border-hairline bg-elevated px-1.5"
+        className="sticky left-0 z-sticky flex shrink-0 items-center border-r border-hairline bg-elevated px-1.5"
       >
         <Checkbox
           checked={selectionState === "all"}
@@ -205,7 +205,7 @@ function HeaderCell({
       style={widthStyle(column.id, column.isPrimary)}
       className={cn(
         "group/head relative flex h-9 shrink-0 items-center gap-1.5 border-r border-hairline px-2",
-        column.isPrimary && "sticky z-10 bg-elevated",
+        column.isPrimary && "sticky z-sticky bg-elevated",
         isDragOver && "bg-accent-soft",
       )}
     >
@@ -217,7 +217,7 @@ function HeaderCell({
           onDoubleClick={() => {
             if (canEditColumn) setDraftName(column.name);
           }}
-          className="min-w-0 flex-1 truncate text-left text-[12px] font-medium text-foreground"
+          className="min-w-0 flex-1 truncate text-left text-ui font-medium text-foreground"
         >
           {column.name}
         </button>
@@ -239,7 +239,7 @@ function HeaderCell({
               setDraftName(null);
             }
           }}
-          className="h-6 flex-1 text-[12px]"
+          className="h-6 flex-1 text-ui"
         />
       )}
 
@@ -255,7 +255,7 @@ function HeaderCell({
         type="button"
         aria-label={`Resize ${column.name}`}
         onPointerDown={beginResize}
-        className="absolute -right-1 top-0 z-10 h-full w-2 cursor-col-resize touch-none hover:bg-accent/40"
+        className="absolute -right-1 top-0 z-raised h-full w-2 cursor-col-resize touch-none hover:bg-accent/40"
       />
     </div>
   );

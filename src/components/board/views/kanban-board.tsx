@@ -169,7 +169,7 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
                 // While a card is in the air: valid targets lift gently, ones a
                 // rule rules out fade back. Two states, no colour wash.
                 isDragging && canLand && "border-dashed border-accent/40",
-                isDragging && !canLand && "opacity-60",
+                isDragging && !canLand && "is-dragging",
                 isOver && canLand && "border-solid border-accent bg-accent-soft",
                 isOver && !canLand && "border-solid border-danger/50 bg-danger/5 opacity-100",
               )}
@@ -178,7 +178,7 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
                 {group.color ? (
                   <span
                     className={cn(
-                      "rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                      "rounded-full border px-2 py-0.5 text-body font-medium",
                       SELECT_COLOR_CLASSES[group.color],
                     )}
                   >
@@ -187,7 +187,7 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
                 ) : (
                   <span
                     className={cn(
-                      "text-[12px] font-medium",
+                      "text-ui font-medium",
                       group.key === UNGROUPED_KEY ? "text-faint-foreground" : "text-foreground",
                     )}
                   >
@@ -199,7 +199,7 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
 
                 {isDragging && !canLand ? (
                   <span
-                    className="ml-auto flex items-center gap-1 text-[10px] text-faint-foreground"
+                    className="ml-auto flex items-center gap-1 text-micro text-faint-foreground"
                     title="A transition rule does not allow this move"
                   >
                     <Workflow className="size-3" />
@@ -240,7 +240,7 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="w-full text-[11px]"
+                    className="w-full text-body"
                     onClick={() =>
                       setLimits((current) => ({
                         ...current,
@@ -258,7 +258,7 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
                 )}
 
                 {group.rowIds.length === 0 && (
-                  <p className="px-1 py-4 text-center text-[11px] text-faint-foreground">
+                  <p className="px-1 py-4 text-center text-body text-faint-foreground">
                     {formatCount(0, "record")}
                   </p>
                 )}
@@ -268,7 +268,7 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="m-1 shrink-0 justify-start gap-1.5 text-[12px]"
+                  className="m-1 shrink-0 justify-start gap-1.5 text-ui"
                   onClick={() => {
                     void addRow().then((rowId) => {
                       const value = groupValueFor(groupColumn, group.key);

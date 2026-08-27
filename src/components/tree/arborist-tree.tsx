@@ -85,7 +85,7 @@ function ArboristRow({ node, style, dragHandle }: NodeRendererProps<DriveNode>) 
       style={style}
       onClick={activate}
       className={cn(
-        "group flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md pr-2 text-[13px] transition-colors",
+        "group flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md pr-2 text-lead transition-colors",
         node.isSelected
           ? "bg-selection text-foreground"
           : "text-muted-foreground hover:bg-hover hover:text-foreground",

@@ -51,8 +51,8 @@ export function NodeDetail({ node }: { node: DriveNode }) {
           <Icon className={cn("size-5", colorClass)} strokeWidth={1.5} />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold text-foreground">{node.name}</h2>
-          <p className="metric truncate text-[11px] text-muted-foreground">{label}</p>
+          <h2 className="truncate text-lead font-semibold text-foreground">{node.name}</h2>
+          <p className="metric truncate text-body text-muted-foreground">{label}</p>
         </div>
         {node.isShared && (
           <Badge variant="accent">
@@ -65,17 +65,17 @@ export function NodeDetail({ node }: { node: DriveNode }) {
       <dl className="grid grid-cols-2 gap-px bg-hairline sm:grid-cols-3">
         {facts.map((fact) => (
           <div key={fact.label} className="bg-surface px-4 py-3">
-            <dt className="text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+            <dt className="text-micro font-semibold uppercase tracking-wider text-faint-foreground">
               {fact.label}
             </dt>
-            <dd className="metric mt-0.5 truncate text-[12px] text-foreground">{fact.value}</dd>
+            <dd className="metric mt-0.5 truncate text-ui text-foreground">{fact.value}</dd>
           </div>
         ))}
       </dl>
 
       <div className="flex items-center gap-2 border-t border-hairline p-3">
         <UserAvatar user={node.owner} className="size-6" />
-        <span className="text-[11px] text-muted-foreground">{node.owner.name}</span>
+        <span className="text-body text-muted-foreground">{node.owner.name}</span>
 
         <div className="ml-auto flex items-center gap-1.5">
           <Button size="sm" variant="outline" onClick={() => toggleFavorite(node.id)} className="gap-1.5">

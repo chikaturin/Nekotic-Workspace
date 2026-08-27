@@ -53,7 +53,7 @@ export function DriveList({ nodes, resolveHref, selectedIds, onSelect, revealKey
         role="row"
         className={cn(
           LIST_GRID_CLASS,
-          "h-8 border-b border-border px-2.5 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground",
+          "h-8 border-b border-border px-2.5 text-micro font-semibold uppercase tracking-wider text-faint-foreground",
         )}
       >
         {COLUMNS.map((column, index) =>

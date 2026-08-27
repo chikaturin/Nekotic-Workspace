@@ -101,10 +101,10 @@ export function AttachmentGallery({
                 <Thumbnail file={file} />
               </button>
 
-              <span className="mt-0.5 block truncate text-[10px] text-muted-foreground" title={file.name}>
+              <span className="mt-0.5 block truncate text-micro text-muted-foreground" title={file.name}>
                 {file.name}
               </span>
-              <span className="metric block truncate text-[9px] text-faint-foreground">
+              <span className="metric block truncate text-micro text-faint-foreground">
                 {formatBytes(file.sizeBytes)}
               </span>
 
@@ -137,7 +137,7 @@ export function AttachmentGallery({
       {active.length > 0 && (
         <div className="space-y-1">
           <Progress value={uploads.summary.progress} label={`Uploading to ${label}`} />
-          <p className="metric text-[10px] text-faint-foreground">
+          <p className="metric text-micro text-faint-foreground">
             Uploading {active.length} file{active.length === 1 ? "" : "s"} ·{" "}
             {Math.round(uploads.summary.progress * 100)}%
           </p>
@@ -151,10 +151,10 @@ export function AttachmentGallery({
               key={task.id}
               className="flex items-center gap-1.5 rounded border border-danger/30 bg-danger/5 px-1.5 py-1"
             >
-              <span className="min-w-0 flex-1 truncate text-[11px] text-foreground">
+              <span className="min-w-0 flex-1 truncate text-body text-foreground">
                 {task.fileName}
               </span>
-              <span className="hidden truncate text-[10px] text-danger sm:block">
+              <span className="hidden truncate text-micro text-danger sm:block">
                 {task.error?.message ?? "Upload failed"}
               </span>
               <Button
@@ -184,14 +184,14 @@ export function AttachmentGallery({
           variant="outline"
           disabled={!field.canAddMore}
           onClick={() => inputRef.current?.click()}
-          className="h-7 w-full gap-1.5 text-[11px]"
+          className="h-7 w-full gap-1.5 text-body"
         >
           <Upload />
           {isOver ? "Drop to upload" : field.canAddMore ? "Add files" : `Limit of ${maxFiles} reached`}
         </Button>
       )}
 
-      <p className="metric text-[10px] text-faint-foreground">
+      <p className="metric text-micro text-faint-foreground">
         {files.length} / {maxFiles} files
         {canEdit && " · drop files straight in"}
       </p>
@@ -240,7 +240,7 @@ function Thumbnail({ file }: { file: CellAttachment }) {
       )}
     >
       <visual.Icon className={cn("size-4", visual.colorClass)} />
-      <span className="metric text-[8px] uppercase tracking-wide text-faint-foreground">
+      <span className="metric text-micro uppercase tracking-wide text-faint-foreground">
         {visual.label}
       </span>
     </div>
@@ -279,7 +279,7 @@ export function AttachmentStrip({
           </span>
         ),
       )}
-      {overflow > 0 && <span className="metric text-[10px] text-faint-foreground">+{overflow}</span>}
+      {overflow > 0 && <span className="metric text-micro text-faint-foreground">+{overflow}</span>}
     </>
   );
 }

@@ -45,11 +45,11 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
       <DialogContent className="flex max-h-[86vh] max-w-4xl flex-col p-0">
         <header className="shrink-0 border-b border-border px-5 py-4 pr-12">
-          <DialogTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <DialogTitle className="flex items-center gap-2 text-lead font-semibold text-foreground">
             <Upload className="size-4 text-accent" />
             Import into {model.board?.name ?? "this board"}
           </DialogTitle>
-          <DialogDescription className="mt-1 text-[12px] text-muted-foreground">
+          <DialogDescription className="mt-1 text-ui text-muted-foreground">
             Nothing is written to the board until you confirm on the last step.
           </DialogDescription>
 
@@ -58,7 +58,7 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
               <li key={step.id} className="flex items-center gap-1.5">
                 <span
                   className={cn(
-                    "flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px]",
+                    "flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-body",
                     index === stepIndex
                       ? "border-accent bg-accent-soft text-accent"
                       : index < stepIndex

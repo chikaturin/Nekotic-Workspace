@@ -31,7 +31,7 @@ export function ListBlock({
     <div className="flex gap-2.5">
       <span
         aria-hidden
-        className="metric mt-[3px] w-4 shrink-0 select-none text-right text-[13px] text-faint-foreground"
+        className="metric mt-[3px] w-4 shrink-0 select-none text-right text-lead text-faint-foreground"
       >
         {marker}
       </span>

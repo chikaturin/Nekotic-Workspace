@@ -37,7 +37,7 @@ export function DriveCanvas({ targetId, targetName, children }: DriveCanvasProps
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.14 }}
-            className="pointer-events-none absolute inset-3 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-accent bg-background/70 backdrop-blur-[1px]"
+            className="pointer-events-none absolute inset-3 z-overlay flex items-center justify-center rounded-lg border-2 border-dashed border-accent bg-background/70 backdrop-blur-[1px]"
           >
             <div className="flex flex-col items-center gap-2 text-center">
               <motion.span
@@ -47,8 +47,8 @@ export function DriveCanvas({ targetId, targetName, children }: DriveCanvasProps
               >
                 <CloudUpload className="size-5" />
               </motion.span>
-              <p className="text-sm font-medium text-foreground">Drop into {targetName}</p>
-              <p className="metric text-[11px] text-muted-foreground">
+              <p className="text-lead font-medium text-foreground">Drop into {targetName}</p>
+              <p className="metric text-body text-muted-foreground">
                 Files upload here · items move here
               </p>
             </div>

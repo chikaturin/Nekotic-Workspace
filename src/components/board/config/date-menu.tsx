@@ -27,7 +27,7 @@ export function DateMenu({ model }: { model: BoardViewModel }) {
 
       <PopoverContent className="w-72">
         <label className="flex items-center gap-2 px-1 py-1">
-          <span className="w-16 shrink-0 text-[11px] text-muted-foreground">
+          <span className="w-16 shrink-0 text-body text-muted-foreground">
             {isTimeline ? "Start" : "Date"}
           </span>
           <SelectField
@@ -46,7 +46,7 @@ export function DateMenu({ model }: { model: BoardViewModel }) {
 
         {isTimeline && (
           <label className="flex items-center gap-2 px-1 py-1">
-            <span className="w-16 shrink-0 text-[11px] text-muted-foreground">End</span>
+            <span className="w-16 shrink-0 text-body text-muted-foreground">End</span>
             <SelectField
               value={view?.endDateColumnId ?? ""}
               onChange={(event) => void setEndDateColumn(event.target.value || null)}
@@ -63,7 +63,7 @@ export function DateMenu({ model }: { model: BoardViewModel }) {
         )}
 
         {dateColumns.length === 0 && (
-          <p className="px-1 py-2 text-[11px] text-faint-foreground">
+          <p className="px-1 py-2 text-body text-faint-foreground">
             This board has no Date column yet. Add one from the table header.
           </p>
         )}

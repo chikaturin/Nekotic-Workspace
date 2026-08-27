@@ -69,10 +69,10 @@ export function ConvertColumnDialog({
       <DialogContent className="max-w-md p-0">
         {column && targetType && preview && (
           <div className="p-4">
-            <DialogTitle className="text-sm font-semibold text-foreground">
+            <DialogTitle className="text-lead font-semibold text-foreground">
               Change column type
             </DialogTitle>
-            <DialogDescription className="mt-1 flex items-center gap-2 text-[12px] text-muted-foreground">
+            <DialogDescription className="mt-1 flex items-center gap-2 text-ui text-muted-foreground">
               <span className="rounded border border-border px-1.5 py-0.5">
                 {COLUMN_TYPE_LABELS[column.type]}
               </span>
@@ -90,14 +90,14 @@ export function ConvertColumnDialog({
 
             {preview.preserved > 0 && (
               <div className="mt-3 rounded-lg border border-warning/30 bg-warning/10 p-3">
-                <p className="flex items-center gap-1.5 text-[12px] font-medium text-warning">
+                <p className="flex items-center gap-1.5 text-ui font-medium text-warning">
                   <TriangleAlert className="size-3.5" />
                   {preview.preserved} {preview.preserved === 1 ? "value" : "values"} cannot be parsed
                 </p>
-                <p className="mt-1 text-[12px] text-muted-foreground">
+                <p className="mt-1 text-ui text-muted-foreground">
                   They stay in the cell as text with a warning marker — nothing is deleted.
                 </p>
-                <ul className="metric mt-2 space-y-0.5 text-[11px] text-faint-foreground">
+                <ul className="metric mt-2 space-y-0.5 text-body text-faint-foreground">
                   {preview.samples.map((sample, index) => (
                     <li key={index} className="truncate">
                       · {sample}
@@ -133,14 +133,14 @@ function Stat({
 }) {
   return (
     <div className="bg-surface px-3 py-2">
-      <dt className="text-[10px] uppercase tracking-wider text-faint-foreground">{label}</dt>
+      <dt className="text-micro uppercase tracking-wider text-faint-foreground">{label}</dt>
       <dd
         className={
           tone === "success"
-            ? "metric text-[15px] text-success"
+            ? "metric text-title text-success"
             : tone === "warning"
-              ? "metric text-[15px] text-warning"
-              : "metric text-[15px] text-foreground"
+              ? "metric text-title text-warning"
+              : "metric text-title text-foreground"
         }
       >
         {value}

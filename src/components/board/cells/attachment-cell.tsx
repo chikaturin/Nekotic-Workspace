@@ -54,7 +54,7 @@ export function AttachmentCellEditor({
       />
 
       <div className="flex justify-end border-t border-border p-1.5">
-        <Button size="sm" variant="ghost" onClick={onCancel} className="h-7 px-2 text-[11px]">
+        <Button size="sm" variant="ghost" onClick={onCancel} className="h-7 px-2 text-body">
           Close
         </Button>
       </div>

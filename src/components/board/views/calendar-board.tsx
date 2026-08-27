@@ -114,18 +114,18 @@ export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
             <ChevronRight />
           </Button>
 
-          <h2 className="text-[13px] font-semibold text-foreground">{month.label}</h2>
+          <h2 className="text-lead font-semibold text-foreground">{month.label}</h2>
 
           <Button
             size="sm"
             variant="ghost"
-            className="text-[11px]"
+            className="text-body"
             onClick={() => setMonthIso(MOCK_NOW)}
           >
             Today
           </Button>
 
-          <span className="metric ml-auto text-[11px] text-faint-foreground">
+          <span className="metric ml-auto text-body text-faint-foreground">
             {dateColumn.name} · {formatCount(month.scheduledCount, "record")} in view
           </span>
         </header>
@@ -134,7 +134,7 @@ export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
           {WEEKDAY_LABELS.map((label) => (
             <div
               key={label}
-              className="metric px-2 py-1 text-[10px] uppercase tracking-wider text-faint-foreground"
+              className="metric px-2 py-1 text-micro uppercase tracking-wider text-faint-foreground"
             >
               {label}
             </div>
@@ -166,7 +166,7 @@ export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
                   aria-label={`Open ${day.iso.slice(0, 10)} — ${day.rowIds.length} records`}
                   onClick={() => setOpenDayKey(day.key)}
                   className={cn(
-                    "metric flex size-5 items-center justify-center rounded-full text-[10px] transition-colors",
+                    "metric flex size-5 items-center justify-center rounded-full text-micro transition-colors",
                     day.isToday
                       ? "bg-accent text-accent-foreground"
                       : day.isCurrentMonth
@@ -197,7 +197,7 @@ export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
                 <button
                   type="button"
                   onClick={() => setOpenDayKey(day.key)}
-                  className="metric shrink-0 rounded px-1 text-left text-[10px] text-muted-foreground hover:bg-hover hover:text-foreground"
+                  className="metric shrink-0 rounded px-1 text-left text-micro text-muted-foreground hover:bg-hover hover:text-foreground"
                 >
                   +{day.rowIds.length - MAX_CARDS_PER_DAY} more
                 </button>
@@ -213,7 +213,7 @@ export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
       >
         <header className="flex shrink-0 items-center gap-1.5 border-b border-hairline px-3 py-2.5">
           <Inbox className="size-3.5 text-faint-foreground" />
-          <h3 className="text-[12px] font-medium text-foreground">Unscheduled</h3>
+          <h3 className="text-ui font-medium text-foreground">Unscheduled</h3>
           <Badge variant="default" className="ml-auto">
             {month.unscheduled.length}
           </Badge>
@@ -232,7 +232,7 @@ export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
           ))}
 
           {month.unscheduled.length === 0 && (
-            <p className="px-1 py-6 text-center text-[11px] text-faint-foreground">
+            <p className="px-1 py-6 text-center text-body text-faint-foreground">
               Every record in this view has a {dateColumn.name.toLowerCase()}.
             </p>
           )}

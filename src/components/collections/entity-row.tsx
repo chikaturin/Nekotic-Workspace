@@ -32,8 +32,8 @@ export function EntityRow({
       >
         <Icon className={cn("size-4 shrink-0", iconClassName ?? "text-muted-foreground")} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] text-foreground">{title}</span>
-          <span className="metric block truncate text-[10px] text-faint-foreground">
+          <span className="block truncate text-lead text-foreground">{title}</span>
+          <span className="metric block truncate text-micro text-faint-foreground">
             {subtitle}
           </span>
         </span>

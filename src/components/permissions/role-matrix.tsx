@@ -13,8 +13,8 @@ import { WORKSPACE_ROLES, type WorkspaceRole } from "@/types";
 export function RoleMatrix({ highlight }: { highlight?: WorkspaceRole | null }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[520px] border-collapse text-[12px]">
-        <thead className="sticky top-0 z-10 bg-elevated">
+      <table className="w-full min-w-[520px] border-collapse text-ui">
+        <thead className="sticky top-0 z-sticky bg-elevated">
           <tr className="border-b border-border">
             <th scope="col" className="w-1/2 px-2 py-2 text-left font-medium text-muted-foreground">
               Permission
@@ -41,7 +41,7 @@ export function RoleMatrix({ highlight }: { highlight?: WorkspaceRole | null }) 
               <th
                 scope="colgroup"
                 colSpan={WORKSPACE_ROLES.length + 1}
-                className="bg-surface px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-wider text-faint-foreground"
+                className="bg-surface px-2 py-1 text-left text-micro font-semibold uppercase tracking-wider text-faint-foreground"
               >
                 {group.label}
               </th>
@@ -51,7 +51,7 @@ export function RoleMatrix({ highlight }: { highlight?: WorkspaceRole | null }) 
               <tr key={permission.key} className="border-b border-hairline last:border-0">
                 <th scope="row" className="px-2 py-1.5 text-left font-normal">
                   <span className="text-foreground">{permission.label}</span>
-                  <span className="metric ml-1.5 text-[10px] text-faint-foreground">
+                  <span className="metric ml-1.5 text-micro text-faint-foreground">
                     {permission.key}
                   </span>
                 </th>

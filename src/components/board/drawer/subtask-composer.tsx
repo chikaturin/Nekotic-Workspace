@@ -108,7 +108,7 @@ export function SubtaskComposer({
               onCancel();
             }
           }}
-          className="h-7 flex-1 text-[12px]"
+          className="h-7 flex-1 text-ui"
         />
         <Button
           size="icon-sm"
@@ -159,7 +159,7 @@ export function SubtaskComposer({
             aria-label={dateColumn.name}
             value={due}
             onChange={(event) => setDue(event.target.value)}
-            className="h-7 min-w-0 flex-1 text-[12px]"
+            className="h-7 min-w-0 flex-1 text-ui"
           />
         )}
 
@@ -168,7 +168,7 @@ export function SubtaskComposer({
           variant="default"
           disabled={title.trim().length === 0 || isSaving}
           onClick={() => void submit()}
-          className="h-7 gap-1.5 px-2 text-[11px]"
+          className="h-7 gap-1.5 px-2 text-body"
         >
           <Plus />
           Add

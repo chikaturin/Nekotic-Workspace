@@ -19,7 +19,7 @@ export function DateCellView({
   return (
     <CellShell>
       {value.iso ? (
-        <span className="metric truncate text-[12px] text-muted-foreground">
+        <span className="metric truncate text-ui text-muted-foreground">
           {column.config.includesTime ? formatDateTime(value.iso) : formatDate(value.iso)}
         </span>
       ) : value.text ? (
@@ -77,18 +77,18 @@ export function DateCellEditor({ value, column, onCommit, onCancel }: DateEditor
           }
         }}
         aria-label="Edit date"
-        className="metric w-full rounded border border-border bg-surface px-2 py-1 text-[12px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="metric w-full rounded border border-border bg-surface px-2 py-1 text-ui text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
 
       <div className="mt-1.5 flex items-center justify-between gap-1">
-        <Button size="sm" variant="ghost" onClick={() => commit("")} className="h-6 px-1.5 text-[11px]">
+        <Button size="sm" variant="ghost" onClick={() => commit("")} className="h-6 px-1.5 text-body">
           Clear
         </Button>
         <Button
           size="sm"
           variant="default"
           onClick={() => commit(draft)}
-          className="h-6 px-2 text-[11px]"
+          className="h-6 px-2 text-body"
         >
           Save
         </Button>

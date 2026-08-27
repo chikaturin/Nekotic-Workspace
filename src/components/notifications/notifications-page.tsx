@@ -19,8 +19,8 @@ export function NotificationsPage() {
         </span>
 
         <div className="min-w-0">
-          <h1 className="text-base font-semibold tracking-tight text-foreground">Notifications</h1>
-          <p className="metric text-[11px] text-faint-foreground">
+          <h1 className="text-title font-semibold tracking-tight text-foreground">Notifications</h1>
+          <p className="metric text-body text-faint-foreground">
             {formatCount(controller.unread, "unread item")} · {controller.all.length} total
           </p>
         </div>

@@ -18,7 +18,7 @@ interface SaveIndicatorProps {
 export function SaveIndicator({ state, onRetry, isReadOnly = false }: SaveIndicatorProps) {
   if (isReadOnly) {
     return (
-      <span className="metric flex items-center gap-1.5 text-[11px] text-faint-foreground">
+      <span className="metric flex items-center gap-1.5 text-body text-faint-foreground">
         Read only
       </span>
     );
@@ -37,7 +37,7 @@ export function SaveIndicator({ state, onRetry, isReadOnly = false }: SaveIndica
         role="status"
         aria-live="polite"
         className={cn(
-          "metric flex items-center gap-1.5 text-[11px]",
+          "metric flex items-center gap-1.5 text-body",
           state.status === "error" ? "text-danger" : "text-faint-foreground",
         )}
       >
@@ -69,7 +69,7 @@ export function SaveIndicator({ state, onRetry, isReadOnly = false }: SaveIndica
           <>
             <TriangleAlert className="size-3" />
             {state.error ?? "Could not save"}
-            <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[11px]" onClick={onRetry}>
+            <Button size="sm" variant="ghost" className="h-5 px-1.5 text-body" onClick={onRetry}>
               Retry
             </Button>
           </>

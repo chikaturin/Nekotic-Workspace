@@ -45,7 +45,7 @@ export function VersionDetail({ entry, mode, currentLines }: VersionDetailProps)
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
         <FileClock className="size-5 text-faint-foreground" />
-        <p className="text-[12px] text-muted-foreground">
+        <p className="text-ui text-muted-foreground">
           Pick a version to read it, or compare it with what is on screen now.
         </p>
       </div>
@@ -55,18 +55,18 @@ export function VersionDetail({ entry, mode, currentLines }: VersionDetailProps)
   return (
     <div className="flex h-full flex-col">
       <header className="flex shrink-0 items-baseline gap-2 border-b border-hairline px-3 py-2">
-        <span className="text-[12px] font-medium text-foreground">
+        <span className="text-ui font-medium text-foreground">
           {mode === "view" ? `Version ${entry.version}` : `Version ${entry.version} → now`}
         </span>
         {mode === "compare" && (
-          <span className="metric ml-auto text-[10px] text-faint-foreground">
+          <span className="metric ml-auto text-micro text-faint-foreground">
             {describeDiff(summary)}
           </span>
         )}
       </header>
 
       <div className="min-h-0 flex-1 overflow-auto bg-canvas p-2">
-        <pre className="min-w-max text-[11px] leading-relaxed">
+        <pre className="min-w-max text-body leading-relaxed">
           {lines.map((line, index) => (
             <div
               key={index}

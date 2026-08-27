@@ -29,7 +29,7 @@ export function BreadcrumbCrumb({ item, dropTargetId }: BreadcrumbCrumbProps) {
   const label = (
     <span
       className={cn(
-        "max-w-[10rem] truncate rounded-md px-1.5 py-1 text-sm transition-colors",
+        "max-w-[10rem] truncate rounded-md px-1.5 py-1 text-lead transition-colors",
         item.isCurrent ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
         isOver && "bg-accent-soft text-accent ring-1 ring-accent",
       )}

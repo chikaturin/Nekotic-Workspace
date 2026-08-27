@@ -24,7 +24,7 @@ export function UploadQueuePanel() {
   const isVisible = tasks.length > 0;
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-50 w-[min(22rem,calc(100vw-2rem))]">
+    <div className="pointer-events-none fixed bottom-4 right-4 z-toast w-[min(22rem,calc(100vw-2rem))]">
       <AnimatePresence>
         {isVisible && (
           <motion.section
@@ -33,17 +33,17 @@ export function UploadQueuePanel() {
             exit={{ opacity: 0, y: 12, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 400, damping: 34 }}
             aria-label="Upload queue"
-            className="pointer-events-auto overflow-hidden rounded-xl border border-border bg-elevated shadow-2xl"
+            className="pointer-events-auto overflow-hidden rounded-xl border border-border bg-elevated shadow-float"
           >
             <header className="flex items-center gap-2 border-b border-border px-3 py-2">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium text-foreground">
+                <p className="truncate text-lead font-medium text-foreground">
                   {hasActive
                     ? `Uploading ${formatCount(summary.active, "file")}`
                     : `${formatCount(summary.completed, "file")} uploaded`}
                 </p>
                 {summary.failed > 0 && (
-                  <p className="metric text-[10px] text-danger">
+                  <p className="metric text-micro text-danger">
                     {formatCount(summary.failed, "failure")}
                   </p>
                 )}

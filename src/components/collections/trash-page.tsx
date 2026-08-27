@@ -41,8 +41,8 @@ export function TrashPage() {
         </span>
 
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-base font-semibold tracking-tight text-foreground">Trash</h1>
-          <p className="metric truncate text-[11px] text-faint-foreground">
+          <h1 className="truncate text-title font-semibold tracking-tight text-foreground">Trash</h1>
+          <p className="metric truncate text-body text-faint-foreground">
             Deleted items are kept for {TRASH_RETENTION_DAYS} days ·{" "}
             {formatCount(rows.length, "item")}
           </p>
@@ -73,7 +73,7 @@ export function TrashPage() {
           <div className="overflow-x-auto rounded-xl border border-border bg-background">
             <table className="w-full border-collapse text-left">
               <thead>
-                <tr className="border-b border-border bg-surface text-[11px] uppercase tracking-wider text-faint-foreground">
+                <tr className="border-b border-border bg-surface text-body uppercase tracking-wider text-faint-foreground">
                   <th className="p-2.5 font-medium">Item</th>
                   <th className="p-2.5 font-medium">Original location</th>
                   <th className="p-2.5 font-medium">Deleted</th>
@@ -148,22 +148,22 @@ function TrashTableRow({
         <span className="flex items-center gap-2">
           <visual.Icon className={cn("size-4 shrink-0", visual.colorClass)} />
           <span className="min-w-0">
-            <span className="block truncate text-[13px] text-foreground">
+            <span className="block truncate text-lead text-foreground">
               {row.entry.node.name}
             </span>
-            <span className="metric block text-[10px] text-faint-foreground">{visual.label}</span>
+            <span className="metric block text-micro text-faint-foreground">{visual.label}</span>
           </span>
         </span>
       </td>
 
       <td className="max-w-56 p-2.5">
-        <span className="block truncate text-[12px] text-muted-foreground">
+        <span className="block truncate text-ui text-muted-foreground">
           {row.entry.originalPath}
         </span>
         {row.willRelocate && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-warning">
+              <span className="mt-0.5 inline-flex items-center gap-1 text-micro text-warning">
                 <TriangleAlert className="size-3" />
                 folder is gone
               </span>
@@ -175,14 +175,14 @@ function TrashTableRow({
         )}
       </td>
 
-      <td className="metric whitespace-nowrap p-2.5 text-[11px] text-muted-foreground">
+      <td className="metric whitespace-nowrap p-2.5 text-body text-muted-foreground">
         {formatRelativeTime(row.entry.deletedAt)}
       </td>
 
       <td className="p-2.5">
         <span className="flex items-center gap-1.5">
           <UserAvatar user={row.entry.deletedBy} className="size-5" />
-          <span className="truncate text-[12px] text-muted-foreground">
+          <span className="truncate text-ui text-muted-foreground">
             {row.entry.deletedBy.name}
           </span>
         </span>
@@ -216,7 +216,7 @@ function TrashTableRow({
             </Button>
           </>
         ) : (
-          <span className="metric text-[10px] text-faint-foreground">
+          <span className="metric text-micro text-faint-foreground">
             only its owner can restore this
           </span>
         )}

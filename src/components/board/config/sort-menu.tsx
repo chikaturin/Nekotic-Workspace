@@ -49,14 +49,14 @@ export function SortMenu({ model }: { model: BoardViewModel }) {
 
       <PopoverContent className="w-[26rem] max-w-[calc(100vw-2rem)]">
         {sorts.length === 0 ? (
-          <p className="px-1 py-2 text-[12px] text-faint-foreground">
+          <p className="px-1 py-2 text-ui text-faint-foreground">
             Records follow the order the board stores them in.
           </p>
         ) : (
           <ol className="space-y-1.5">
             {sorts.map((sort, index) => (
               <li key={sort.columnId} className="flex items-center gap-1.5">
-                <span className="metric w-10 shrink-0 text-[11px] text-faint-foreground">
+                <span className="metric w-10 shrink-0 text-body text-faint-foreground">
                   {index === 0 ? "Sort" : "then"}
                 </span>
 
@@ -137,7 +137,7 @@ export function SortMenu({ model }: { model: BoardViewModel }) {
             <Button
               size="sm"
               variant="ghost"
-              className="ml-auto text-[11px]"
+              className="ml-auto text-body"
               onClick={() => void setSorts([])}
             >
               Clear
@@ -145,7 +145,7 @@ export function SortMenu({ model }: { model: BoardViewModel }) {
           )}
         </div>
 
-        <p className="mt-2 px-1 text-[11px] text-faint-foreground">
+        <p className="mt-2 px-1 text-body text-faint-foreground">
           Empty values always sort last, whichever direction is chosen.
         </p>
       </PopoverContent>

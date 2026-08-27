@@ -104,7 +104,7 @@ export function ViewConfigBar({ model }: { model: BoardViewModel }) {
               key={filter.id}
               type="button"
               onClick={() => void setFilters(filters.filter((item) => item.id !== filter.id))}
-              className="flex max-w-56 items-center gap-1 rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-[11px] text-accent"
+              className="flex max-w-56 items-center gap-1 rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-body text-accent"
             >
               <span className="truncate">{describeFilter(filter, columns)}</span>
               <X className="size-2.5 shrink-0 opacity-70" />
@@ -114,7 +114,7 @@ export function ViewConfigBar({ model }: { model: BoardViewModel }) {
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 px-1.5 text-[11px]"
+            className="h-6 px-1.5 text-body"
             onClick={() => void setFilters([])}
           >
             Clear all

@@ -76,7 +76,7 @@ export function DocumentPage({ node }: DocumentPageProps) {
       className={cn(
         "flex h-full flex-col bg-background",
         // Focus mode lifts the page out of the shell and over the whole viewport.
-        isFullScreen && "fixed inset-0 z-50 h-dvh animate-in fade-in-0",
+        isFullScreen && "fixed inset-0 z-modal h-dvh animate-in fade-in-0",
       )}
     >
       <AsyncBoundary

@@ -29,7 +29,7 @@ export function SlashMenu({
   if (results.length === 0) {
     return (
       <MenuShell>
-        <p className="px-2 py-3 text-center text-[13px] text-muted-foreground">
+        <p className="px-2 py-3 text-center text-lead text-muted-foreground">
           No blocks match that search
         </p>
       </MenuShell>
@@ -51,7 +51,7 @@ export function SlashMenu({
           return (
             <li key={command.type}>
               {showHeading && (
-                <p className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+                <p className="px-2 pb-1 pt-2 text-micro font-semibold uppercase tracking-wider text-faint-foreground">
                   {GROUP_LABELS[command.group]}
                 </p>
               )}
@@ -77,13 +77,13 @@ export function SlashMenu({
                   <Icon className="size-3.5 text-muted-foreground" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] text-foreground">{command.label}</span>
-                  <span className="block truncate text-[11px] text-faint-foreground">
+                  <span className="block truncate text-lead text-foreground">{command.label}</span>
+                  <span className="block truncate text-body text-faint-foreground">
                     {command.description}
                   </span>
                 </span>
                 {command.markdownPrefix && (
-                  <span className="metric shrink-0 text-[10px] text-faint-foreground">
+                  <span className="metric shrink-0 text-micro text-faint-foreground">
                     {command.markdownPrefix}
                   </span>
                 )}
@@ -102,7 +102,7 @@ function MenuShell({ children }: { children: React.ReactNode }) {
       initial={{ opacity: 0, y: -4, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
-      className="absolute left-0 top-full z-40 mt-1 w-72 overflow-hidden rounded-xl border border-border bg-elevated shadow-2xl"
+      className="absolute left-0 top-full z-dropdown mt-1 w-72 overflow-hidden rounded-xl border border-border bg-elevated shadow-float"
     >
       {children}
     </motion.div>

@@ -33,7 +33,7 @@ export function NotificationBell() {
         >
           <Bell />
           {controller.unread > 0 && (
-            <span className="absolute right-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-semibold leading-4 text-accent-foreground ring-2 ring-surface">
+            <span className="absolute right-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-accent px-1 text-micro font-semibold leading-4 text-accent-foreground ring-2 ring-surface">
               {controller.unread > 9 ? "9+" : controller.unread}
             </span>
           )}
@@ -42,14 +42,14 @@ export function NotificationBell() {
 
       <PopoverContent align="end" className="w-[380px] p-0">
         <header className="flex items-center gap-2 border-b border-border px-3 py-2">
-          <span className="text-[13px] font-semibold text-foreground">Notifications</span>
-          <span className="metric text-[10px] text-faint-foreground">
+          <span className="text-lead font-semibold text-foreground">Notifications</span>
+          <span className="metric text-micro text-faint-foreground">
             {controller.unread} unread
           </span>
           <Button
             size="sm"
             variant="ghost"
-            className="ml-auto h-6 gap-1.5 px-2 text-[11px]"
+            className="ml-auto h-6 gap-1.5 px-2 text-body"
             disabled={controller.unread === 0}
             onClick={controller.markAllRead}
           >
@@ -79,7 +79,7 @@ export function NotificationBell() {
             size="sm"
             variant="ghost"
             asChild
-            className="w-full justify-center text-[11px]"
+            className="w-full justify-center text-body"
             onClick={() => setPanelOpen(false)}
           >
             <Link href="/notifications">Open the full inbox</Link>

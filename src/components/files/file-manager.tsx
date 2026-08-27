@@ -63,8 +63,8 @@ export function FileManager({ folderId, title, description }: FileManagerProps) 
     <div className="flex h-full flex-col">
       <header className="flex flex-wrap items-center gap-3 border-b border-border bg-background/80 px-4 py-3 backdrop-blur">
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-base font-semibold tracking-tight text-foreground">{title}</h1>
-          <p className="metric truncate text-[11px] text-faint-foreground">
+          <h1 className="truncate text-title font-semibold tracking-tight text-foreground">{title}</h1>
+          <p className="metric truncate text-body text-faint-foreground">
             {description ?? formatCount(files.length, "file")}
           </p>
         </div>

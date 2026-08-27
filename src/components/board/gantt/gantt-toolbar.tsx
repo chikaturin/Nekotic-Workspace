@@ -53,7 +53,7 @@ export function GanttToolbar({
             aria-pressed={zoom === level}
             onClick={() => onZoomChange(level)}
             className={cn(
-              "rounded px-2 py-1 text-[11px] transition-colors",
+              "rounded px-2 py-1 text-body transition-colors",
               zoom === level
                 ? "bg-accent text-accent-foreground"
                 : "text-muted-foreground hover:text-foreground",
@@ -82,10 +82,10 @@ export function GanttToolbar({
       >
         {showDependencies ? <GitBranch /> : <Link2Off />}
         <span className="hidden sm:inline">Dependencies</span>
-        <span className="metric text-[10px] text-faint-foreground">{linkCount}</span>
+        <span className="metric text-micro text-faint-foreground">{linkCount}</span>
       </Button>
 
-      <span className="metric ml-auto truncate text-[11px] text-faint-foreground">{summary}</span>
+      <span className="metric ml-auto truncate text-body text-faint-foreground">{summary}</span>
     </header>
   );
 }

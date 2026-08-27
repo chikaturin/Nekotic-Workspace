@@ -58,11 +58,11 @@ export function RenameDialog() {
       <DialogContent className="max-w-sm p-5">
         {node && visual && (
           <>
-            <DialogTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <DialogTitle className="flex items-center gap-2 text-lead font-semibold text-foreground">
               <visual.Icon className={`size-4 ${visual.colorClass}`} />
               Name this {visual.label.toLowerCase()}
             </DialogTitle>
-            <DialogDescription className="mt-1 text-[12px] text-muted-foreground">
+            <DialogDescription className="mt-1 text-ui text-muted-foreground">
               Press Enter to save, Escape to keep the current name.
             </DialogDescription>
 

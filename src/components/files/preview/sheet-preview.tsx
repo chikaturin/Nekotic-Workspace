@@ -122,7 +122,7 @@ export function SheetPreview({ rows, sheetName, node, canEdit, onSaved }: SheetP
           <Table2 className="size-3" />
           {sheetName}
         </Badge>
-        <span className="metric text-[10px] text-faint-foreground">
+        <span className="metric text-micro text-faint-foreground">
           {shown.length} × {columns}
         </span>
 
@@ -156,18 +156,18 @@ export function SheetPreview({ rows, sheetName, node, canEdit, onSaved }: SheetP
       </div>
 
       <div ref={containerRef} className="min-h-0 flex-1 overflow-auto bg-surface">
-        <table className="border-collapse text-[12.5px]">
+        <table className="border-collapse text-code">
           <thead>
             <tr>
-              <th className="sticky left-0 top-0 z-20 w-10 border-b border-r border-border bg-hover" />
+              <th className="sticky left-0 top-0 z-sticky w-10 border-b border-r border-border bg-hover" />
               {Array.from({ length: columns }, (_, columnIndex) => (
                 <th
                   key={columnIndex}
                   scope="col"
-                  className="sticky top-0 z-10 border-b border-r border-border bg-hover px-0 py-1"
+                  className="sticky top-0 z-sticky border-b border-r border-border bg-hover px-0 py-1"
                 >
                   <div className="flex items-center justify-center gap-1">
-                    <span className="metric text-[10px] font-medium text-muted-foreground">
+                    <span className="metric text-micro font-medium text-muted-foreground">
                       {columnLabel(columnIndex)}
                     </span>
                     {editor.isEditing && (
@@ -190,7 +190,7 @@ export function SheetPreview({ rows, sheetName, node, canEdit, onSaved }: SheetP
                 </th>
               ))}
               {editor.isEditing && (
-                <th scope="col" className="sticky top-0 z-10 border-b border-border bg-hover p-0">
+                <th scope="col" className="sticky top-0 z-sticky border-b border-border bg-hover p-0">
                   <EdgeAdd
                     label="Add column"
                     onClick={() => {
@@ -208,10 +208,10 @@ export function SheetPreview({ rows, sheetName, node, canEdit, onSaved }: SheetP
               <tr key={rowIndex} className="group/row">
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 border-b border-r border-border bg-hover px-0 py-0 text-center"
+                  className="sticky left-0 z-sticky border-b border-r border-border bg-hover px-0 py-0 text-center"
                 >
                   <div className="flex items-center justify-center gap-0.5">
-                    <span className="metric text-[10px] font-normal text-faint-foreground">
+                    <span className="metric text-micro font-normal text-faint-foreground">
                       {rowIndex + 1}
                     </span>
                     {editor.isEditing && (
@@ -269,7 +269,7 @@ export function SheetPreview({ rows, sheetName, node, canEdit, onSaved }: SheetP
 
             {editor.isEditing && (
               <tr>
-                <th scope="row" className="sticky left-0 z-10 border-r border-border bg-hover p-0" />
+                <th scope="row" className="sticky left-0 z-sticky border-r border-border bg-hover p-0" />
                 <td colSpan={columns} className="p-0">
                   <EdgeAdd
                     label="Add row"
@@ -325,7 +325,7 @@ function AxisMenu({ label, canDelete, items, deleteLabel, onInsert, onDelete }: 
           aria-label={label}
           className="flex size-4 items-center justify-center rounded text-faint-foreground opacity-0 transition-opacity hover:bg-hover hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100 [th:hover_&]:opacity-100"
         >
-          <span aria-hidden className="text-[9px] leading-none">
+          <span aria-hidden className="text-micro leading-none">
             ▾
           </span>
         </button>

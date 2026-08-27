@@ -31,7 +31,7 @@ export function AttachmentPanel({ rowId, columns, folderId, canEdit }: Attachmen
     <section aria-label="Attachments" className="space-y-3">
       <header className="flex items-center gap-2">
         <Paperclip className="size-3.5 shrink-0 text-faint-foreground" />
-        <h3 className="text-[12px] font-medium text-foreground">Attachments</h3>
+        <h3 className="text-ui font-medium text-foreground">Attachments</h3>
       </header>
 
       {fields.map((column) => (
@@ -64,13 +64,13 @@ function AttachmentColumnSection({ column, rowId, folderId, canEdit, showName }:
     <div className="space-y-1.5">
       {showName && (
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-muted-foreground">{column.name}</span>
+          <span className="text-body text-muted-foreground">{column.name}</span>
           {field.files.length > 0 && <Badge variant="default">{field.files.length}</Badge>}
         </div>
       )}
 
       {field.files.length === 0 && !canEdit ? (
-        <p className="text-[12px] text-faint-foreground">Nothing attached.</p>
+        <p className="text-ui text-faint-foreground">Nothing attached.</p>
       ) : (
         <AttachmentGallery
           field={field}

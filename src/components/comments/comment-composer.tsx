@@ -110,7 +110,7 @@ export function CommentComposer({
           <Paperclip />
         </Button>
 
-        <span className="metric truncate text-[10px] text-faint-foreground">
+        <span className="metric truncate text-micro text-faint-foreground">
           {isAttaching
             ? "Attaching…"
             : draft.trim().length > 0
@@ -122,7 +122,7 @@ export function CommentComposer({
           <Button
             size="sm"
             variant="ghost"
-            className="ml-auto h-6 gap-1 px-2 text-[11px]"
+            className="ml-auto h-6 gap-1 px-2 text-body"
             onClick={onCancel}
           >
             <X />
@@ -133,7 +133,7 @@ export function CommentComposer({
         <Button
           size="sm"
           variant="default"
-          className={onCancel ? "h-6 gap-1.5 px-2 text-[11px]" : "ml-auto h-6 gap-1.5 px-2 text-[11px]"}
+          className={onCancel ? "h-6 gap-1.5 px-2 text-body" : "ml-auto h-6 gap-1.5 px-2 text-body"}
           disabled={!canSend}
           onClick={() => void send()}
         >

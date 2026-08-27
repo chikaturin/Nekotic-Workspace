@@ -35,10 +35,10 @@ export function WidgetCard({ widget, icon: Icon, tone = "neutral", onOpen }: Wid
         </span>
 
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-semibold text-foreground">
+          <span className="block truncate text-lead font-semibold text-foreground">
             {widget.label}
           </span>
-          <span className="metric block truncate text-[10px] text-faint-foreground">
+          <span className="metric block truncate text-micro text-faint-foreground">
             {widget.description}
           </span>
         </span>
@@ -49,7 +49,7 @@ export function WidgetCard({ widget, icon: Icon, tone = "neutral", onOpen }: Wid
       </header>
 
       {widget.items.length === 0 ? (
-        <p className="px-3 py-6 text-center text-[12px] text-faint-foreground">
+        <p className="px-3 py-6 text-center text-ui text-faint-foreground">
           Nothing here right now.
         </p>
       ) : (
@@ -63,7 +63,7 @@ export function WidgetCard({ widget, icon: Icon, tone = "neutral", onOpen }: Wid
       )}
 
       {hidden > 0 && (
-        <p className="metric border-t border-hairline px-3 py-1.5 text-[10px] text-faint-foreground">
+        <p className="metric border-t border-hairline px-3 py-1.5 text-micro text-faint-foreground">
           {hidden} more on the boards
         </p>
       )}

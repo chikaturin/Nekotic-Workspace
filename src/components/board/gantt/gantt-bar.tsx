@@ -101,7 +101,7 @@ export function GanttBar({
       )}
 
       {width >= LABEL_MIN_WIDTH && (
-        <span className="relative truncate px-2 text-[11px] leading-none font-medium text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.6)]">
+        <span className="relative truncate px-2 text-body leading-none font-medium text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.6)]">
           {hasConflict && <TriangleAlert className="mr-1 inline size-3" />}
           {label}
         </span>

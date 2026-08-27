@@ -54,10 +54,10 @@ export function UploadDialog({
       <DialogContent fullscreen hideClose className="flex flex-col bg-background p-0">
         <header className="flex shrink-0 items-center gap-3 border-b border-border bg-surface px-4 py-3">
           <div className="min-w-0 flex-1">
-            <DialogTitle className="truncate text-[15px] font-semibold tracking-tight text-foreground">
+            <DialogTitle className="truncate text-title font-semibold tracking-tight text-foreground">
               Add files
             </DialogTitle>
-            <DialogDescription className="metric truncate text-[11px] text-faint-foreground">
+            <DialogDescription className="metric truncate text-body text-faint-foreground">
               Destination · {folderName}
             </DialogDescription>
           </div>
@@ -79,8 +79,8 @@ export function UploadDialog({
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-surface/60 p-10 text-center">
                 <Lock className="size-8 text-faint-foreground" strokeWidth={1.5} />
-                <p className="text-sm font-medium text-foreground">Uploads are not allowed here</p>
-                <p className="max-w-sm text-[13px] text-muted-foreground">
+                <p className="text-lead font-medium text-foreground">Uploads are not allowed here</p>
+                <p className="max-w-sm text-lead text-muted-foreground">
                   You do not have permission to add files to “{folderName}”. Ask a workspace admin
                   for access.
                 </p>
@@ -100,11 +100,11 @@ export function UploadDialog({
                   className="overflow-hidden rounded-xl border border-border bg-surface"
                 >
                   <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
-                    <h2 className="text-[13px] font-medium text-foreground">
+                    <h2 className="text-lead font-medium text-foreground">
                       {formatCount(scoped.length, "file")}
                     </h2>
                     {summary.active > 0 && (
-                      <span className="metric text-[11px] text-faint-foreground">
+                      <span className="metric text-body text-faint-foreground">
                         {formatPercent(summary.progress)} · {summary.active} in flight
                       </span>
                     )}
@@ -139,7 +139,7 @@ export function UploadDialog({
         </div>
 
         <footer className="flex shrink-0 flex-wrap items-center gap-3 border-t border-border bg-surface px-4 py-2.5">
-          <span className="metric text-[11px] text-faint-foreground">
+          <span className="metric text-body text-faint-foreground">
             {summary.completed > 0 && (
               <span className="inline-flex items-center gap-1 text-success">
                 <CheckCircle2 className="size-3.5" />
@@ -174,8 +174,8 @@ function AcceptedTypes() {
   return (
     <section className="rounded-xl border border-border bg-surface p-4">
       <div className="mb-3 flex items-baseline gap-2">
-        <h2 className="text-[13px] font-medium text-foreground">What you can upload</h2>
-        <span className="metric text-[11px] text-faint-foreground">
+        <h2 className="text-lead font-medium text-foreground">What you can upload</h2>
+        <span className="metric text-body text-faint-foreground">
           up to {formatBytes(MAX_UPLOAD_BYTES)} per file
         </span>
       </div>
@@ -183,14 +183,14 @@ function AcceptedTypes() {
       <dl className="grid gap-3 sm:grid-cols-2">
         {TYPE_GROUPS.map((group) => (
           <div key={group.label} className="space-y-1.5">
-            <dt className="text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+            <dt className="text-micro font-semibold uppercase tracking-wider text-faint-foreground">
               {group.label}
             </dt>
             <dd className="flex flex-wrap gap-1">
               {group.extensions.map((extension) => (
                 <span
                   key={extension}
-                  className="metric rounded border border-border bg-background px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground"
+                  className="metric rounded border border-border bg-background px-1.5 py-0.5 text-micro uppercase text-muted-foreground"
                 >
                   {extension}
                 </span>
@@ -200,7 +200,7 @@ function AcceptedTypes() {
         ))}
       </dl>
 
-      <p className="mt-3 text-[12px] text-muted-foreground">
+      <p className="mt-3 text-ui text-muted-foreground">
         Uploads keep running while you work — close this page any time and watch progress in the
         tray.
       </p>

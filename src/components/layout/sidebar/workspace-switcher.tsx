@@ -30,7 +30,7 @@ function WorkspaceTile({ workspace, className }: { workspace: Workspace; classNa
   return (
     <span
       className={cn(
-        "metric flex size-7 shrink-0 items-center justify-center rounded-md text-[11px] font-bold",
+        "metric flex size-7 shrink-0 items-center justify-center rounded-md text-body font-bold",
         className,
       )}
       style={{ backgroundColor: `color-mix(in oklch, ${workspace.color} 22%, transparent)`, color: workspace.color }}
@@ -83,8 +83,8 @@ export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
         {!isCollapsed && (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-foreground">{active.name}</span>
-              <span className="metric block text-[10px] uppercase tracking-wider text-faint-foreground">
+              <span className="block truncate text-lead font-semibold text-foreground">{active.name}</span>
+              <span className="metric block text-micro uppercase tracking-wider text-faint-foreground">
                 {active.plan} plan
               </span>
             </span>
@@ -101,10 +101,10 @@ export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
             onSelect={() => handleSelect(workspace.id)}
             className="gap-2.5 py-2"
           >
-            <WorkspaceTile workspace={workspace} className="size-6 text-[10px]" />
+            <WorkspaceTile workspace={workspace} className="size-6 text-micro" />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm">{workspace.name}</span>
-              <span className="block truncate text-[11px] text-faint-foreground">
+              <span className="block truncate text-lead">{workspace.name}</span>
+              <span className="block truncate text-body text-faint-foreground">
                 {workspace.members.length} members
               </span>
             </span>
@@ -125,7 +125,7 @@ export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
           <DropdownMenuSubTrigger>
             <Eye />
             Preview as
-            <span className="ml-auto text-[11px] text-faint-foreground">
+            <span className="ml-auto text-body text-faint-foreground">
               {ROLE_LABELS[previewRole ?? role]}
             </span>
           </DropdownMenuSubTrigger>

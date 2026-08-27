@@ -84,7 +84,7 @@ export function CreateMenuItems({
                   {template.name}
                   <DropdownMenuShortcut>{template.rowIdPrefix}-001</DropdownMenuShortcut>
                 </span>
-                <span className="truncate text-[11px] text-faint-foreground">
+                <span className="truncate text-body text-faint-foreground">
                   {template.description}
                 </span>
               </div>

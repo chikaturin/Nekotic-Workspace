@@ -35,7 +35,7 @@ export function VersionList({
 }: VersionListProps) {
   if (entries.length === 0) {
     return (
-      <p className="px-3 py-6 text-center text-[12px] text-faint-foreground">
+      <p className="px-3 py-6 text-center text-ui text-faint-foreground">
         No versions recorded yet.
       </p>
     );
@@ -60,23 +60,23 @@ export function VersionList({
             )}
           >
             <div className="flex items-baseline gap-2">
-              <span className="metric text-[11px] font-medium text-foreground">
+              <span className="metric text-body font-medium text-foreground">
                 v{entry.version}
               </span>
               {isCurrent && (
-                <span className="text-[10px] uppercase tracking-wide text-accent">current</span>
+                <span className="text-micro uppercase tracking-wide text-accent">current</span>
               )}
-              <span className="metric ml-auto text-[10px] text-faint-foreground">
+              <span className="metric ml-auto text-micro text-faint-foreground">
                 {formatRelativeTime(entry.createdAt)}
               </span>
             </div>
 
             <div className="mt-1.5 flex items-center gap-1.5">
               <UserAvatar user={entry.author} className="size-5" />
-              <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+              <span className="min-w-0 flex-1 truncate text-body text-muted-foreground">
                 {entry.author.name}
               </span>
-              <span className="metric shrink-0 text-[10px] text-faint-foreground">
+              <span className="metric shrink-0 text-micro text-faint-foreground">
                 {entry.summary}
               </span>
             </div>
@@ -86,7 +86,7 @@ export function VersionList({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-6 gap-1.5 px-1.5 text-[11px]"
+                  className="h-6 gap-1.5 px-1.5 text-body"
                   onClick={() => onView(entry)}
                 >
                   <Eye />
@@ -97,7 +97,7 @@ export function VersionList({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 gap-1.5 px-1.5 text-[11px]"
+                    className="h-6 gap-1.5 px-1.5 text-body"
                     onClick={() => onCompare(entry)}
                   >
                     <GitCompare />
@@ -109,7 +109,7 @@ export function VersionList({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 gap-1.5 px-1.5 text-[11px]"
+                    className="h-6 gap-1.5 px-1.5 text-body"
                     disabled={restoringId !== null}
                     onClick={() => onRestore(entry)}
                   >

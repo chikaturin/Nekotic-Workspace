@@ -65,11 +65,11 @@ export function TreeRow({ node, depth, href, isExpanded, isActive, onToggle }: T
   );
 
   const className = cn(
-    "group relative flex h-[30px] w-full items-center gap-1.5 rounded-md pr-2 text-[13px] outline-none transition-colors",
+    "group relative flex h-[30px] w-full items-center gap-1.5 rounded-md pr-2 text-lead outline-none transition-colors",
     "focus-visible:ring-2 focus-visible:ring-ring",
     isActive ? "bg-selection text-foreground" : "text-muted-foreground hover:bg-hover hover:text-foreground",
     isOver && "bg-accent-soft ring-1 ring-accent",
-    isDragging && "opacity-40",
+    isDragging && "is-dragging",
   );
 
   if (node.type === "file") {

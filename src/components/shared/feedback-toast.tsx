@@ -35,7 +35,7 @@ export function FeedbackToast() {
   const Icon = feedback ? TONE_ICON[feedback.tone] : Info;
 
   return (
-    <div className="pointer-events-none fixed bottom-5 left-1/2 z-[60] -translate-x-1/2">
+    <div className="pointer-events-none fixed bottom-5 left-1/2 z-toast -translate-x-1/2">
       <AnimatePresence>
         {feedback && (
           <motion.div
@@ -46,10 +46,10 @@ export function FeedbackToast() {
             transition={{ type: "spring", stiffness: 420, damping: 32 }}
             role="status"
             aria-live="polite"
-            className="pointer-events-auto flex items-center gap-2.5 rounded-full border border-border bg-elevated py-1.5 pl-3.5 pr-1.5 shadow-2xl"
+            className="pointer-events-auto flex items-center gap-2.5 rounded-full border border-border bg-elevated py-1.5 pl-3.5 pr-1.5 shadow-float"
           >
             <Icon className={cn("size-4 shrink-0", TONE_CLASS[feedback.tone])} />
-            <span className="text-sm text-foreground">{feedback.message}</span>
+            <span className="text-lead text-foreground">{feedback.message}</span>
             <Button size="icon-sm" variant="ghost" className="rounded-full" onClick={dismissFeedback}>
               <X />
               <span className="sr-only">Dismiss</span>

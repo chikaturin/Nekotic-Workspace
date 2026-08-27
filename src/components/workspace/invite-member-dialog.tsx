@@ -79,15 +79,15 @@ export function InviteMemberDialog({ isOpen, onClose }: InviteMemberDialogProps)
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md p-5">
-        <DialogTitle className="text-[15px]">Invite members</DialogTitle>
-        <DialogDescription className="mt-1 text-[12px] text-muted-foreground">
+        <DialogTitle className="text-title">Invite members</DialogTitle>
+        <DialogDescription className="mt-1 text-ui text-muted-foreground">
           People are added to {workspace.name} straight away. Their role decides what
           they can do; folder access is decided separately, on the folder.
         </DialogDescription>
 
         <div className="mt-4 flex items-end gap-2">
           <label className="min-w-0 flex-1">
-            <span className="mb-1 block text-[11px] font-medium text-muted-foreground">
+            <span className="mb-1 block text-body font-medium text-muted-foreground">
               Name or email
             </span>
             <Input
@@ -100,7 +100,7 @@ export function InviteMemberDialog({ isOpen, onClose }: InviteMemberDialogProps)
           </label>
 
           <label>
-            <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Role</span>
+            <span className="mb-1 block text-body font-medium text-muted-foreground">Role</span>
             <SelectField
               value={role}
               aria-label="Role for the new member"
@@ -126,8 +126,8 @@ export function InviteMemberDialog({ isOpen, onClose }: InviteMemberDialogProps)
               >
                 <UserAvatar user={person} className="size-6" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12px] text-foreground">{person.name}</span>
-                  <span className="block truncate text-[11px] text-faint-foreground">
+                  <span className="block truncate text-ui text-foreground">{person.name}</span>
+                  <span className="block truncate text-body text-faint-foreground">
                     {person.email}
                   </span>
                 </span>
@@ -138,7 +138,7 @@ export function InviteMemberDialog({ isOpen, onClose }: InviteMemberDialogProps)
         </ul>
 
         {isUnknownAddress && (
-          <p className="mt-2 rounded-md border border-hairline bg-surface px-2.5 py-2 text-[11px] text-muted-foreground">
+          <p className="mt-2 rounded-md border border-hairline bg-surface px-2.5 py-2 text-body text-muted-foreground">
             Nobody in the directory uses <span className="text-foreground">{query.trim()}</span>.
             Sending an invitation to an address is not part of this build — the backend has no
             invitation flow yet, so adding them silently would be a lie.
@@ -146,7 +146,7 @@ export function InviteMemberDialog({ isOpen, onClose }: InviteMemberDialogProps)
         )}
 
         {!isUnknownAddress && candidates.length === 0 && (
-          <p className="mt-2 text-[11px] text-muted-foreground">
+          <p className="mt-2 text-body text-muted-foreground">
             Everybody in the directory is already a member.
           </p>
         )}

@@ -19,7 +19,7 @@ export function TreePanel({ nodes }: TreePanelProps) {
     return (
       <div className="flex flex-col items-center gap-2 px-2 py-6 text-center">
         <FolderOpen className="size-5 text-faint-foreground" />
-        <p className="text-xs text-faint-foreground">No projects yet</p>
+        <p className="text-ui text-faint-foreground">No projects yet</p>
       </div>
     );
   }

@@ -34,10 +34,10 @@ export function DashboardWidget({ widget, icon: Icon, onOpenSource }: DashboardW
         </span>
 
         <div className="min-w-0 flex-1">
-          <h2 id={`widget-${widget.id}`} className="text-[13px] font-medium text-foreground">
+          <h2 id={`widget-${widget.id}`} className="text-lead font-medium text-foreground">
             {widget.label}
           </h2>
-          <p className="truncate text-[11px] text-faint-foreground">{widget.description}</p>
+          <p className="truncate text-body text-faint-foreground">{widget.description}</p>
         </div>
 
         <span className="metric shrink-0 text-xl font-semibold tabular-nums text-foreground">
@@ -46,7 +46,7 @@ export function DashboardWidget({ widget, icon: Icon, onOpenSource }: DashboardW
       </header>
 
       {isEmpty ? (
-        <p className="rounded-lg border border-dashed border-hairline px-3 py-4 text-center text-[12px] text-faint-foreground">
+        <p className="rounded-lg border border-dashed border-hairline px-3 py-4 text-center text-ui text-faint-foreground">
           No records reach this widget yet.
         </p>
       ) : (
@@ -73,7 +73,7 @@ export function DashboardWidget({ widget, icon: Icon, onOpenSource }: DashboardW
 
           <ul className="flex flex-col gap-1">
             {widget.buckets.map((bucket) => (
-              <li key={bucket.id} className="flex items-center gap-2 text-[12px]">
+              <li key={bucket.id} className="flex items-center gap-2 text-ui">
                 <span
                   aria-hidden
                   className={cn("size-2 shrink-0 rounded-full", BUCKET_BAR_CLASSES[bucket.color])}
@@ -86,7 +86,7 @@ export function DashboardWidget({ widget, icon: Icon, onOpenSource }: DashboardW
         </>
       )}
 
-      <footer className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-hairline pt-2 text-[11px]">
+      <footer className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-hairline pt-2 text-body">
         {widget.sources.length > 0 ? (
           widget.sources.map((source) => (
             <button

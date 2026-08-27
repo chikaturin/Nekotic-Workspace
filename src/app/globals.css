@@ -11,6 +11,43 @@
 :root {
   --radius: 0.625rem;
 
+  /* ------------------------------------------------------------- layering
+   * Eleven surfaces used to claim z-50 and settle their order by DOM
+   * accident. Named steps, far enough apart that a one-off can sit between
+   * two of them without a new token.
+   */
+  --z-base: 0;
+  --z-raised: 10;          /* a focused grid cell, a sticky column     */
+  --z-sticky: 20;          /* sticky headers, the frozen first column  */
+  --z-overlay: 30;         /* the grid's own in-flow cell editor       */
+  --z-dropdown: 40;        /* menus, popovers, listboxes               */
+  --z-modal: 50;           /* dialogs, drawers, their overlays         */
+  --z-toast: 60;           /* above a modal, on purpose                */
+  --z-tooltip: 70;         /* above everything, including a toast      */
+
+  /* ------------------------------------------------------------ elevation
+   * Tailwind's stock shadows are black, which reads as dirt on the dark
+   * theme's navy rather than as lift. These are tinted to the surface they
+   * fall on and re-tuned under `.dark`.
+   */
+  --shadow-raise: 0 1px 2px oklch(0.32 0.05 258 / 0.06);
+  --shadow-pop: 0 4px 12px -2px oklch(0.32 0.05 258 / 0.1),
+    0 2px 4px -2px oklch(0.32 0.05 258 / 0.06);
+  --shadow-float: 0 12px 28px -6px oklch(0.32 0.05 258 / 0.16),
+    0 4px 10px -4px oklch(0.32 0.05 258 / 0.1);
+
+  /* --------------------------------------------------------------- states
+   * Opacity was doing four different jobs at five different values —
+   * disabled, mid-drag, an optimistic write in flight, and frozen-by-archive
+   * all looked slightly different from each other and from themselves. Each
+   * job gets a name, so the class says what is true rather than how faded it
+   * happens to be.
+   */
+  --disabled-opacity: 0.5;
+  --dragging-opacity: 0.4;
+  --pending-opacity: 0.6;
+  --frozen-opacity: 0.65;
+
   --background: oklch(0.988 0.004 250);
   --canvas: oklch(0.966 0.009 248);
   --surface: oklch(1 0 0);
@@ -52,6 +89,14 @@
 }
 
 .dark {
+  /* Deeper and wider on navy: a shadow that works on white paper is
+   * invisible here, and one that is merely darker reads as a smudge. */
+  --shadow-raise: 0 1px 2px oklch(0.1 0.02 263 / 0.4);
+  --shadow-pop: 0 4px 12px -2px oklch(0.1 0.02 263 / 0.5),
+    0 2px 4px -2px oklch(0.1 0.02 263 / 0.4);
+  --shadow-float: 0 14px 32px -6px oklch(0.08 0.02 263 / 0.62),
+    0 4px 12px -4px oklch(0.08 0.02 263 / 0.45);
+
   --background: oklch(0.212 0.028 262);
   --canvas: oklch(0.188 0.026 262);
   --surface: oklch(0.248 0.03 263);
@@ -127,14 +172,76 @@
   --color-kind-code: var(--kind-code);
   --color-kind-other: var(--kind-other);
 
-  --radius-sm: calc(var(--radius) - 4px);
+  --radius-sm: calc(var(--radius) - 6px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
+  --shadow-raise: var(--shadow-raise);
+  --shadow-pop: var(--shadow-pop);
+  --shadow-float: var(--shadow-float);
+
   --font-sans:
     ui-sans-serif, "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
+
+  /* ---------------------------------------------------------------- type
+   * Ratified from what the app already writes rather than imposed on it:
+   * 10/11/12/13px carry 84% of every string on screen, so those are the four
+   * middle steps and 11px — the most-used size by a wide margin — is `body`.
+   * Each step carries its own line height, because a size without one is half
+   * a decision and the other half gets made again at every call site.
+   *
+   * None of the names collide with Tailwind's own ramp on purpose. Defining
+   * `--text-base` here would quietly redefine `text-base` from 16px to 12px,
+   * so every `text-base` already in the app would shrink without anyone
+   * touching it — a token that silently changes what a documented utility
+   * means is worse than no token.
+   */
+  --text-micro: 0.625rem;          /* 10px — metadata, counts, badges       */
+  --text-micro--line-height: 1.4;
+  --text-body: 0.6875rem;          /* 11px — the workspace default          */
+  --text-body--line-height: 1.45;
+  --text-ui: 0.75rem;              /* 12px — form controls, menu items      */
+  --text-ui--line-height: 1.5;
+  --text-lead: 0.8125rem;          /* 13px — list rows, tree rows           */
+  --text-lead--line-height: 1.5;
+  --text-title: 0.9375rem;         /* 15px — dialog and section titles      */
+  --text-title--line-height: 1.35;
+  --text-display: 1.125rem;        /* 18px — page titles                    */
+  --text-display--line-height: 1.3;
+
+  /* Monospace is half a pixel larger so it optically matches the sans text
+   * beside it. Load-bearing: the code editor stacks a transparent textarea
+   * over a highlighted <pre>, and a mismatch here misaligns the caret. */
+  --text-code: 0.78125rem;         /* 12.5px */
+  --text-code--line-height: 1.6;
+
+  /* --------------------------------------------------------------- density
+   * One ladder for anything a person clicks or types into. Padding is bound
+   * to height here so a control cannot be 28px tall with 12px of padding —
+   * which is exactly how a Select and an Input end up different shapes.
+   */
+  --control-xs: 1.5rem;            /* 24px — inside a grid cell, a chip row */
+  --control-sm: 1.75rem;           /* 28px — toolbars, menus, dense forms   */
+  --control-md: 2rem;              /* 32px — dialogs and settings forms     */
+  --control-lg: 2.25rem;           /* 36px — the rare primary action        */
+
+  --control-pad-xs: 0.375rem;
+  --control-pad-sm: 0.625rem;
+  --control-pad-md: 0.75rem;
+  --control-pad-lg: 0.875rem;
+
+  /* Rows are not controls: a list row is taller than the button inside it. */
+  --row-sm: 1.875rem;              /* 30px — tree and sidebar rows          */
+  --row-md: 2.25rem;               /* 36px — grid header                    */
+  --row-lg: 2.75rem;               /* 44px — list rows, grid medium         */
+
+  /* ---------------------------------------------------------------- icons */
+  --icon-xs: 0.625rem;             /* 10px */
+  --icon-sm: 0.75rem;              /* 12px */
+  --icon-md: 0.875rem;             /* 14px — the workspace default          */
+  --icon-lg: 1rem;                 /* 16px */
 }
 
 @layer base {
@@ -201,14 +308,23 @@
     box-shadow: inset 0 -1px 0 0 var(--hairline);
   }
 
-  .focus-ring {
-    outline: 2px solid transparent;
-    outline-offset: 2px;
-  }
+  /* The layering ladder as utilities. Naming the layer is the point: `z-50`
+     told you a number, `z-modal` tells you which surface you are on. */
+  .z-base { z-index: var(--z-base); }
+  .z-raised { z-index: var(--z-raised); }
+  .z-sticky { z-index: var(--z-sticky); }
+  .z-overlay { z-index: var(--z-overlay); }
+  .z-dropdown { z-index: var(--z-dropdown); }
+  .z-modal { z-index: var(--z-modal); }
+  .z-toast { z-index: var(--z-toast); }
+  .z-tooltip { z-index: var(--z-tooltip); }
 
-  .focus-ring:focus-visible {
-    outline-color: var(--accent);
-  }
+  /* State opacities, named. `is-pending` on an optimistic row says what the
+     row is; `opacity-60` said only that somebody picked a number. */
+  .is-disabled { opacity: var(--disabled-opacity); }
+  .is-dragging { opacity: var(--dragging-opacity); }
+  .is-pending { opacity: var(--pending-opacity); }
+  .is-frozen { opacity: var(--frozen-opacity); }
 
   .no-scrollbar::-webkit-scrollbar {
     display: none;
@@ -260,5 +376,29 @@
     .animate-nudge {
       animation: nudge-still 440ms ease-in-out 1;
     }
+  }
+}
+
+/*
+ * Reduced motion, once, for everything.
+ *
+ * The app animates in three different ways — framer-motion springs, Tailwind
+ * enter/exit classes, and CSS keyframes — and the preference was honoured by
+ * exactly one of them. Rather than teach every surface to ask, motion is cut
+ * off at the root and the few places where a beat carries meaning opt back in
+ * with a still variant of their own.
+ *
+ * Not `animation: none`: an `animationend` listener that never fires leaves a
+ * component stuck mid-state, so animations are collapsed to a single instant
+ * frame instead of removed.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

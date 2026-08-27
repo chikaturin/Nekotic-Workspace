@@ -84,7 +84,7 @@ export function ImageCanvas({
             }}
             onError={() => setStatus("error")}
             className={cn(
-              "block max-w-none rounded-lg border border-border bg-surface shadow-2xl",
+              "block max-w-none rounded-lg border border-border bg-surface shadow-float",
               status === "ready" ? "opacity-100" : "opacity-0",
             )}
           />
@@ -104,7 +104,7 @@ export function ImageCanvas({
               className="max-h-full max-w-full rounded-lg opacity-60 blur-md"
             />
           ) : (
-            <span className="metric text-[11px] text-faint-foreground">Loading image…</span>
+            <span className="metric text-body text-faint-foreground">Loading image…</span>
           )}
         </div>
       )}
@@ -112,7 +112,7 @@ export function ImageCanvas({
       {status === "error" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-10 text-center">
           <ImageOff className="size-8 text-faint-foreground" />
-          <p className="text-[12px] text-muted-foreground">This image could not be loaded.</p>
+          <p className="text-ui text-muted-foreground">This image could not be loaded.</p>
         </div>
       )}
 
@@ -129,12 +129,12 @@ export function ImageCanvas({
 function CanvasToolbar({ canvas }: { canvas: ReturnType<typeof usePanZoom> }) {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-      <div className="pointer-events-auto flex items-center gap-0.5 rounded-full border border-border bg-elevated/95 p-1 shadow-xl backdrop-blur">
+      <div className="pointer-events-auto flex items-center gap-0.5 rounded-full border border-border bg-elevated/95 p-1 shadow-float backdrop-blur">
         <Button size="icon-sm" variant="ghost" aria-label="Zoom out" onClick={canvas.zoomOut}>
           <Minus />
         </Button>
 
-        <span className="metric min-w-14 text-center text-[11px] tabular-nums text-muted-foreground">
+        <span className="metric min-w-14 text-center text-body tabular-nums text-muted-foreground">
           {scaleLabel(canvas.scale)}
         </span>
 
@@ -148,7 +148,7 @@ function CanvasToolbar({ canvas }: { canvas: ReturnType<typeof usePanZoom> }) {
           size="sm"
           variant={canvas.isFitted ? "subtle" : "ghost"}
           aria-pressed={canvas.isFitted}
-          className="h-7 gap-1 px-2 text-[11px]"
+          className="h-7 gap-1 px-2 text-body"
           title="Fit the whole image in view, centred"
           onClick={canvas.fit}
         >
@@ -159,7 +159,7 @@ function CanvasToolbar({ canvas }: { canvas: ReturnType<typeof usePanZoom> }) {
         <Button
           size="sm"
           variant="ghost"
-          className="h-7 gap-1 px-2 text-[11px]"
+          className="h-7 gap-1 px-2 text-body"
           title="Show the image at its actual pixel size"
           onClick={canvas.actualSize}
         >

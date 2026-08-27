@@ -33,7 +33,7 @@ export function SidebarNavItem({
       href={href}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "group relative flex h-8 items-center gap-2.5 rounded-md px-2 text-sm transition-colors outline-none",
+        "group relative flex h-8 items-center gap-2.5 rounded-md px-2 text-lead transition-colors outline-none",
         "focus-visible:ring-2 focus-visible:ring-ring",
         isActive
           ? "bg-selection text-foreground"

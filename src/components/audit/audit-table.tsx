@@ -28,12 +28,12 @@ const SEVERITY_CLASSES: Readonly<Record<AuditSeverity, string>> = {
  */
 export function AuditTable({ events }: { events: readonly AuditEvent[] }) {
   return (
-    <table className="w-full border-collapse text-[12px]">
+    <table className="w-full border-collapse text-ui">
       <caption className="sr-only">
         Workspace audit log. Read-only: entries cannot be edited or deleted.
       </caption>
 
-      <thead className="sticky top-0 z-10 bg-elevated">
+      <thead className="sticky top-0 z-sticky bg-elevated">
         <tr className="border-b border-border text-left text-muted-foreground">
           <th scope="col" className="px-3 py-2 font-medium">Timestamp</th>
           <th scope="col" className="px-3 py-2 font-medium">Module</th>
@@ -71,7 +71,7 @@ export function AuditTable({ events }: { events: readonly AuditEvent[] }) {
                   )}
                 </p>
                 {event.detail && (
-                  <p className="mt-0.5 max-w-lg text-[11px] text-faint-foreground">{event.detail}</p>
+                  <p className="mt-0.5 max-w-lg text-body text-faint-foreground">{event.detail}</p>
                 )}
                 <span className="sr-only">{describeAuditEvent(event)}</span>
               </td>
@@ -90,7 +90,7 @@ export function AuditTable({ events }: { events: readonly AuditEvent[] }) {
               <td className="px-3 py-2">
                 <span
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[10px] font-medium uppercase tracking-wider",
+                    "inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-micro font-medium uppercase tracking-wider",
                     SEVERITY_CLASSES[event.severity],
                   )}
                 >

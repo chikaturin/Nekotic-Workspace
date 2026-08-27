@@ -8,7 +8,7 @@ import type { CellValue } from "@/types";
 export function LongTextCellView({ value }: { value: Extract<CellValue, { kind: "longText" }> }) {
   return (
     <CellShell>
-      <span className="min-w-0 truncate text-[13px] text-muted-foreground">{value.value}</span>
+      <span className="min-w-0 truncate text-lead text-muted-foreground">{value.value}</span>
     </CellShell>
   );
 }
@@ -66,9 +66,9 @@ export function LongTextCellEditor({
           if (!isCancelled.current) onCommit({ kind: "longText", value: draft });
         }}
         aria-label="Edit long text"
-        className="w-full resize-none bg-transparent p-2 text-[13px] leading-relaxed text-foreground outline-none"
+        className="w-full resize-none bg-transparent p-2 text-lead leading-relaxed text-foreground outline-none"
       />
-      <div className="flex items-center gap-1.5 border-t border-border px-2 py-1 text-[10px] text-faint-foreground">
+      <div className="flex items-center gap-1.5 border-t border-border px-2 py-1 text-micro text-faint-foreground">
         <Kbd>⌘</Kbd>
         <Kbd>↵</Kbd>
         to save

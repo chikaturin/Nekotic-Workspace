@@ -337,7 +337,7 @@ export function TableGrid({
               type="button"
               onClick={() => void addRow()}
               style={{ height: rowHeight, paddingLeft: GUTTER_WIDTH }}
-              className="sticky left-0 flex w-full items-center gap-1.5 border-b border-hairline px-2 text-[12px] text-faint-foreground hover:bg-hover hover:text-foreground"
+              className="sticky left-0 flex w-full items-center gap-1.5 border-b border-hairline px-2 text-ui text-faint-foreground hover:bg-hover hover:text-foreground"
             >
               <Plus className="size-3.5" />
               New record

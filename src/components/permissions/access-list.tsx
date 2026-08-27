@@ -79,7 +79,7 @@ export function AccessList({ entries, canManage, onGrant, onReset }: AccessListP
             )}
 
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] text-foreground">{subjectName(entry.subject)}</p>
+              <p className="truncate text-lead text-foreground">{subjectName(entry.subject)}</p>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="inline-flex">

@@ -137,9 +137,9 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
                   </Badge>
                 )}
                 {row.isPending && (
-                  <span className="metric text-[10px] text-faint-foreground">saving…</span>
+                  <span className="metric text-micro text-faint-foreground">saving…</span>
                 )}
-                <DrawerDescription className="metric ml-auto text-[10px] text-faint-foreground">
+                <DrawerDescription className="metric ml-auto text-micro text-faint-foreground">
                   v{row.revision} · updated {formatRelativeTime(row.updatedAt)}
                 </DrawerDescription>
                 <WatchButton target={target} isCompact />
@@ -149,7 +149,7 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
                 <button
                   type="button"
                   onClick={() => useGridStore.getState().openDrawer(parent.id)}
-                  className="mt-2 flex max-w-full items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                  className="mt-2 flex max-w-full items-center gap-1 text-body text-muted-foreground hover:text-foreground"
                 >
                   <CornerLeftUp className="size-3 shrink-0" />
                   <span className="metric shrink-0">{parent.displayId}</span>
@@ -157,7 +157,7 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
                 </button>
               )}
 
-              <DrawerTitle className="mt-2 truncate text-lg font-semibold tracking-tight text-foreground">
+              <DrawerTitle className="mt-2 truncate text-display font-semibold tracking-tight text-foreground">
                 {title || "Untitled record"}
               </DrawerTitle>
             </header>
@@ -176,7 +176,7 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
                     record must not be reachable by keyboard either. */}
                 <div
                   inert={isArchived}
-                  className={cn(isArchived && "opacity-70")}
+                  className={cn(isArchived && "is-frozen")}
                   // A press anywhere in the field list that is not on a field
                   // puts the open editor away, the way clicking off a cell does
                   // in the grid. Editors that portal out sit outside this
@@ -293,7 +293,7 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
                 Delete
               </Button>
 
-              <span className="metric ml-auto text-[10px] text-faint-foreground">
+              <span className="metric ml-auto text-micro text-faint-foreground">
                 {isArchived ? "Archived — read-only" : "Edits save as you make them"}
               </span>
             </footer>

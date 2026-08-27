@@ -54,14 +54,14 @@ export function EnvironmentPicker({
             type="button"
             disabled={!canEdit}
             aria-label="Environment"
-            className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+            className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-[var(--disabled-opacity)]"
           >
             <SelectChip option={current} />
           </button>
         </PopoverTrigger>
 
         <PopoverContent className="w-52">
-          <p className="px-1 pb-1 text-[10px] uppercase tracking-wider text-faint-foreground">
+          <p className="px-1 pb-1 text-micro uppercase tracking-wider text-faint-foreground">
             Environment
           </p>
           {ENVIRONMENT_OPTIONS.map((option) => {
@@ -78,7 +78,7 @@ export function EnvironmentPicker({
               >
                 <SelectChip option={option} />
                 {isBlocked && (
-                  <span className="ml-auto text-[10px] text-faint-foreground">admins only</span>
+                  <span className="ml-auto text-micro text-faint-foreground">admins only</span>
                 )}
               </button>
             );
@@ -88,11 +88,11 @@ export function EnvironmentPicker({
 
       <Dialog open={pendingProduction} onOpenChange={setPendingProduction}>
         <DialogContent className="max-w-sm p-4">
-          <DialogTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <DialogTitle className="flex items-center gap-2 text-lead font-semibold text-foreground">
             <ShieldAlert className="size-4 text-danger" />
             Point this at Production?
           </DialogTitle>
-          <DialogDescription className="mt-1.5 text-[13px] text-muted-foreground">
+          <DialogDescription className="mt-1.5 text-lead text-muted-foreground">
             Production configuration is read by live services. This change is recorded against your
             account.
           </DialogDescription>

@@ -32,8 +32,8 @@ export function UserMenu() {
         <div className="flex items-center gap-2.5 px-2 py-2">
           <UserAvatar user={CURRENT_USER} className="size-8" />
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-foreground">{CURRENT_USER.name}</p>
-            <p className="truncate text-[11px] text-faint-foreground">{CURRENT_USER.email}</p>
+            <p className="truncate text-lead font-medium text-foreground">{CURRENT_USER.name}</p>
+            <p className="truncate text-body text-faint-foreground">{CURRENT_USER.email}</p>
           </div>
         </div>
 

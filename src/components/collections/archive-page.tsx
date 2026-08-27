@@ -41,10 +41,10 @@ export function ArchivePage() {
         </span>
 
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-base font-semibold tracking-tight text-foreground">
+          <h1 className="truncate text-title font-semibold tracking-tight text-foreground">
             Archive
           </h1>
-          <p className="metric truncate text-[11px] text-faint-foreground">
+          <p className="metric truncate text-body text-faint-foreground">
             Read-only, still searchable · {formatCount(roots.length, "item")}
           </p>
         </div>
@@ -104,7 +104,7 @@ function ArchiveRow({ node, path }: { node: DriveNode; path: string }) {
             Restore
           </Button>
         ) : (
-          <span className="metric px-1 text-[10px] text-faint-foreground">read only</span>
+          <span className="metric px-1 text-micro text-faint-foreground">read only</span>
         )
       }
     />

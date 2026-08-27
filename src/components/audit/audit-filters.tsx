@@ -27,7 +27,7 @@ export function AuditFilters({ filters, isFiltered, onChange, onClear }: AuditFi
           aria-label="Search the audit log"
           placeholder="Search actor, action, target or address"
           onChange={(event) => onChange("search", event.target.value)}
-          className="h-7 pl-7 text-[12px]"
+          className="h-7 pl-7 text-ui"
         />
       </div>
 

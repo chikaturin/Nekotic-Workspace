@@ -36,8 +36,8 @@ export function ActivityTimeline({ boardId, rowId }: { boardId: string; rowId: s
     return (
       <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
         <TriangleAlert className="size-5 text-danger" />
-        <p className="text-[12px] text-foreground">{state.error.message}</p>
-        <p className="metric text-[11px] text-faint-foreground">
+        <p className="text-ui text-foreground">{state.error.message}</p>
+        <p className="metric text-body text-faint-foreground">
           {state.error.detail ?? "The history did not load. Nothing was changed."}
         </p>
       </div>
@@ -48,10 +48,10 @@ export function ActivityTimeline({ boardId, rowId }: { boardId: string; rowId: s
     return (
       <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">
         <History className="size-5 text-faint-foreground" />
-        <p className="text-[12px] text-muted-foreground">
+        <p className="text-ui text-muted-foreground">
           Nothing has happened to this record yet.
         </p>
-        <p className="metric text-[11px] text-faint-foreground">
+        <p className="metric text-body text-faint-foreground">
           Every edit, comment and attachment lands here as it happens.
         </p>
       </div>
@@ -60,14 +60,14 @@ export function ActivityTimeline({ boardId, rowId }: { boardId: string; rowId: s
 
   return (
     <div className="px-5 py-4">
-      <p className="metric mb-3 text-[10px] uppercase tracking-wider text-faint-foreground">
+      <p className="metric mb-3 text-micro uppercase tracking-wider text-faint-foreground">
         {formatCount(total, "event")}
       </p>
 
       <div className="space-y-4">
         {days.map((day) => (
           <section key={day.key}>
-            <h4 className="sticky top-0 z-10 -mx-1 bg-background/90 px-1 pb-1.5 text-[11px] font-semibold text-foreground backdrop-blur">
+            <h4 className="sticky top-0 z-sticky -mx-1 bg-background/90 px-1 pb-1.5 text-body font-semibold text-foreground backdrop-blur">
               {day.label}
             </h4>
 
@@ -95,11 +95,11 @@ function TimelineEntry({ entry }: { entry: ActivityEntry }) {
       />
 
       <div className="flex items-baseline gap-2">
-        <span className="metric shrink-0 text-[11px] tabular-nums text-faint-foreground">
+        <span className="metric shrink-0 text-body tabular-nums text-faint-foreground">
           {activityTime(entry.createdAt)}
         </span>
         <UserAvatar user={entry.actor} className="size-4 shrink-0 self-center" />
-        <span className="min-w-0 flex-1 text-[12px] leading-snug text-muted-foreground">
+        <span className="min-w-0 flex-1 text-ui leading-snug text-muted-foreground">
           <span className="font-medium text-foreground">{entry.actor.name}</span> {entry.summary}
         </span>
       </div>
@@ -108,10 +108,10 @@ function TimelineEntry({ entry }: { entry: ActivityEntry }) {
         <ul className="mt-1 space-y-1 pl-[52px]">
           {entry.changes.map((change, index) => (
             <li key={`${change.columnName}_${index}`} className="flex flex-wrap items-center gap-1.5">
-              <span className="metric text-[10px] uppercase tracking-wide text-faint-foreground">
+              <span className="metric text-micro uppercase tracking-wide text-faint-foreground">
                 {change.columnName}
               </span>
-              <span className="flex min-w-0 items-center gap-1.5 text-[11px]">
+              <span className="flex min-w-0 items-center gap-1.5 text-body">
                 <span className="max-w-40 truncate rounded bg-danger/10 px-1.5 py-px text-danger line-through decoration-danger/40">
                   {displayValue(change.from)}
                 </span>

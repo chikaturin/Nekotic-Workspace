@@ -18,10 +18,10 @@ export function FileMetadataTable({ node, className }: FileMetadataTableProps) {
     >
       {fileMetadataEntries(node).map((entry) => (
         <div key={entry.label} className="contents">
-          <dt className="bg-surface px-3 py-2 text-[11px] font-medium text-faint-foreground">
+          <dt className="bg-surface px-3 py-2 text-body font-medium text-faint-foreground">
             {entry.label}
           </dt>
-          <dd className="metric truncate bg-surface px-3 py-2 text-[12px] text-foreground">
+          <dd className="metric truncate bg-surface px-3 py-2 text-ui text-foreground">
             {entry.value}
           </dd>
         </div>

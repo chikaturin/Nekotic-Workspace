@@ -44,7 +44,7 @@ export const GanttGridLayer = memo(function GanttGridLayer({
   return (
     // `z-0` pins the whole layer under every bar, while still letting the
     // today line sit above the shading inside it.
-    <div aria-hidden style={{ height }} className="pointer-events-none absolute inset-x-0 top-0 z-0">
+    <div aria-hidden style={{ height }} className="pointer-events-none absolute inset-x-0 top-0 z-base">
       {weekends.map((offset) => (
         <div
           key={`weekend-${offset}`}
@@ -67,11 +67,11 @@ export const GanttGridLayer = memo(function GanttGridLayer({
       {/* Today is the one line worth interrupting the plan for. */}
       <div
         style={{ left: todayOffset * dayWidth }}
-        className="absolute inset-y-0 z-10 w-px bg-accent"
+        className="absolute inset-y-0 z-raised w-px bg-accent"
       />
       <div
         style={{ left: todayOffset * dayWidth }}
-        className="absolute inset-y-0 z-10 w-[3px] -translate-x-[1px] bg-accent/15"
+        className="absolute inset-y-0 z-raised w-[3px] -translate-x-[1px] bg-accent/15"
       />
     </div>
   );

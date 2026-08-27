@@ -52,12 +52,12 @@ export function UploadDropTarget({ onFiles, label, className, children }: Upload
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.14 }}
-            className="pointer-events-none absolute inset-3 z-20 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-accent bg-accent-soft backdrop-blur-[1px]"
+            className="pointer-events-none absolute inset-3 z-overlay flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-accent bg-accent-soft backdrop-blur-[1px]"
           >
-            <span className="flex size-14 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg">
+            <span className="flex size-14 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-pop">
               <CloudUpload className="size-7" strokeWidth={1.5} />
             </span>
-            <p className="text-sm font-medium text-foreground">{label}</p>
+            <p className="text-lead font-medium text-foreground">{label}</p>
           </motion.div>
         )}
       </AnimatePresence>

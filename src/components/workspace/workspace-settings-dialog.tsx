@@ -60,8 +60,8 @@ export function WorkspaceSettingsDialog({ isOpen, onClose }: WorkspaceSettingsDi
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="flex max-h-[85vh] w-[min(46rem,92vw)] max-w-none flex-col p-0">
         <header className="border-b border-border px-5 pt-5 pb-0">
-          <DialogTitle className="text-[15px]">Workspace settings</DialogTitle>
-          <DialogDescription className="mt-1 text-[12px] text-muted-foreground">
+          <DialogTitle className="text-title">Workspace settings</DialogTitle>
+          <DialogDescription className="mt-1 text-ui text-muted-foreground">
             {workspace.name}
           </DialogDescription>
 
@@ -73,7 +73,7 @@ export function WorkspaceSettingsDialog({ isOpen, onClose }: WorkspaceSettingsDi
                 aria-current={candidate.id === active?.id}
                 onClick={() => setTab(candidate.id)}
                 className={cn(
-                  "rounded-t-md border-b-2 px-2.5 py-1.5 text-[12px] transition-colors",
+                  "rounded-t-md border-b-2 px-2.5 py-1.5 text-ui transition-colors",
                   candidate.id === active?.id
                     ? "border-accent text-foreground"
                     : "border-transparent text-muted-foreground hover:bg-hover",
@@ -104,7 +104,7 @@ function SettingsBody({
 }) {
   if (tab === null) {
     return (
-      <p className="text-[12px] text-muted-foreground">
+      <p className="text-ui text-muted-foreground">
         You do not have access to any workspace settings.
       </p>
     );

@@ -46,10 +46,10 @@ export function DashboardPage() {
         </span>
 
         <div className="min-w-0">
-          <h1 className="text-base font-semibold tracking-tight text-foreground">
+          <h1 className="text-title font-semibold tracking-tight text-foreground">
             {workspace.name}
           </h1>
-          <p className="metric truncate text-[11px] text-faint-foreground">
+          <p className="metric truncate text-body text-faint-foreground">
             {resource.state.status === "success"
               ? `${formatCount(resource.state.data.recordCount, "record")} across ${formatCount(
                   resource.state.data.boardCount,

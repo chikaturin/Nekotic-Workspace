@@ -48,7 +48,7 @@ export function SidebarSection({
           type="button"
           onClick={() => setIsOpen((previous) => !previous)}
           aria-expanded={isOpen}
-          className="group flex min-w-0 flex-1 items-center gap-1 rounded text-[10px] font-semibold uppercase tracking-wider text-faint-foreground outline-none transition-colors hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="group flex min-w-0 flex-1 items-center gap-1 rounded text-micro font-semibold uppercase tracking-wider text-faint-foreground outline-none transition-colors hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ChevronRight
             className={cn("size-3 transition-transform duration-200", isOpen && "rotate-90")}

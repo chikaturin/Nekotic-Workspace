@@ -87,11 +87,11 @@ export function FilePreviewDialog({ node, onClose }: FilePreviewDialogProps) {
             </div>
 
             <footer className="flex shrink-0 items-center gap-3 border-t border-border bg-surface px-4 py-2">
-              <span className="metric truncate text-[11px] text-faint-foreground">
+              <span className="metric truncate text-body text-faint-foreground">
                 {fileSummaryLine(node)}
               </span>
 
-              <span className="ml-auto hidden items-center gap-2 text-[11px] text-faint-foreground sm:flex">
+              <span className="ml-auto hidden items-center gap-2 text-body text-faint-foreground sm:flex">
                 <Kbd>I</Kbd> details
                 <Kbd>Esc</Kbd> close
               </span>

@@ -43,10 +43,10 @@ export function SecretDocumentPage({ node }: { node: DocumentNode }) {
         <span className="text-xl">{node.icon}</span>
 
         <div className="min-w-0">
-          <h1 className="truncate text-base font-semibold tracking-tight text-foreground">
+          <h1 className="truncate text-title font-semibold tracking-tight text-foreground">
             {node.name}
           </h1>
-          <p className="metric truncate text-[11px] text-faint-foreground">
+          <p className="metric truncate text-body text-faint-foreground">
             Encrypted at rest · every reveal is recorded
           </p>
         </div>
@@ -89,7 +89,7 @@ export function SecretDocumentPage({ node }: { node: DocumentNode }) {
       {!canReveal && (
         <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-4 py-2">
           <Lock className="size-3.5 shrink-0 text-faint-foreground" />
-          <p className="text-[12px] text-muted-foreground">
+          <p className="text-ui text-muted-foreground">
             Only owners and admins can reveal or copy these values. Asking anyway is refused by the
             server and still recorded.
           </p>
@@ -154,12 +154,12 @@ function SecretRow({
 
   return (
     <li className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2.5">
-      <span className="metric shrink-0 text-[12px] font-medium text-foreground">{entry.key}</span>
-      <span className="metric shrink-0 text-[12px] text-faint-foreground">=</span>
+      <span className="metric shrink-0 text-ui font-medium text-foreground">{entry.key}</span>
+      <span className="metric shrink-0 text-ui text-faint-foreground">=</span>
 
       <span
         className={cn(
-          "metric min-w-0 flex-1 truncate text-[12px]",
+          "metric min-w-0 flex-1 truncate text-ui",
           isRevealed ? "text-foreground" : "tracking-widest text-faint-foreground",
         )}
       >
@@ -168,7 +168,7 @@ function SecretRow({
 
       <SelectChip option={environmentOption(entry.environmentOptionId)} />
 
-      <span className="metric hidden shrink-0 items-center gap-1.5 text-[10px] text-faint-foreground sm:flex">
+      <span className="metric hidden shrink-0 items-center gap-1.5 text-micro text-faint-foreground sm:flex">
         <UserAvatar user={entry.rotatedBy} className="size-4" />
         {formatRelativeTime(entry.updatedAt)}
       </span>
@@ -196,7 +196,7 @@ function SecretRow({
       </div>
 
       {entry.note && (
-        <p className="w-full text-[11px] text-faint-foreground">{entry.note}</p>
+        <p className="w-full text-body text-faint-foreground">{entry.note}</p>
       )}
     </li>
   );
@@ -221,8 +221,8 @@ function AuditPanel({ nodeId }: { nodeId: string }) {
     >
       <header className="flex shrink-0 items-center gap-1.5 border-b border-hairline px-3 py-2.5">
         <ShieldCheck className="size-3.5 text-faint-foreground" />
-        <h2 className="text-[12px] font-medium text-foreground">Audit log</h2>
-        <span className="metric ml-auto text-[10px] text-faint-foreground">{entries.length}</span>
+        <h2 className="text-ui font-medium text-foreground">Audit log</h2>
+        <span className="metric ml-auto text-micro text-faint-foreground">{entries.length}</span>
       </header>
 
       <ol className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
@@ -232,18 +232,18 @@ function AuditPanel({ nodeId }: { nodeId: string }) {
               <Badge variant={entry.action === "reveal" ? "accent" : "default"}>
                 {entry.action}
               </Badge>
-              <span className="metric min-w-0 flex-1 truncate text-[11px] text-foreground">
+              <span className="metric min-w-0 flex-1 truncate text-body text-foreground">
                 {entry.key}
               </span>
             </div>
-            <p className="metric mt-1 truncate text-[10px] text-faint-foreground">
+            <p className="metric mt-1 truncate text-micro text-faint-foreground">
               {entry.actor.name} · {entry.ip} · {formatRelativeTime(entry.at)}
             </p>
           </li>
         ))}
 
         {entries.length === 0 && (
-          <li className="px-1 py-6 text-center text-[11px] text-faint-foreground">
+          <li className="px-1 py-6 text-center text-body text-faint-foreground">
             Nothing has been revealed in this session.
           </li>
         )}

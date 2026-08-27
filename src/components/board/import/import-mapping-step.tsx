@@ -41,7 +41,7 @@ export function ImportMappingStep({
   return (
     <div className="space-y-3 px-5 py-4">
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex cursor-pointer items-center gap-2 text-[12px] text-foreground">
+        <label className="flex cursor-pointer items-center gap-2 text-ui text-foreground">
           <Checkbox
             checked={hasHeaderRow}
             onChange={(event) => onSetHeaderRow(event.target.checked)}
@@ -49,7 +49,7 @@ export function ImportMappingStep({
           First row holds column names
         </label>
 
-        <span className="metric text-[11px] text-faint-foreground">
+        <span className="metric text-body text-faint-foreground">
           {source.fileName}
           {source.sheetName ? ` · ${source.sheetName}` : ""} ·{" "}
           {formatCount(source.rows.length, "row")} · {mappedCount} of {source.headers.length} columns
@@ -58,7 +58,7 @@ export function ImportMappingStep({
       </div>
 
       {wasTruncated && (
-        <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] text-foreground">
+        <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-body text-foreground">
           Only the first {source.rows.length.toLocaleString("en-GB")} rows of this file will be
           imported.
         </p>
@@ -75,7 +75,7 @@ export function ImportMappingStep({
 
                 return (
                   <th key={`${header}_${index}`} className="min-w-52 p-2 align-top">
-                    <p className="truncate text-[12px] font-medium text-foreground" title={header}>
+                    <p className="truncate text-ui font-medium text-foreground" title={header}>
                       {header}
                     </p>
 
@@ -112,7 +112,7 @@ export function ImportMappingStep({
                 {source.headers.map((_, columnIndex) => (
                   <td
                     key={columnIndex}
-                    className="max-w-64 truncate p-2 text-[11px] text-muted-foreground"
+                    className="max-w-64 truncate p-2 text-body text-muted-foreground"
                     title={row[columnIndex] ?? ""}
                   >
                     {row[columnIndex] ?? ""}
@@ -125,7 +125,7 @@ export function ImportMappingStep({
       </div>
 
       {source.rows.length > preview.length && (
-        <p className="metric text-[11px] text-faint-foreground">
+        <p className="metric text-body text-faint-foreground">
           Showing the first {preview.length} rows.{" "}
           <Badge variant="default">{source.rows.length - preview.length} more</Badge>
         </p>

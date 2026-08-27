@@ -35,8 +35,8 @@ export function StorageMeter({ storage, isCollapsed }: StorageMeterProps) {
   return (
     <div className="px-1 py-1.5">
       <div className="flex items-baseline justify-between">
-        <span className="text-[11px] font-medium text-muted-foreground">Storage</span>
-        <span className={cn("metric text-[10px]", isWarning ? "text-warning" : "text-faint-foreground")}>
+        <span className="text-body font-medium text-muted-foreground">Storage</span>
+        <span className={cn("metric text-micro", isWarning ? "text-warning" : "text-faint-foreground")}>
           {formatPercent(ratio)}
         </span>
       </div>
@@ -48,7 +48,7 @@ export function StorageMeter({ storage, isCollapsed }: StorageMeterProps) {
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         />
       </div>
-      <p className="metric mt-1.5 text-[10px] text-faint-foreground">{label}</p>
+      <p className="metric mt-1.5 text-micro text-faint-foreground">{label}</p>
     </div>
   );
 }

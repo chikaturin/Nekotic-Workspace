@@ -47,11 +47,11 @@ export function VersionHistoryDialog({
     >
       <DialogContent className="flex h-[80vh] max-w-5xl flex-col p-0">
         <header className="shrink-0 border-b border-border px-5 py-4 pr-12">
-          <DialogTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <DialogTitle className="flex items-center gap-2 text-lead font-semibold text-foreground">
             <History className="size-4 text-accent" />
             Version history · {title}
           </DialogTitle>
-          <DialogDescription className="mt-1 text-[12px] text-muted-foreground">
+          <DialogDescription className="mt-1 text-ui text-muted-foreground">
             {history.canRestore
               ? "Restoring writes a new version instead of rewinding, so the record of what happened stays complete."
               : "A read-only record of what changed, when, and who changed it."}
@@ -59,7 +59,7 @@ export function VersionHistoryDialog({
         </header>
 
         {notice && (
-          <p className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-5 py-2 text-[11px] text-muted-foreground">
+          <p className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-5 py-2 text-body text-muted-foreground">
             <ShieldCheck className="size-3.5 shrink-0 text-success" />
             {notice}
           </p>

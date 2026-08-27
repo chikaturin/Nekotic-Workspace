@@ -42,7 +42,7 @@ export function PinnedPages({ isCollapsed }: PinnedPagesProps) {
             href={href}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "flex h-8 items-center gap-2 rounded-md px-2 text-[13px] outline-none transition-colors",
+              "flex h-8 items-center gap-2 rounded-md px-2 text-lead outline-none transition-colors",
               "focus-visible:ring-2 focus-visible:ring-ring",
               isActive
                 ? "bg-selection text-foreground"
@@ -50,7 +50,7 @@ export function PinnedPages({ isCollapsed }: PinnedPagesProps) {
               isCollapsed && "justify-center px-0",
             )}
           >
-            <span aria-hidden className="text-sm leading-none">
+            <span aria-hidden className="text-lead leading-none">
               {page.icon}
             </span>
             {!isCollapsed && <span className="min-w-0 flex-1 truncate">{page.name}</span>}

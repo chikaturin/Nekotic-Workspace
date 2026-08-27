@@ -107,15 +107,15 @@ export const GridCell = memo(function GridCell({
       style={widthStyle(column.id, column.isPrimary)}
       className={cn(
         "relative h-full shrink-0 border-b border-r border-hairline",
-        column.isPrimary && "sticky z-20 bg-surface",
+        column.isPrimary && "sticky z-sticky bg-surface",
         !column.isPrimary && isSelected && "bg-selection",
-        isFocused && "z-30 ring-2 ring-inset ring-accent",
+        isFocused && "z-raised ring-2 ring-inset ring-accent",
       )}
     >
       {(indent > 0 || disclosure) && !isEditing && (
         <div
           style={{ width: indent + (disclosure ? 18 : 0) }}
-          className="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center justify-end pr-0.5"
+          className="pointer-events-none absolute inset-y-0 left-0 z-overlay flex items-center justify-end pr-0.5"
         >
           <span className="pointer-events-auto">{disclosure}</span>
         </div>

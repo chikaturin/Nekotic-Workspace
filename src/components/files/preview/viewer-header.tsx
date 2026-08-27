@@ -73,7 +73,7 @@ export function ViewerHeader({
       <div className="min-w-0 flex-1">
         <DialogTitle
           className={cn(
-            "truncate text-[15px] font-semibold tracking-tight text-foreground",
+            "truncate text-title font-semibold tracking-tight text-foreground",
             isRenaming && "sr-only",
           )}
         >
@@ -82,7 +82,7 @@ export function ViewerHeader({
 
         <DialogDescription
           className={cn(
-            "metric truncate text-[11px] text-faint-foreground",
+            "metric truncate text-body text-faint-foreground",
             isRenaming && "sr-only",
           )}
         >
@@ -97,7 +97,7 @@ export function ViewerHeader({
             onChange={(event) => setDraftName(event.target.value)}
             onKeyDown={handleRenameKey}
             onBlur={commitRename}
-            className="h-7 max-w-md text-[14px] font-medium"
+            className="h-7 max-w-md text-lead font-medium"
           />
         )}
       </div>

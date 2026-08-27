@@ -43,7 +43,7 @@ export function BreadcrumbNav({ trail }: BreadcrumbNavProps) {
           <Separator />
           <DropdownMenu>
             <DropdownMenuTrigger
-              className="rounded-md px-1.5 py-1 text-sm text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
+              className="rounded-md px-1.5 py-1 text-lead text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
               aria-label="Show hidden path segments"
             >
               …

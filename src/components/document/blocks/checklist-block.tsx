@@ -40,7 +40,7 @@ export function ChecklistBlock({
           block.isChecked
             ? "border-accent bg-accent text-accent-foreground"
             : "border-border-strong bg-surface hover:border-accent",
-          !isEditable && "cursor-default opacity-70",
+          !isEditable && "cursor-default is-disabled",
         )}
       >
         {block.isChecked && <Check className="size-3" strokeWidth={3} />}

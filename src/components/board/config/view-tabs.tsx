@@ -154,7 +154,7 @@ function ViewTab({
               onRenameEnd();
             }
           }}
-          className="h-6 w-28 text-[12px]"
+          className="h-6 w-28 text-ui"
         />
       ) : (
         <button
@@ -162,12 +162,12 @@ function ViewTab({
           onClick={onSelect}
           onDoubleClick={() => canManage && onRenameStart()}
           className={cn(
-            "flex items-baseline gap-1.5 text-[12px]",
+            "flex items-baseline gap-1.5 text-ui",
             isActive ? "text-foreground" : "text-muted-foreground",
           )}
         >
           {view.name}
-          <span className="metric text-[10px] text-faint-foreground">
+          <span className="metric text-micro text-faint-foreground">
             {summary || VIEW_TYPE_LABELS[view.type]}
           </span>
         </button>
@@ -219,7 +219,7 @@ function ViewTab({
                     <option.Icon />
                     {VIEW_TYPE_LABELS[type]}
                     {type === view.type && (
-                      <span className="ml-auto text-[10px] text-faint-foreground">current</span>
+                      <span className="ml-auto text-micro text-faint-foreground">current</span>
                     )}
                   </DropdownMenuItem>
                 );

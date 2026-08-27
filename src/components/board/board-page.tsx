@@ -123,8 +123,8 @@ export function BoardPage({ node }: { node: BoardNode }) {
     return (
       <div className="flex h-full flex-col">
         <div className="border-b border-border px-4 py-3">
-          <p className="text-base font-semibold text-foreground">{node.name}</p>
-          <p className="metric text-[11px] text-faint-foreground">Loading records…</p>
+          <p className="text-title font-semibold text-foreground">{node.name}</p>
+          <p className="metric text-body text-faint-foreground">Loading records…</p>
         </div>
         <div className="min-h-0 flex-1 p-4">
           <ListLoadingState />
@@ -165,7 +165,7 @@ export function BoardPage({ node }: { node: BoardNode }) {
           {conflicts.map((conflict) => (
             <li key={conflict.id} className="flex items-center gap-2 px-4 py-1.5">
               <TriangleAlert className="size-3.5 shrink-0 text-warning" />
-              <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">
+              <span className="min-w-0 flex-1 truncate text-ui text-foreground">
                 {conflict.message}
               </span>
               <Button

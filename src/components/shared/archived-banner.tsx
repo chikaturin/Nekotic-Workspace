@@ -33,7 +33,7 @@ export function ArchivedBanner({ source, subject, canRestore }: ArchivedBannerPr
     >
       <Archive className="size-3.5 shrink-0 text-muted-foreground" />
 
-      <p className="min-w-0 flex-1 text-[12px] text-foreground">
+      <p className="min-w-0 flex-1 text-ui text-foreground">
         {isInherited ? (
           <>
             Inside the archived {archiveLabelFor(source)}{" "}

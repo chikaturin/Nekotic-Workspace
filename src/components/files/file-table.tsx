@@ -48,7 +48,7 @@ export function FileTable({
         role="row"
         className={cn(
           GRID_CLASS,
-          "h-8 border-b border-border px-2.5 text-[10px] font-semibold uppercase tracking-wider text-faint-foreground",
+          "h-8 border-b border-border px-2.5 text-micro font-semibold uppercase tracking-wider text-faint-foreground",
         )}
       >
         <span role="columnheader">Name</span>
@@ -93,29 +93,29 @@ export function FileTable({
             >
               <div role="cell" className="flex min-w-0 items-center gap-2">
                 <Icon className={cn("size-4 shrink-0", colorClass)} />
-                <span className="min-w-0 truncate text-[13px] text-foreground">{file.name}</span>
+                <span className="min-w-0 truncate text-lead text-foreground">{file.name}</span>
                 {file.isFavorite && <Star className="size-3 shrink-0 fill-accent text-accent" />}
               </div>
 
-              <span role="cell" className="metric truncate text-[11px] text-faint-foreground">
+              <span role="cell" className="metric truncate text-body text-faint-foreground">
                 {label}
               </span>
 
               <div role="cell" className="hidden min-w-0 items-center gap-1.5 lg:flex">
                 <UserAvatar user={file.owner} className="size-5" />
-                <span className="truncate text-[11px] text-muted-foreground">{file.owner.name}</span>
+                <span className="truncate text-body text-muted-foreground">{file.owner.name}</span>
               </div>
 
               <span
                 role="cell"
-                className="metric hidden truncate text-[11px] text-faint-foreground sm:block"
+                className="metric hidden truncate text-body text-faint-foreground sm:block"
               >
                 {formatBytes(file.sizeBytes)}
               </span>
 
               <span
                 role="cell"
-                className="metric hidden truncate text-[11px] text-faint-foreground lg:block"
+                className="metric hidden truncate text-body text-faint-foreground lg:block"
               >
                 {formatDate(file.createdAt)}
               </span>

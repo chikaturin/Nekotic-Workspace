@@ -58,7 +58,7 @@ export function FilterMenu({ model }: { model: BoardViewModel }) {
 
       <PopoverContent className="w-[34rem] max-w-[calc(100vw-2rem)]">
         {filters.length === 0 ? (
-          <p className="px-1 py-2 text-[12px] text-faint-foreground">
+          <p className="px-1 py-2 text-ui text-faint-foreground">
             No conditions yet. Records are shown as they come.
           </p>
         ) : (
@@ -68,7 +68,7 @@ export function FilterMenu({ model }: { model: BoardViewModel }) {
 
               return (
                 <li key={filter.id} className="flex items-center gap-1.5">
-                  <span className="w-16 shrink-0 text-[11px] text-muted-foreground">
+                  <span className="w-16 shrink-0 text-body text-muted-foreground">
                     {index === 0 ? (
                       "Where"
                     ) : index === 1 ? (
@@ -157,7 +157,7 @@ export function FilterMenu({ model }: { model: BoardViewModel }) {
             <Button
               size="sm"
               variant="ghost"
-              className="ml-auto text-[11px]"
+              className="ml-auto text-body"
               onClick={() => void setFilters([])}
             >
               Clear all
@@ -184,7 +184,7 @@ function FilterValue({ filter, column, people, onChange }: FilterValueProps) {
   const kind = valueKindFor(column, filter.operator);
 
   if (kind === "none") {
-    return <span className="flex-1 text-[11px] text-faint-foreground">—</span>;
+    return <span className="flex-1 text-body text-faint-foreground">—</span>;
   }
 
   if (kind === "option" && column.type === "select") {
@@ -230,7 +230,7 @@ function FilterValue({ filter, column, people, onChange }: FilterValueProps) {
       value={filter.value}
       placeholder="Value"
       onChange={(event) => onChange(event.target.value)}
-      className="h-7 min-w-0 flex-1 text-[12px]"
+      className="h-7 min-w-0 flex-1 text-ui"
     />
   );
 }

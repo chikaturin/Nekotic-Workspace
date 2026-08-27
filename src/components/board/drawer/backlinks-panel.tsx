@@ -30,7 +30,7 @@ export function BacklinksPanel({ rowId }: { rowId: string }) {
 
   return (
     <section className="space-y-2">
-      <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-faint-foreground">
+      <h3 className="flex items-center gap-1.5 text-body font-semibold uppercase tracking-wider text-faint-foreground">
         <CornerUpLeft className="size-3.5" />
         Backlinks
         {links.length > 0 && <span className="metric normal-case">· {links.length}</span>}
@@ -44,33 +44,33 @@ export function BacklinksPanel({ rowId }: { rowId: string }) {
               className="flex items-center gap-2 rounded-lg border border-border bg-surface px-2.5 py-2 no-underline hover:border-border-strong"
             >
               <Link2 className="size-3.5 shrink-0 text-faint-foreground" />
-              <span className="metric shrink-0 text-[10px] text-faint-foreground">
+              <span className="metric shrink-0 text-micro text-faint-foreground">
                 {link.displayId}
               </span>
-              <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">
+              <span className="min-w-0 flex-1 truncate text-ui text-foreground">
                 {link.title || "Untitled"}
               </span>
               <Badge variant="default" className="shrink-0">
                 {link.boardName}
               </Badge>
             </Link>
-            <p className="metric mt-0.5 pl-7 text-[10px] text-faint-foreground">
+            <p className="metric mt-0.5 pl-7 text-micro text-faint-foreground">
               via {link.columnName}
             </p>
           </li>
         ))}
 
         {failure && (
-          <li className="text-[12px] text-danger">
+          <li className="text-ui text-danger">
             {failure.message}
-            <span className="metric mt-0.5 block text-[10px] text-faint-foreground">
+            <span className="metric mt-0.5 block text-micro text-faint-foreground">
               Backlinks could not be read. Nothing was changed.
             </span>
           </li>
         )}
 
         {!failure && links.length === 0 && (
-          <li className="text-[12px] text-faint-foreground">
+          <li className="text-ui text-faint-foreground">
             Nothing links here yet. Relations from other boards show up on their own.
           </li>
         )}

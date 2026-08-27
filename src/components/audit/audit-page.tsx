@@ -49,14 +49,14 @@ export function AuditPage() {
         </span>
 
         <div className="min-w-0">
-          <h1 className="text-base font-semibold tracking-tight text-foreground">Audit log</h1>
-          <p className="metric truncate text-[11px] text-faint-foreground">
+          <h1 className="text-title font-semibold tracking-tight text-foreground">Audit log</h1>
+          <p className="metric truncate text-body text-faint-foreground">
             Every privileged action, as it happened
           </p>
         </div>
 
         {/* Stated where someone would look for an Edit button. */}
-        <span className="ml-auto flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span className="ml-auto flex items-center gap-1.5 text-body text-muted-foreground">
           <Lock className="size-3" />
           Append-only · entries cannot be edited or deleted
         </span>
@@ -90,7 +90,7 @@ export function AuditPage() {
         >
           {(page) => (
             <>
-              <div className="flex flex-wrap items-center gap-2 px-4 py-2 text-[11px] text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 px-4 py-2 text-body text-muted-foreground">
                 <span>{formatCount(page.total, "entry", "entries")}</span>
                 {(Object.keys(page.bySeverity) as AuditSeverity[])
                   .filter((severity) => page.bySeverity[severity] > 0)

@@ -32,7 +32,7 @@ export function DrawerTabs({ active, onChange }: DrawerTabsProps) {
             aria-controls={`drawer-panel-${tab.id}`}
             onClick={() => onChange(tab.id)}
             className={cn(
-              "-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[12px] transition-colors",
+              "-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-ui transition-colors",
               isActive
                 ? "border-accent font-medium text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground",

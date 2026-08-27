@@ -120,7 +120,7 @@ function AttachmentText({
   }
 
   return (
-    <pre className="m-3 max-w-full overflow-auto rounded-lg border border-border bg-surface p-4 text-[12px] leading-relaxed text-foreground">
+    <pre className="m-3 max-w-full overflow-auto rounded-lg border border-border bg-surface p-4 text-ui leading-relaxed text-foreground">
       <code>{current?.content ?? "Reading…"}</code>
     </pre>
   );
@@ -141,12 +141,12 @@ export function AttachmentFallback({
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
       <visual.Icon className={`size-10 ${visual.colorClass}`} />
-      <p className="text-sm text-foreground">{file.name}</p>
+      <p className="text-lead text-foreground">{file.name}</p>
       <Badge variant="default">
         <FileWarning className="size-3" />
         {formatBytes(file.sizeBytes)}
       </Badge>
-      <p className="max-w-sm text-[12px] text-muted-foreground">{reason}</p>
+      <p className="max-w-sm text-ui text-muted-foreground">{reason}</p>
       <Button variant="outline" size="sm" onClick={onDownload} className="gap-1.5">
         <Download />
         Download

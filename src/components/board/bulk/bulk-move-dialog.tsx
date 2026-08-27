@@ -46,10 +46,10 @@ export function BulkMoveDialog({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md p-0">
         <header className="border-b border-border px-5 py-4 pr-12">
-          <DialogTitle className="text-sm font-semibold text-foreground">
+          <DialogTitle className="text-lead font-semibold text-foreground">
             Move {formatCount(count, "record")}
           </DialogTitle>
-          <DialogDescription className="mt-1 text-[12px] text-muted-foreground">
+          <DialogDescription className="mt-1 text-ui text-muted-foreground">
             Columns are matched by name. Anything the destination has no column for is
             reported before it is dropped.
           </DialogDescription>
@@ -62,7 +62,7 @@ export function BulkMoveDialog({
 
               if (destinations.length === 0) {
                 return (
-                  <p className="px-3 py-6 text-center text-[12px] text-faint-foreground">
+                  <p className="px-3 py-6 text-center text-ui text-faint-foreground">
                     There is no other board in this workspace to move to.
                   </p>
                 );
@@ -76,7 +76,7 @@ export function BulkMoveDialog({
                         type="button"
                         onClick={() => setTargetId(board.nodeId)}
                         className={cn(
-                          "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[12px] transition-colors",
+                          "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-ui transition-colors",
                           targetId === board.nodeId
                             ? "bg-accent-soft text-accent"
                             : "text-foreground hover:bg-hover",

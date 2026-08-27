@@ -104,8 +104,8 @@ export function WorkspaceMembersTab() {
       </div>
 
       <div className="overflow-x-auto rounded-md border border-border">
-        <table className="w-full min-w-[34rem] text-left text-[12px]">
-          <thead className="bg-surface text-[11px] text-muted-foreground">
+        <table className="w-full min-w-[34rem] text-left text-ui">
+          <thead className="bg-surface text-body text-muted-foreground">
             <tr>
               <th className="px-3 py-2 font-medium">Member</th>
               <th className="px-3 py-2 font-medium">Email</th>
@@ -122,7 +122,7 @@ export function WorkspaceMembersTab() {
                     <UserAvatar user={member} className="size-6" />
                     <span className="truncate text-foreground">{member.name}</span>
                     {member.id === CURRENT_USER.id && (
-                      <span className="text-[10px] text-faint-foreground">you</span>
+                      <span className="text-micro text-faint-foreground">you</span>
                     )}
                   </span>
                 </td>
@@ -167,13 +167,13 @@ export function WorkspaceMembersTab() {
       </div>
 
       {members.length === 0 && (
-        <p className="text-[12px] text-muted-foreground">Nobody matches “{query}”.</p>
+        <p className="text-ui text-muted-foreground">Nobody matches “{query}”.</p>
       )}
 
       {/* Leaving is the member's own action, not an administrative one — so it
           sits apart from the table and never shares a control with Remove. */}
       <div className="flex items-center justify-between gap-3 rounded-md border border-hairline bg-surface px-3 py-2">
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-body text-muted-foreground">
           {leaveVerdict.isAllowed
             ? `Leaving removes ${workspace.name} from your switcher.`
             : leaveVerdict.reason}

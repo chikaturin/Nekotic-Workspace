@@ -50,7 +50,7 @@ export function WorkspaceRestrictedTab() {
 
   return (
     <div className="space-y-3">
-      <p className="flex items-start gap-2 rounded-md border border-hairline bg-surface px-3 py-2 text-[11px] text-muted-foreground">
+      <p className="flex items-start gap-2 rounded-md border border-hairline bg-surface px-3 py-2 text-body text-muted-foreground">
         <ShieldCheck className="mt-px size-3.5 shrink-0 text-faint-foreground" />
         <span>
           Restricted folders are hidden from everybody they are not shared with — you
@@ -61,7 +61,7 @@ export function WorkspaceRestrictedTab() {
       </p>
 
       {rows.length === 0 ? (
-        <p className="text-[12px] text-muted-foreground">
+        <p className="text-ui text-muted-foreground">
           No folder in {workspace.name} is restricted. Every folder inherits from the one
           above it.
         </p>
@@ -71,10 +71,10 @@ export function WorkspaceRestrictedTab() {
             <li key={row.node.id} className="flex items-center gap-2 px-3 py-2">
               <Lock className="size-3.5 shrink-0 text-faint-foreground" />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[12px] text-foreground">
+                <span className="block truncate text-ui text-foreground">
                   {row.node.name}
                 </span>
-                <span className="block truncate text-[11px] text-faint-foreground">
+                <span className="block truncate text-body text-faint-foreground">
                   {row.path}
                 </span>
               </span>

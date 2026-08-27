@@ -260,11 +260,11 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
                 horizontally. Both have to, or one of them stops being a label. */}
             <div
               style={{ height: HEADER_HEIGHT }}
-              className="sticky top-0 z-30 flex border-b border-border bg-elevated"
+              className="sticky top-0 z-sticky flex border-b border-border bg-elevated"
             >
               <div
                 style={{ width: panelWidth }}
-                className="sticky left-0 z-10 flex shrink-0 items-end border-r border-hairline bg-elevated px-3 pb-1 text-[11px] font-medium text-muted-foreground"
+                className="sticky left-0 z-sticky flex shrink-0 items-end border-r border-hairline bg-elevated px-3 pb-1 text-body font-medium text-muted-foreground"
               >
                 Task
               </div>
@@ -277,7 +277,7 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
             <div className="flex">
               <div
                 style={{ width: panelWidth }}
-                className="sticky left-0 z-20 shrink-0 border-r border-hairline bg-background"
+                className="sticky left-0 z-sticky shrink-0 border-r border-hairline bg-background"
               >
                 <div style={{ height: range.paddingTop }} aria-hidden />
                 {visible.map((row) => (
@@ -371,7 +371,7 @@ function PanelResizer({
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", finish);
       }}
-      className="sticky z-20 -ml-1 w-2 shrink-0 cursor-col-resize touch-none"
+      className="sticky z-sticky -ml-1 w-2 shrink-0 cursor-col-resize touch-none"
       style={{ left: width - 4 }}
     />
   );

@@ -23,7 +23,7 @@ export function PdfPreview({ url, fileName, onDownload }: PdfPreviewProps) {
         className="h-full min-h-[420px] w-full rounded-lg border border-border bg-surface"
       >
         <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-          <p className="text-sm text-foreground">This browser cannot display PDFs inline.</p>
+          <p className="text-lead text-foreground">This browser cannot display PDFs inline.</p>
           <Button variant="outline" size="sm" onClick={onDownload} className="gap-1.5">
             <Download />
             Download {fileName}

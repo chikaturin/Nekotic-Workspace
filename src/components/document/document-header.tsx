@@ -110,7 +110,7 @@ export function DocumentHeader({
                 <DropdownMenuItem
                   key={icon}
                   onSelect={() => onIconChange(icon)}
-                  className="justify-center p-1.5 text-lg"
+                  className="justify-center p-1.5 text-display"
                 >
                   {icon}
                 </DropdownMenuItem>
@@ -132,7 +132,7 @@ export function DocumentHeader({
           }}
           aria-label="Page title"
           placeholder="Untitled"
-          className="min-w-0 flex-1 truncate bg-transparent text-lg font-semibold tracking-tight text-foreground outline-none placeholder:text-faint-foreground"
+          className="min-w-0 flex-1 truncate bg-transparent text-display font-semibold tracking-tight text-foreground outline-none placeholder:text-faint-foreground"
         />
 
         <div className="flex shrink-0 items-center gap-1.5">
@@ -186,8 +186,8 @@ export function DocumentHeader({
 
       <div className="mt-1.5 flex w-full items-center gap-2 pl-10">
         <UserAvatar user={document.owner} className="size-5" />
-        <span className="text-[11px] text-muted-foreground">{document.owner.name}</span>
-        <span className="metric text-[11px] text-faint-foreground">
+        <span className="text-body text-muted-foreground">{document.owner.name}</span>
+        <span className="metric text-body text-faint-foreground">
           · {formatCount(countWords(draft.blocks), "word")} · v{document.version}
         </span>
         <span className="ml-auto">

@@ -60,38 +60,38 @@ export function DriveItemRow({ node, href, isSelected, onSelect }: DriveItemRowP
           "hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring",
           isSelected && "border-accent/40 bg-selection",
           isOver && "border-accent bg-accent-soft",
-          isDragging && "opacity-40",
+          isDragging && "is-dragging",
         )}
         {...dragProps}
         {...dropProps}
       >
         <div role="cell" className="flex min-w-0 items-center gap-2">
           <Icon className={cn("size-4 shrink-0", colorClass)} />
-          <span className="min-w-0 truncate text-[13px] text-foreground">{node.name}</span>
+          <span className="min-w-0 truncate text-lead text-foreground">{node.name}</span>
           <AccessBadge node={node} />
           {node.isFavorite && <Star className="size-3 shrink-0 fill-accent text-accent" />}
           {node.isShared && <Users className="size-3 shrink-0 text-faint-foreground" />}
         </div>
 
-        <span role="cell" className="metric truncate text-[11px] text-faint-foreground">
+        <span role="cell" className="metric truncate text-body text-faint-foreground">
           {typeLabel(node)}
         </span>
 
         <div role="cell" className="hidden min-w-0 items-center gap-1.5 lg:flex">
           <UserAvatar user={node.owner} className="size-5" />
-          <span className="truncate text-[11px] text-muted-foreground">{node.owner.name}</span>
+          <span className="truncate text-body text-muted-foreground">{node.owner.name}</span>
         </div>
 
         <span
           role="cell"
-          className="metric hidden truncate text-[11px] text-faint-foreground sm:block"
+          className="metric hidden truncate text-body text-faint-foreground sm:block"
         >
           {sizeLabel(node)}
         </span>
 
         <span
           role="cell"
-          className="metric hidden truncate text-[11px] text-faint-foreground lg:block"
+          className="metric hidden truncate text-body text-faint-foreground lg:block"
         >
           {formatRelativeTime(node.updatedAt)}
         </span>

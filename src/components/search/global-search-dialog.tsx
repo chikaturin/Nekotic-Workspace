@@ -83,8 +83,8 @@ export function GlobalSearchDialog() {
           <CommandList>
             {failure && (
               <div className="px-3 py-6">
-                <p className="text-center text-sm text-danger">{failure.message}</p>
-                <p className="mt-1 text-center text-[12px] text-muted-foreground">
+                <p className="text-center text-lead text-danger">{failure.message}</p>
+                <p className="mt-1 text-center text-ui text-muted-foreground">
                   {failure.detail ?? "The search did not complete. Try again in a moment."}
                 </p>
               </div>
@@ -97,7 +97,7 @@ export function GlobalSearchDialog() {
             )}
 
             {isSearching && !failure && search.total === 0 && (
-              <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+              <p className="flex items-center justify-center gap-2 py-10 text-lead text-muted-foreground">
                 <LoaderCircle className="size-3.5 animate-spin" />
                 Searching the workspace…
               </p>
@@ -124,7 +124,7 @@ export function GlobalSearchDialog() {
                   >
                     <Clock className="size-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate">{entry.ref.label}</span>
-                    <span className="metric truncate text-[11px] text-faint-foreground">
+                    <span className="metric truncate text-body text-faint-foreground">
                       {entry.ref.kind}
                     </span>
                   </CommandItem>
@@ -193,13 +193,13 @@ function ResultItem({
       <span className="min-w-0 flex-1">
         <span className="block truncate">{result.title}</span>
         {result.snippet && (
-          <span className="block truncate text-[11px] text-muted-foreground">
+          <span className="block truncate text-body text-muted-foreground">
             {result.snippet}
           </span>
         )}
       </span>
 
-      <span className="metric max-w-[45%] truncate text-[11px] text-faint-foreground">
+      <span className="metric max-w-[45%] truncate text-body text-faint-foreground">
         {result.subtitle}
       </span>
     </CommandItem>

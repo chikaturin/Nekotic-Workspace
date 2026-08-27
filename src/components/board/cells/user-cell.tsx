@@ -20,14 +20,14 @@ export function UserChip({ person }: { person: DirectoryUser }) {
       <UserAvatar user={person} className={cn("size-5", !person.isActive && "opacity-50")} />
       <span
         className={cn(
-          "min-w-0 truncate text-[12px]",
+          "min-w-0 truncate text-ui",
           person.isActive ? "text-foreground" : "text-faint-foreground line-through",
         )}
       >
         {person.name}
       </span>
       {!person.isActive && (
-        <span className="shrink-0 rounded border border-border px-1 text-[9px] uppercase tracking-wide text-faint-foreground">
+        <span className="shrink-0 rounded border border-border px-1 text-micro uppercase tracking-wide text-faint-foreground">
           inactive
         </span>
       )}
@@ -54,7 +54,7 @@ export function UserCellView({
         <UserChip key={person.id} person={person} />
       ))}
       {unknown.length > 0 && (
-        <span className="inline-flex items-center gap-1 text-[11px] text-faint-foreground">
+        <span className="inline-flex items-center gap-1 text-body text-faint-foreground">
           <UserX className="size-3" />
           {unknown.length} unknown
         </span>
@@ -124,7 +124,7 @@ export function UserCellEditor({ value, column, people, onCommit, onCancel }: Us
               if (first) toggle(first.id);
             }
           }}
-          className="h-7 text-[12px]"
+          className="h-7 text-ui"
         />
       </div>
 
@@ -133,7 +133,7 @@ export function UserCellEditor({ value, column, people, onCommit, onCancel }: Us
           <button
             type="button"
             onClick={() => onCommit({ kind: "user", userIds: [] })}
-            className="w-full rounded px-1.5 py-1 text-left text-[12px] text-faint-foreground hover:bg-hover"
+            className="w-full rounded px-1.5 py-1 text-left text-ui text-faint-foreground hover:bg-hover"
           >
             Unassigned
           </button>
@@ -160,7 +160,7 @@ export function UserCellEditor({ value, column, people, onCommit, onCancel }: Us
           <button
             type="button"
             onClick={() => onCommit({ kind: "user", userIds: selected })}
-            className="rounded bg-accent px-2 py-1 text-[11px] font-medium text-accent-foreground"
+            className="rounded bg-accent px-2 py-1 text-body font-medium text-accent-foreground"
           >
             Apply
           </button>

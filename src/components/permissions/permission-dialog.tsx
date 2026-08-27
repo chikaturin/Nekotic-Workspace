@@ -81,10 +81,10 @@ export function PermissionDialog({ node, isOpen, onClose }: PermissionDialogProp
           </span>
 
           <div className="min-w-0 flex-1">
-            <DialogTitle className="truncate text-sm font-semibold text-foreground">
+            <DialogTitle className="truncate text-lead font-semibold text-foreground">
               Access · {node?.name ?? workspace.name}
             </DialogTitle>
-            <DialogDescription className="metric truncate text-[11px] text-faint-foreground">
+            <DialogDescription className="metric truncate text-body text-faint-foreground">
               {parent
                 ? `Inherits from ${parent.name} unless a rule is written here`
                 : "Top level — the workspace role is the floor under everything below"}
@@ -103,7 +103,7 @@ export function PermissionDialog({ node, isOpen, onClose }: PermissionDialogProp
               aria-controls={`permission-panel-${entry.id}`}
               onClick={() => setTab(entry.id)}
               className={cn(
-                "-mb-px border-b-2 px-3 py-2 text-[12px] transition-colors",
+                "-mb-px border-b-2 px-3 py-2 text-ui transition-colors",
                 tab === entry.id
                   ? "border-accent font-medium text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground",
@@ -129,7 +129,7 @@ export function PermissionDialog({ node, isOpen, onClose }: PermissionDialogProp
             />
 
             {!canManage && (
-              <p className="pt-3 text-[12px] text-muted-foreground">
+              <p className="pt-3 text-ui text-muted-foreground">
                 You hold {ROLE_LABELS[myRole]} here, which can read this list but not change it.
               </p>
             )}
@@ -146,7 +146,7 @@ export function PermissionDialog({ node, isOpen, onClose }: PermissionDialogProp
         </div>
 
         <footer className="flex shrink-0 flex-wrap items-center gap-2 border-t border-border px-4 py-2.5">
-          <label htmlFor="role-preview" className="text-[12px] text-muted-foreground">
+          <label htmlFor="role-preview" className="text-ui text-muted-foreground">
             Preview as
           </label>
           <SelectField
@@ -166,7 +166,7 @@ export function PermissionDialog({ node, isOpen, onClose }: PermissionDialogProp
 
           {/* Said here rather than in a doc nobody opens: this whole dialog is
               about what the interface offers, not about what is enforced. */}
-          <p className="ml-auto max-w-sm text-right text-[11px] text-faint-foreground">
+          <p className="ml-auto max-w-sm text-right text-body text-faint-foreground">
             Preview only narrows what you see. The server re-checks every one of
             these on its own.
           </p>

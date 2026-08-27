@@ -55,7 +55,7 @@ export function FileDropzone({
         )}
       >
         <Lock className="size-4 shrink-0 text-faint-foreground" />
-        <p className="text-[13px] text-muted-foreground">
+        <p className="text-lead text-muted-foreground">
           You do not have permission to upload to this folder.
         </p>
       </div>
@@ -93,10 +93,10 @@ export function FileDropzone({
         </motion.span>
 
         <div>
-          <p className={cn("font-medium text-foreground", isHero ? "text-base" : "text-[13px]")}>
+          <p className={cn("font-medium text-foreground", isHero ? "text-title" : "text-lead")}>
             {isOver ? "Release to upload" : "Drop files here"}
           </p>
-          <p className={cn("metric mt-1 text-faint-foreground", isHero ? "text-[11px]" : "text-[10px]")}>
+          <p className={cn("metric mt-1 text-faint-foreground", isHero ? "text-body" : "text-micro")}>
             {ACCEPTED_HINT}
           </p>
         </div>

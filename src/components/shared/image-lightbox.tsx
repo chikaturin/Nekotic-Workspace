@@ -41,11 +41,11 @@ export function ImageLightbox({ image, onClose, caption, onDownload }: ImageLigh
           <>
             <header className="flex shrink-0 items-center gap-3 border-b border-border bg-surface px-4 py-2.5">
               <div className="min-w-0 flex-1">
-                <DialogTitle className="truncate text-[13px] font-medium text-foreground">
+                <DialogTitle className="truncate text-lead font-medium text-foreground">
                   {image.alt || caption || "Image"}
                 </DialogTitle>
                 {caption && (
-                  <DialogDescription className="truncate text-[11px] text-faint-foreground">
+                  <DialogDescription className="truncate text-body text-faint-foreground">
                     {caption}
                   </DialogDescription>
                 )}

@@ -27,7 +27,7 @@ export function LockedBanner({
     <div className="mx-auto flex max-w-3xl items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5">
       <Icon className="size-4 shrink-0 text-muted-foreground" />
 
-      <p className="min-w-0 flex-1 text-[13px] text-muted-foreground">
+      <p className="min-w-0 flex-1 text-lead text-muted-foreground">
         {isLocked ? (
           <>
             This page is locked

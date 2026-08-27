@@ -42,7 +42,7 @@ export const GroupHeader = memo(function GroupHeader({
         onClick={onToggle}
         aria-expanded={!isCollapsed}
         style={{ paddingLeft: GUTTER_WIDTH - 28 }}
-        className="sticky left-0 z-20 flex items-center gap-2 bg-surface/95 px-3 text-left backdrop-blur"
+        className="sticky left-0 z-sticky flex items-center gap-2 bg-surface/95 px-3 text-left backdrop-blur"
       >
         <ChevronRight
           className={cn(
@@ -54,7 +54,7 @@ export const GroupHeader = memo(function GroupHeader({
         {color ? (
           <span
             className={cn(
-              "rounded-full border px-2 py-0.5 text-[11px] font-medium",
+              "rounded-full border px-2 py-0.5 text-body font-medium",
               SELECT_COLOR_CLASSES[color],
             )}
           >
@@ -63,7 +63,7 @@ export const GroupHeader = memo(function GroupHeader({
         ) : (
           <span
             className={cn(
-              "text-[12px] font-medium",
+              "text-ui font-medium",
               isEmptyBucket ? "text-faint-foreground" : "text-foreground",
             )}
           >
@@ -71,7 +71,7 @@ export const GroupHeader = memo(function GroupHeader({
           </span>
         )}
 
-        <span className="metric text-[11px] text-faint-foreground">{count}</span>
+        <span className="metric text-body text-faint-foreground">{count}</span>
       </button>
     </div>
   );

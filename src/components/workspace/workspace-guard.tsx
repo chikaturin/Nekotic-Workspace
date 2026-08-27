@@ -97,8 +97,8 @@ function Frame({
         <span className="mx-auto mb-3 flex size-11 items-center justify-center rounded-xl border border-border bg-surface">
           {icon}
         </span>
-        <h1 className="text-[15px] font-semibold text-foreground">{title}</h1>
-        <p className="mt-1 text-[12px] text-muted-foreground">{body}</p>
+        <h1 className="text-title font-semibold text-foreground">{title}</h1>
+        <p className="mt-1 text-ui text-muted-foreground">{body}</p>
         <div className="mt-4 flex justify-center">{action}</div>
       </div>
       {children}

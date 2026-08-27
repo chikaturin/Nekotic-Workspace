@@ -22,7 +22,7 @@ export function UnparsedBadge({ text }: { text: string }) {
       <TooltipTrigger asChild>
         <span className="flex min-w-0 items-center gap-1 text-warning">
           <TriangleAlert className="size-3 shrink-0" />
-          <span className="min-w-0 truncate text-[12px]">{text}</span>
+          <span className="min-w-0 truncate text-ui">{text}</span>
         </span>
       </TooltipTrigger>
       <TooltipContent>Kept as text — this column could not parse the value</TooltipContent>
@@ -41,7 +41,7 @@ export function EditorSurface({
   return (
     <div
       className={cn(
-        "absolute left-0 top-0 z-50 min-w-full rounded-md border border-accent bg-elevated shadow-2xl",
+        "absolute left-0 top-0 z-overlay min-w-full rounded-md border border-accent bg-elevated shadow-float",
         className,
       )}
     >

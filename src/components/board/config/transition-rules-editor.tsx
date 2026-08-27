@@ -81,10 +81,10 @@ export function TransitionRulesEditor({
           }
         />
         <span className="min-w-0">
-          <span className="block text-[12px] font-medium text-foreground">
+          <span className="block text-ui font-medium text-foreground">
             Restrict {noun} transitions
           </span>
-          <span className="block text-[11px] text-faint-foreground">
+          <span className="block text-body text-faint-foreground">
             {rules.enabled
               ? "Only the moves ticked below are allowed. A drag that breaks a rule is refused and the card stays where it was."
               : `Off — a card can be dragged from any ${noun} to any other, like a plain Kanban.`}
@@ -95,7 +95,7 @@ export function TransitionRulesEditor({
       {rules.enabled && (
         <>
           <div className="flex flex-wrap items-center gap-1 rounded-md border border-hairline bg-hover/40 px-1.5 py-1">
-            <span className="px-1 text-[11px] text-faint-foreground">Start from</span>
+            <span className="px-1 text-body text-faint-foreground">Start from</span>
             <Preset label="Anything" onClick={() => onChange(allowAllTransitions(options))} />
             <Preset
               label="Linear →"
@@ -126,7 +126,7 @@ export function TransitionRulesEditor({
                 >
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                     <span className="flex shrink-0 items-center gap-1.5">
-                      <span className="text-[11px] text-faint-foreground">From</span>
+                      <span className="text-body text-faint-foreground">From</span>
                       <OptionPill optionKey={from} options={options} />
                       <ArrowRight className="size-3 text-faint-foreground" />
                     </span>
@@ -150,7 +150,7 @@ export function TransitionRulesEditor({
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-6 px-1.5 text-[11px]"
+                        className="h-6 px-1.5 text-body"
                         title={`Allow ${transitionLabel(from, options)} to move anywhere`}
                         onClick={() =>
                           onChange(
@@ -167,7 +167,7 @@ export function TransitionRulesEditor({
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-6 px-1.5 text-[11px]"
+                        className="h-6 px-1.5 text-body"
                         title={
                           governed
                             ? `Lift the rule — ${transitionLabel(from, options)} goes back to unrestricted`
@@ -187,14 +187,14 @@ export function TransitionRulesEditor({
                   </div>
 
                   {!governed && (
-                    <p className="mt-1 flex items-center gap-1 text-[10px] text-faint-foreground">
+                    <p className="mt-1 flex items-center gap-1 text-micro text-faint-foreground">
                       <Info className="size-2.5 shrink-0" />
                       No rule yet — cards can move in and out freely. Tick a target to restrict it.
                     </p>
                   )}
 
                   {isStranded && (
-                    <p className="mt-1 flex items-center gap-1 text-[10px] text-warning">
+                    <p className="mt-1 flex items-center gap-1 text-micro text-warning">
                       <CircleAlert className="size-2.5 shrink-0" />
                       Cards here cannot move anywhere. Tick a target, or Reset to lift the rule.
                     </p>
@@ -205,7 +205,7 @@ export function TransitionRulesEditor({
           </ul>
 
           {unconfigured.length > 0 && (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-body text-muted-foreground">
               {unconfigured.map((key) => transitionLabel(key, options)).join(", ")}{" "}
               {unconfigured.length === 1 ? "has" : "have"} no transition rule yet, so{" "}
               {unconfigured.length === 1 ? "it stays" : "they stay"} unrestricted until you tick
@@ -214,7 +214,7 @@ export function TransitionRulesEditor({
           )}
 
           {stranded.length === keys.length && keys.length > 0 && (
-            <p className="flex items-center gap-1 text-[11px] text-warning">
+            <p className="flex items-center gap-1 text-body text-warning">
               <CircleAlert className="size-3 shrink-0" />
               Nothing is allowed anywhere — no card on this board can change {noun}.
             </p>
@@ -238,7 +238,7 @@ function Preset({
     <Button
       size="sm"
       variant="outline"
-      className="h-6 px-1.5 text-[11px]"
+      className="h-6 px-1.5 text-body"
       title={title}
       onClick={onClick}
     >
@@ -288,19 +288,19 @@ function OptionPill({
 }) {
   if (optionKey === EMPTY_OPTION_KEY) {
     return (
-      <span className="inline-block whitespace-nowrap rounded-full border border-dashed border-border px-1.5 py-px text-[11px] text-faint-foreground">
+      <span className="inline-block whitespace-nowrap rounded-full border border-dashed border-border px-1.5 py-px text-body text-faint-foreground">
         No value
       </span>
     );
   }
 
   const option = options.find((candidate) => candidate.id === optionKey);
-  if (!option) return <span className="text-[11px]">{optionKey}</span>;
+  if (!option) return <span className="text-body">{optionKey}</span>;
 
   return (
     <span
       className={cn(
-        "inline-block whitespace-nowrap rounded-full border px-1.5 py-px text-[11px]",
+        "inline-block whitespace-nowrap rounded-full border px-1.5 py-px text-body",
         SELECT_COLOR_CLASSES[option.color],
       )}
     >

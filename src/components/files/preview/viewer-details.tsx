@@ -24,7 +24,7 @@ export function ViewerDetails({ node }: { node: FileNode }) {
       className="flex w-full shrink-0 flex-col gap-4 overflow-y-auto border-t border-border bg-surface p-4 md:w-[20rem] md:border-l md:border-t-0"
     >
       <Section title="Location">
-        <ol className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[12px] text-muted-foreground">
+        <ol className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-ui text-muted-foreground">
           <li>Workspace</li>
           {location.map((name) => (
             <li key={name} className="flex items-center gap-1">
@@ -43,8 +43,8 @@ export function ViewerDetails({ node }: { node: FileNode }) {
         <div className="flex items-center gap-2.5 rounded-lg border border-border bg-background px-3 py-2.5">
           <UserAvatar user={node.owner} className="size-8" />
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-medium text-foreground">{node.owner.name}</p>
-            <p className="metric truncate text-[10px] text-faint-foreground">{node.owner.email}</p>
+            <p className="truncate text-lead font-medium text-foreground">{node.owner.name}</p>
+            <p className="metric truncate text-micro text-faint-foreground">{node.owner.email}</p>
           </div>
         </div>
       </Section>
@@ -65,7 +65,7 @@ export function ViewerDetails({ node }: { node: FileNode }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-2">
-      <h3 className="text-[10px] font-semibold uppercase tracking-wider text-faint-foreground">
+      <h3 className="text-micro font-semibold uppercase tracking-wider text-faint-foreground">
         {title}
       </h3>
       {children}

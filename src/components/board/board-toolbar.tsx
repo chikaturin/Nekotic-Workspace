@@ -57,11 +57,11 @@ export function BoardToolbar({
     <div className="shrink-0 border-b border-border bg-background/80 backdrop-blur">
       <div className="flex flex-wrap items-center gap-2 px-4 pt-3">
         <div className="min-w-0 flex-1">
-          <h1 className="flex items-center gap-2 truncate text-base font-semibold tracking-tight text-foreground">
+          <h1 className="flex items-center gap-2 truncate text-title font-semibold tracking-tight text-foreground">
             {board?.name}
             <Badge variant="default">{board?.rowIdPrefix}-000</Badge>
           </h1>
-          <p className="metric truncate text-[11px] text-faint-foreground">
+          <p className="metric truncate text-body text-faint-foreground">
             {rowIds.length === totalRows
               ? formatCount(totalRows, "record")
               : `${rowIds.length} of ${formatCount(totalRows, "record")}`}
@@ -78,7 +78,7 @@ export function BoardToolbar({
             placeholder="Search records…"
             onChange={(event) => setSearch(event.target.value)}
             aria-label="Search records"
-            className="h-8 w-56 pl-7 text-[12px]"
+            className="h-8 w-56 pl-7 text-ui"
           />
         </div>
 

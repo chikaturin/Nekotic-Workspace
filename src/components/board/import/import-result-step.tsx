@@ -23,12 +23,12 @@ export function ImportResultStep({ outcome }: { outcome: ImportOutcome }) {
       </span>
 
       <div>
-        <p className="text-base font-semibold tracking-tight text-foreground">
+        <p className="text-title font-semibold tracking-tight text-foreground">
           {hasCreated
             ? `Imported ${formatCount(outcome.created, "record")}`
             : "Nothing was imported"}
         </p>
-        <p className="mt-1 text-[12px] text-muted-foreground">
+        <p className="mt-1 text-ui text-muted-foreground">
           {outcome.skipped > 0
             ? `${formatCount(outcome.skipped, "row")} left out because of the values flagged in validation.`
             : "Every row in the file was written, and each record was given its own id by the board."}

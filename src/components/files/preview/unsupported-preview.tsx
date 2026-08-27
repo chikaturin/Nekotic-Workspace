@@ -29,8 +29,8 @@ export function UnsupportedPreview({
         <span className={cn("flex size-14 items-center justify-center rounded-xl", tintClass)}>
           <Icon className={cn("size-7", colorClass)} strokeWidth={1.5} />
         </span>
-        <p className="text-sm font-medium text-foreground">{node.name}</p>
-        <p className="max-w-sm text-[13px] text-muted-foreground">{reason}</p>
+        <p className="text-lead font-medium text-foreground">{node.name}</p>
+        <p className="max-w-sm text-lead text-muted-foreground">{reason}</p>
       </div>
 
       <FileMetadataTable node={node} className="w-full max-w-md" />

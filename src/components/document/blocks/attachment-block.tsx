@@ -68,11 +68,11 @@ export function AttachmentBlock({ block, onChange, isEditable, folderId }: Attac
       <div
         className={cn(
           "flex items-center gap-3 rounded-lg border border-dashed border-border bg-surface/60 px-4 py-3",
-          !isEditable && "opacity-70",
+          !isEditable && "is-disabled",
         )}
       >
         <Paperclip className="size-4 shrink-0 text-faint-foreground" />
-        <p className="flex-1 text-[13px] text-muted-foreground">No file attached</p>
+        <p className="flex-1 text-lead text-muted-foreground">No file attached</p>
         {isEditable && (
           <Button
             size="sm"
@@ -109,8 +109,8 @@ export function AttachmentBlock({ block, onChange, isEditable, folderId }: Attac
       </span>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-medium text-foreground">{block.name}</p>
-        <p className="metric truncate text-[10px] text-faint-foreground">
+        <p className="truncate text-lead font-medium text-foreground">{block.name}</p>
+        <p className="metric truncate text-micro text-faint-foreground">
           {label} · {formatBytes(block.sizeBytes)}
         </p>
       </div>

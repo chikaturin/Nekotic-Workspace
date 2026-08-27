@@ -38,7 +38,7 @@ export function GroupMenu({ model }: { model: BoardViewModel }) {
 
       <PopoverContent className="w-72">
         <label className="flex items-center gap-2 px-1 py-1">
-          <span className="w-16 shrink-0 text-[11px] text-muted-foreground">Group by</span>
+          <span className="w-16 shrink-0 text-body text-muted-foreground">Group by</span>
           <SelectField
             value={view?.groupByColumnId ?? ""}
             onChange={(event) => void setGroupBy(event.target.value || null)}
@@ -55,7 +55,7 @@ export function GroupMenu({ model }: { model: BoardViewModel }) {
 
         {isGrouped && (
           <>
-            <label className="mt-1 flex items-center gap-2 px-1 py-1 text-[12px] text-muted-foreground">
+            <label className="mt-1 flex items-center gap-2 px-1 py-1 text-ui text-muted-foreground">
               <input
                 type="checkbox"
                 checked={view?.hideEmptyGroups ?? false}
@@ -65,7 +65,7 @@ export function GroupMenu({ model }: { model: BoardViewModel }) {
               />
               Hide empty groups
               {isKanban && (
-                <span className="text-[10px] text-faint-foreground">(Kanban keeps them)</span>
+                <span className="text-micro text-faint-foreground">(Kanban keeps them)</span>
               )}
             </label>
 
@@ -74,7 +74,7 @@ export function GroupMenu({ model }: { model: BoardViewModel }) {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="text-[11px]"
+                  className="text-body"
                   onClick={() =>
                     setCollapsedGroups(
                       view.id,
@@ -87,7 +87,7 @@ export function GroupMenu({ model }: { model: BoardViewModel }) {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="text-[11px]"
+                  className="text-body"
                   onClick={() => setCollapsedGroups(view.id, [])}
                 >
                   Expand all
