@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
   CONNECTOR_ELBOW,
-  connectorGutterY,
   connectorPath,
   connectorPoints,
   type Point,
@@ -10,31 +9,35 @@ import {
 /**
  * Connector routing.
  *
- * The property under test throughout: a connector never runs sideways at the
- * height of a bar it is not attached to. That is the whole reason the
- * backwards case exists — the naive route turned at the source and travelled
- * back at the target's own height, straight through the target's bar.
+ * A lane holds exactly one bar, so the property under test throughout is that
+ * every horizontal leg stays outside the bar in its own lane. Anything else
+ * draws a wire across a task it has nothing to do with.
  */
 
-const ROW_HEIGHT = 44;
-
-function xsAt(points: readonly Point[], y: number): readonly number[] {
-  const hits: number[] = [];
+/** Horizontal legs at a given height, as [from, to] pairs. */
+function legsAt(points: readonly Point[], y: number): readonly (readonly [number, number])[] {
+  const legs: (readonly [number, number])[] = [];
 
   for (let index = 1; index < points.length; index += 1) {
     const from = points[index - 1];
     const to = points[index];
     if (!from || !to) continue;
-    // A horizontal leg at exactly this height.
-    if (from.y === y && to.y === y) hits.push(from.x, to.x);
+    if (from.y === y && to.y === y) legs.push([from.x, to.x]);
   }
 
-  return hits;
+  return legs;
 }
 
 describe("routing a blocked-by connector", () => {
-  test("forwards is out, across and in — three legs", () => {
-    const points = connectorPoints({ x1: 100, y1: 20, x2: 300, y2: 64, gutterY: 44 });
+  /** A schedule that holds together: the blocker finishes, then the work starts. */
+  test("forwards leaves the blocker's finish and lands on the target's start", () => {
+    const points = connectorPoints({
+      fromStartX: 40,
+      fromEndX: 100,
+      fromY: 20,
+      toStartX: 300,
+      toY: 64,
+    });
 
     expect(points).toEqual([
       { x: 100, y: 20 },
@@ -45,65 +48,102 @@ describe("routing a blocked-by connector", () => {
   });
 
   /**
-   * The case in the screenshot: the blocked record starts before its blocker
-   * finishes, so the arrowhead is to the *left* of where the line leaves.
+   * The conflict case: the target starts before its blocker finishes, so it
+   * lies to the *left*. Leaving from the finish sent the wire right, away from
+   * the target, and then all the way back across whatever it passed.
    */
-  test("backwards travels in the lane between the rows, not across a bar", () => {
-    const gutterY = connectorGutterY(0, 1, ROW_HEIGHT);
-    const points = connectorPoints({ x1: 400, y1: 22, x2: 200, y2: 66, gutterY });
+  test("backwards leaves the blocker's start and drops down the left of both", () => {
+    const points = connectorPoints({
+      fromStartX: 340,
+      fromEndX: 400,
+      fromY: 22,
+      toStartX: 200,
+      toY: 66,
+    });
 
-    // It leaves right of the blocker, drops into the lane, and only then goes
-    // back — so the only sideways movement at either bar's height is the elbow
-    // itself, never a run back across the chart.
-    expect(xsAt(points, 22)).toEqual([400, 410]);
-    expect(xsAt(points, 66)).toEqual([190, 200]);
-    expect(points.at(-1)).toEqual({ x: 200, y: 66 });
-
-    const sideways = xsAt(points, gutterY);
-    expect(sideways).toEqual([410, 190]);
+    expect(points).toEqual([
+      { x: 340, y: 22 },
+      { x: 190, y: 22 },
+      { x: 190, y: 66 },
+      { x: 200, y: 66 },
+    ]);
   });
 
-  test("a tight forward gap routes the same way, rather than doubling back", () => {
-    // Too close to fit "out, across, in" without the across leg running
-    // backwards over the source.
-    const points = connectorPoints({ x1: 100, y1: 20, x2: 105, y2: 64, gutterY: 44 });
+  test("neither horizontal leg touches the bar in its own lane", () => {
+    const blocker = { fromStartX: 340, fromEndX: 400, fromY: 22 };
+    const points = connectorPoints({ ...blocker, toStartX: 200, toY: 66 });
 
-    expect(points).toHaveLength(6);
-    expect(xsAt(points, 64)).toEqual([95, 105]);
-  });
-
-  test("the arrow always lands on the blocked record's start", () => {
-    for (const x2 of [40, 100, 260]) {
-      const points = connectorPoints({ x1: 100, y1: 20, x2, y2: 64, gutterY: 44 });
-      expect(points.at(-1)).toEqual({ x: x2, y: 64 });
-      expect(points[0]).toEqual({ x: 100, y: 20 });
+    // Left of the blocker's own start, so it never crosses the blocker.
+    for (const [from, to] of legsAt(points, 22)) {
+      expect(Math.max(from, to)).toBeLessThanOrEqual(blocker.fromStartX);
+    }
+    // Left of the target's start, so it never crosses the target.
+    for (const [from, to] of legsAt(points, 66)) {
+      expect(Math.max(from, to)).toBeLessThanOrEqual(200);
     }
   });
 
-  test("the lane sits between the two rows, whichever way the link runs", () => {
-    // Target below: the lane is just inside the top of the target's row.
-    expect(connectorGutterY(0, 1, ROW_HEIGHT)).toBe(48);
-    // Target above: just inside the bottom of it.
-    expect(connectorGutterY(3, 1, ROW_HEIGHT)).toBe(84);
+  test("a target further left still routes outside both bars", () => {
+    const points = connectorPoints({
+      fromStartX: 340,
+      fromEndX: 400,
+      fromY: 22,
+      toStartX: 60,
+      toY: 66,
+    });
+
+    // The channel clears the leftmost of the two, which is the target.
+    expect(points[1]?.x).toBe(60 - CONNECTOR_ELBOW);
+    expect(points.at(-1)).toEqual({ x: 60, y: 66 });
+  });
+
+  /**
+   * Barely forwards is not forwards. Squeezing the elbow into a gap too small
+   * for it made the final leg run backwards over its own source.
+   */
+  test("a gap too tight for the elbow takes the left-hand route", () => {
+    const points = connectorPoints({
+      fromStartX: 40,
+      fromEndX: 100,
+      fromY: 20,
+      toStartX: 105,
+      toY: 64,
+    });
+
+    expect(points[0]).toEqual({ x: 40, y: 20 });
+    expect(points[1]?.x).toBe(40 - CONNECTOR_ELBOW);
+  });
+
+  test("the arrow always lands on the blocked record's start", () => {
+    for (const toStartX of [40, 100, 260, 800]) {
+      const points = connectorPoints({
+        fromStartX: 90,
+        fromEndX: 150,
+        fromY: 20,
+        toStartX,
+        toY: 64,
+      });
+
+      expect(points.at(-1)).toEqual({ x: toStartX, y: 64 });
+    }
   });
 
   test("every leg is orthogonal, so the path is only H and V", () => {
-    const points = connectorPoints({ x1: 400, y1: 22, x2: 200, y2: 66, gutterY: 48 });
+    const points = connectorPoints({
+      fromStartX: 340,
+      fromEndX: 400,
+      fromY: 22,
+      toStartX: 200,
+      toY: 66,
+    });
     const path = connectorPath(points);
 
-    expect(path.startsWith("M 400 22")).toBe(true);
+    expect(path.startsWith("M 340 22")).toBe(true);
     expect(path).not.toMatch(/[LlCcQq]/);
     expect(path.match(/[HV]/g)?.length).toBe(points.length - 1);
   });
 
   test("an empty route is an empty path, not a broken one", () => {
     expect(connectorPath([])).toBe("");
-  });
-
-  test("the elbow is the same reach on both sides", () => {
-    const points = connectorPoints({ x1: 400, y1: 22, x2: 200, y2: 66, gutterY: 48 });
-
-    expect(points[1]?.x).toBe(400 + CONNECTOR_ELBOW);
-    expect(points.at(-2)?.x).toBe(200 - CONNECTOR_ELBOW);
   });
 });

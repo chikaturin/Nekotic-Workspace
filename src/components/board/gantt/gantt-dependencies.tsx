@@ -1,7 +1,7 @@
 "use client";
 
 import type { GanttLink, GanttRow } from "@/lib/board-gantt";
-import { connectorGutterY, connectorPath, connectorPoints } from "@/lib/gantt-connector";
+import { connectorPath, connectorPoints } from "@/lib/gantt-connector";
 
 interface GanttDependenciesProps {
   /** Every scheduled row, so a connector can reach a row that is off-screen. */
@@ -25,8 +25,9 @@ interface GanttDependenciesProps {
  * reschedule anyone. Deciding what to move is the plan owner's job.
  *
  * Routing is in `gantt-connector`, which is where the backwards case is
- * handled: a conflict points leftwards, and running straight back at the
- * target's own height drew the line through the target's bar.
+ * handled: a conflict points leftwards, so the wire leaves the blocker's start
+ * and drops down the left of both bars rather than setting off to the right
+ * and then travelling all the way back.
  *
  * A link is drawn when *either* end is on screen. Requiring both meant that
  * scrolling a blocker out of the window silently deleted the arrow pointing at
@@ -74,18 +75,18 @@ export function GanttDependencies({
 
         const stroke = link.isConflict ? "var(--warning)" : "var(--border-strong)";
 
-        const path = connectorPath(
-          connectorPoints({
-            x1: (from.offset + from.span) * dayWidth,
-            y1: fromIndex * rowHeight + rowHeight / 2,
-            x2: to.offset * dayWidth,
-            y2: toIndex * rowHeight + rowHeight / 2,
-            gutterY: connectorGutterY(fromIndex, toIndex, rowHeight),
-          }),
-        );
-
         const x2 = to.offset * dayWidth;
         const y2 = toIndex * rowHeight + rowHeight / 2;
+
+        const path = connectorPath(
+          connectorPoints({
+            fromStartX: from.offset * dayWidth,
+            fromEndX: (from.offset + from.span) * dayWidth,
+            fromY: fromIndex * rowHeight + rowHeight / 2,
+            toStartX: x2,
+            toY: y2,
+          }),
+        );
 
         return (
           <g key={`${link.fromRowId}->${link.toRowId}`}>
