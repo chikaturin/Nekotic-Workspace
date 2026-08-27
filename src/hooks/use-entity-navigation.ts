@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback } from "react";
+import { useOpenNode } from "@/hooks/use-open-node";
 import { hrefForRef, opensDrawer } from "@/lib/entity-ref";
 import { findPathToId } from "@/lib/tree";
 import { useRecentStore } from "@/store/recent-store";
@@ -17,7 +17,7 @@ import type { EntityRef } from "@/types";
  * deleted reports that instead of dropping the user at the drive root.
  */
 export function useOpenEntity(): (ref: EntityRef) => void {
-  const router = useRouter();
+  const openNode = useOpenNode();
   const tree = useWorkspaceStore(selectTree);
   const requestRow = useWorkspaceStore((state) => state.requestRow);
   const openPreview = useWorkspaceStore((state) => state.openPreview);
@@ -41,8 +41,8 @@ export function useOpenEntity(): (ref: EntityRef) => void {
       // The board reads this after it loads; the grid store resets per board.
       if (opensDrawer(ref)) requestRow(ref.nodeId, ref.rowId);
 
-      router.push(hrefForRef(tree, ref));
+      openNode(hrefForRef(tree, ref));
     },
-    [tree, router, requestRow, openPreview, pushFeedback, visit],
+    [tree, openNode, requestRow, openPreview, pushFeedback, visit],
   );
 }

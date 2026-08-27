@@ -2,6 +2,7 @@
 
 import { FileManager } from "@/components/files/file-manager";
 import { NotFoundState } from "@/components/drive/empty-state";
+import { useRouteSegments } from "@/hooks/use-route-segments";
 import { useDriveLocation } from "@/hooks/use-drive-location";
 import { formatCount } from "@/lib/format";
 import { pathLabel, visibleFilesOf } from "@/lib/tree";
@@ -14,7 +15,9 @@ interface FilesViewProps {
 }
 
 /** File manager for the folder addressed by the URL. */
-export function FilesView({ segments }: FilesViewProps) {
+export function FilesView({ segments: prerendered }: FilesViewProps) {
+  // Same reason as Drive: the live URL, not the build-time params.
+  const segments = useRouteSegments(prerendered);
   const location = useDriveLocation(segments);
   const workspace = useWorkspaceStore(selectActiveWorkspace);
   const tree = useWorkspaceStore(selectTree);

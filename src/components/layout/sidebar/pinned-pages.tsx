@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { routableHref } from "@/lib/exported-routes";
 import { collectNodes, hrefForNode } from "@/lib/tree";
 import { cn } from "@/lib/utils";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
@@ -32,7 +33,7 @@ export function PinnedPages({ isCollapsed }: PinnedPagesProps) {
   return (
     <>
       {pinned.map((page) => {
-        const href = hrefForNode(tree, page.id);
+        const href = routableHref(hrefForNode(tree, page.id));
         const isActive = pathname === href;
 
         const link = (

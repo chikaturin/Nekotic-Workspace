@@ -19,18 +19,24 @@ import { useTrackRecent } from "@/hooks/use-recent";
 import { deniedReason } from "@/lib/permissions";
 import { nodeRef } from "@/lib/entity-ref";
 import { useDriveLocation } from "@/hooks/use-drive-location";
+import { useRouteSegments } from "@/hooks/use-route-segments";
 import { formatCount } from "@/lib/format";
 import { pathLabel } from "@/lib/tree";
 import { selectActiveWorkspace, selectTree, useWorkspaceStore } from "@/store/workspace-store";
 import { documentKindOf, isBoard, isContainer, isDocument } from "@/types";
+import { routableHref } from "@/lib/exported-routes";
 
 interface DriveViewProps {
-  /** URL path segments below `/drive`, already decoded. */
+  /** URL path segments below `/drive`, already decoded — what was prerendered. */
   readonly segments: readonly string[];
 }
 
 /** Drive Mode: folder contents as grid or list, with drop targets everywhere. */
-export function DriveView({ segments }: DriveViewProps) {
+export function DriveView({ segments: prerendered }: DriveViewProps) {
+  // The live URL wins over the params the page was built with, so this one
+  // prerendered route can also serve `/drive/?p=…` — the address a node made
+  // after the build has to use.
+  const segments = useRouteSegments(prerendered);
   const location = useDriveLocation(segments);
   const workspace = useWorkspaceStore(selectActiveWorkspace);
   const tree = useWorkspaceStore(selectTree);
@@ -115,7 +121,7 @@ export function DriveView({ segments }: DriveViewProps) {
         title={title}
         subtitle={subtitle}
         targetId={location.dropTargetId}
-        filesHref={`${FILES_ROOT_PATH}${basePath.slice(DRIVE_ROOT_PATH.length)}`}
+        filesHref={routableHref(`${FILES_ROOT_PATH}${basePath.slice(DRIVE_ROOT_PATH.length)}`)}
       />
 
       <div

@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { useOpenNode } from "@/hooks/use-open-node";
 import { hrefForNode } from "@/lib/tree";
 import { getActiveTree, useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardTemplate } from "@/types";
@@ -16,7 +16,7 @@ export function useCreateBoard(): {
   createBoard: (parentId: string | null, template: BoardTemplate) => void;
   isCreating: boolean;
 } {
-  const router = useRouter();
+  const openNode = useOpenNode();
   const [isCreating, setIsCreating] = useState(false);
   const createNode = useWorkspaceStore((state) => state.createBoard);
 
@@ -26,12 +26,12 @@ export function useCreateBoard(): {
 
       try {
         const node = createNode(parentId, template.name, template.id);
-        if (node) router.push(hrefForNode(getActiveTree(), node.id));
+        if (node) openNode(hrefForNode(getActiveTree(), node.id));
       } finally {
         setIsCreating(false);
       }
     },
-    [createNode, router],
+    [createNode, openNode],
   );
 
   return { createBoard, isCreating };

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { usePermissions } from "@/hooks/use-permissions";
 import { canToggleLock } from "@/lib/permissions";
+import { useOpenNode } from "@/hooks/use-open-node";
 import { hrefForNode } from "@/lib/tree";
 import { CURRENT_USER } from "@/mock/users";
 import { documentService } from "@/services/document-service";
@@ -40,6 +41,7 @@ export function useDocumentActions({
   onDocumentChanged,
 }: UseDocumentActionsInput): DocumentActions {
   const router = useRouter();
+  const openNode = useOpenNode();
   const can = usePermissions(node);
   const [pending, setPending] = useState<DocumentActionId | null>(null);
 
@@ -92,9 +94,9 @@ export function useDocumentActions({
       if (!clone) throw new Error("The page could not be duplicated");
 
       await documentService.duplicate(document.nodeId, clone.id, clone.name);
-      router.push(hrefForNode(getActiveTree(), clone.id));
+      openNode(hrefForNode(getActiveTree(), clone.id));
     });
-  }, [document, node, duplicateNode, router, run]);
+  }, [document, node, duplicateNode, openNode, run]);
 
   const setArchived = useCallback(
     async (isArchived: boolean) => {
@@ -114,17 +116,18 @@ export function useDocumentActions({
     await run("delete", async () => {
       const parentHref = node.parentId ? hrefForNode(tree, node.parentId) : "/drive";
       trashNode(node.id);
-      router.push(parentHref);
+      openNode(parentHref);
     });
-  }, [node, tree, trashNode, router, run]);
+  }, [node, tree, trashNode, openNode, run]);
 
   const move = useCallback(
     (targetFolderId: string | null) => {
       if (!node) return;
       moveNode(node.id, targetFolderId);
-      router.push(hrefForNode(getActiveTree(), node.id));
+      // The move changed the node's path, so its old URL is now stale too.
+      openNode(hrefForNode(getActiveTree(), node.id));
     },
-    [moveNode, node, router],
+    [moveNode, node, openNode],
   );
 
   return {

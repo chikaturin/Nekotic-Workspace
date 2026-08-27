@@ -11,6 +11,7 @@ import { SelectField } from "@/components/ui/select-field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBoardList } from "@/hooks/use-board-list";
 import { useEmbeddedBoard } from "@/hooks/use-embedded-board";
+import { routableHref } from "@/lib/exported-routes";
 import { cellOf } from "@/lib/cell-values";
 import { formatCount } from "@/lib/format";
 import { hrefForNode } from "@/lib/tree";
@@ -117,7 +118,7 @@ export function EmbedBlock({ block, onChange, isEditable }: EmbedBlockProps) {
 
   const rows = embed.rowIds.slice(0, EMBED_ROW_LIMIT);
   const hidden = embed.rowIds.length - rows.length;
-  const href = embed.board ? hrefForNode(getActiveTree(), embed.board.nodeId) : "#";
+  const href = embed.board ? routableHref(hrefForNode(getActiveTree(), embed.board.nodeId)) : "#";
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-surface">

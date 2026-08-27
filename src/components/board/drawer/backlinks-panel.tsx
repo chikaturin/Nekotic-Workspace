@@ -4,6 +4,7 @@ import { CornerUpLeft, Link2 } from "lucide-react";
 import { useCallback } from "react";
 import { useAsyncResource } from "@/hooks/use-async-resource";
 import { boardService, type Backlink } from "@/services/board-service";
+import { routableHref } from "@/lib/exported-routes";
 import { hrefForNode } from "@/lib/tree";
 import { getActiveTree } from "@/store/workspace-store";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +40,7 @@ export function BacklinksPanel({ rowId }: { rowId: string }) {
         {links.map((link) => (
           <li key={`${link.boardId}_${link.rowId}_${link.columnName}`}>
             <Link
-              href={hrefForNode(getActiveTree(), link.boardNodeId)}
+              href={routableHref(hrefForNode(getActiveTree(), link.boardNodeId))}
               className="flex items-center gap-2 rounded-lg border border-border bg-surface px-2.5 py-2 no-underline hover:border-border-strong"
             >
               <Link2 className="size-3.5 shrink-0 text-faint-foreground" />

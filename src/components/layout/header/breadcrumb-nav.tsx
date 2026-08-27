@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { routableHref } from "@/lib/exported-routes";
 import { BREADCRUMB_VISIBLE_LIMIT } from "@/config/app";
 import Link from "next/link";
 import type { BreadcrumbTrail } from "@/types";
@@ -50,7 +51,7 @@ export function BreadcrumbNav({ trail }: BreadcrumbNavProps) {
             <DropdownMenuContent align="start" className="w-60">
               {overflow.map((item) => (
                 <DropdownMenuItem key={item.id} asChild>
-                  <Link href={item.href}>{item.label}</Link>
+                  <Link href={routableHref(item.href)}>{item.label}</Link>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

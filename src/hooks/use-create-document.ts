@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { useOpenNode } from "@/hooks/use-open-node";
 import { emptyDocumentBlocks } from "@/lib/blocks";
 import { hrefForNode } from "@/lib/tree";
 import { CURRENT_USER } from "@/mock/users";
@@ -28,7 +28,7 @@ export function useCreateDocument(): {
   ) => Promise<void>;
   isCreating: boolean;
 } {
-  const router = useRouter();
+  const openNode = useOpenNode();
   const [isCreating, setIsCreating] = useState(false);
   const createNode = useWorkspaceStore((state) => state.createDocument);
   const requestTitleFocus = useWorkspaceStore((state) => state.requestTitleFocus);
@@ -48,7 +48,7 @@ export function useCreateDocument(): {
 
         // Config and secret documents are seeded by their own service.
         if (kind !== "page") {
-          router.push(hrefForNode(getActiveTree(), node.id));
+          openNode(hrefForNode(getActiveTree(), node.id));
           return;
         }
 
@@ -62,14 +62,16 @@ export function useCreateDocument(): {
           blocks: emptyDocumentBlocks(() => `blk_${node.id}_${(blockSeed += 1).toString(36)}`),
         });
 
-        router.push(hrefForNode(getActiveTree(), node.id));
+        // A page that has just been made exists only in this tab, so opening
+        // it must never become a page load — see `use-open-node`.
+        openNode(hrefForNode(getActiveTree(), node.id));
       } catch (error) {
         pushFeedback(toAppError(error).message, "error");
       } finally {
         setIsCreating(false);
       }
     },
-    [createNode, requestTitleFocus, pushFeedback, router],
+    [createNode, requestTitleFocus, pushFeedback, openNode],
   );
 
   return { createDocument, isCreating };

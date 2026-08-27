@@ -2,11 +2,11 @@
 
 import { motion } from "framer-motion";
 import { Star, Users } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { DriveItemMenu } from "@/components/drive/drive-item-menu";
 import { sizeLabel, typeLabel } from "@/components/drive/node-meta";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { useDragSource, useDropTarget } from "@/hooks/use-node-dnd";
+import { useOpenNode } from "@/hooks/use-open-node";
 import { formatRelativeTime } from "@/lib/format";
 import { nodeVisual } from "@/lib/node-visuals";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,7 @@ interface DriveItemRowProps {
 }
 
 export function DriveItemRow({ node, href, isSelected, onSelect }: DriveItemRowProps) {
-  const router = useRouter();
+  const openNode = useOpenNode();
   const openPreview = useWorkspaceStore((state) => state.openPreview);
   const { Icon, colorClass } = nodeVisual(node);
   const { dragProps, isDragging } = useDragSource(node);
@@ -40,7 +40,7 @@ export function DriveItemRow({ node, href, isSelected, onSelect }: DriveItemRowP
       openPreview(node.id);
       return;
     }
-    router.push(href);
+    openNode(href);
   }
 
   return (

@@ -2,10 +2,10 @@
 
 import { motion } from "framer-motion";
 import { Expand, Star, Users } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { DriveItemMenu } from "@/components/drive/drive-item-menu";
 import { describeNode } from "@/components/drive/node-meta";
 import { useDragSource, useDropTarget } from "@/hooks/use-node-dnd";
+import { useOpenNode } from "@/hooks/use-open-node";
 import { nodeVisual } from "@/lib/node-visuals";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/workspace-store";
@@ -29,7 +29,7 @@ interface DriveItemCardProps {
  * owns `onDragStart` for its gesture system, which would shadow native HTML5 DnD.
  */
 export function DriveItemCard({ node, href, isSelected, onSelect }: DriveItemCardProps) {
-  const router = useRouter();
+  const openNode = useOpenNode();
   const openPreview = useWorkspaceStore((state) => state.openPreview);
   const { Icon, colorClass, tintClass, label } = nodeVisual(node);
   const { dragProps, isDragging } = useDragSource(node);
@@ -42,7 +42,7 @@ export function DriveItemCard({ node, href, isSelected, onSelect }: DriveItemCar
       openPreview(node.id);
       return;
     }
-    router.push(href);
+    openNode(href);
   }
 
   return (

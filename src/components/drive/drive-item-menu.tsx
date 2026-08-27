@@ -13,7 +13,6 @@ import {
   StarOff,
   Trash2,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PermissionDialog } from "@/components/permissions/permission-dialog";
 import { Button } from "@/components/ui/button";
@@ -25,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useFileDownload } from "@/hooks/use-file-preview";
+import { useOpenNode } from "@/hooks/use-open-node";
 import { usePermissions } from "@/hooks/use-permissions";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/workspace-store";
@@ -39,7 +39,7 @@ interface DriveItemMenuProps {
 
 /** Row/card overflow actions. Shared so both layouts stay in sync. */
 export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
-  const router = useRouter();
+  const openNode = useOpenNode();
   const toggleFavorite = useWorkspaceStore((state) => state.toggleFavorite);
   const trashNode = useWorkspaceStore((state) => state.trashNode);
   const requestRename = useWorkspaceStore((state) => state.requestRename);
@@ -83,7 +83,7 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
 
       <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuItem
-          onSelect={() => (node.type === "file" ? openPreview(node.id) : router.push(href))}
+          onSelect={() => (node.type === "file" ? openPreview(node.id) : openNode(href))}
         >
           <ExternalLink />
           {node.type === "file" ? "Preview" : "Open"}
