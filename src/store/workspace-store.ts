@@ -13,6 +13,22 @@ import {
   updateNode,
 } from "@/lib/tree";
 import { extractTrashed, restoreTargetFor, trashNodeFrom, untrash } from "@/lib/trash";
+import {
+  moveVisibilityImpact,
+  visibleTree,
+  type VisibilityInput,
+} from "@/lib/permissions/visibility";
+import {
+  isWorkspaceMember,
+  makeWorkspace,
+  visibleWorkspaces,
+  withMember,
+  withoutMember,
+  workspaceAccess,
+  type NewWorkspaceInput,
+  type WorkspaceAccess,
+} from "@/lib/workspace-access";
+import { usePermissionStore } from "@/store/permission-store";
 import type { DocumentSummaryPatch } from "@/services/document-service";
 import { createId, slugify, uniqueSlug } from "@/lib/utils";
 import { CURRENT_USER } from "@/mock/users";
@@ -31,9 +47,12 @@ import {
   type FileNode,
   type FolderNode,
   type SortState,
+  type NodeAccessMode,
   type TrashEntry,
+  type UserSummary,
   type ViewMode,
   type Workspace,
+  type WorkspaceRole,
 } from "@/types";
 
 /**
@@ -127,7 +146,25 @@ interface WorkspaceState {
 }
 
 interface WorkspaceActions {
-  setActiveWorkspace: (workspaceId: string) => void;
+  /**
+   * Switch tenants. Refused for a workspace the signed-in user is not in —
+   * a switcher can be bypassed, this cannot.
+   */
+  setActiveWorkspace: (workspaceId: string) => boolean;
+
+  /* Workspace lifecycle. The creator is an admin from the first frame. */
+  createWorkspace: (input: NewWorkspaceInput, creator: UserSummary) => string;
+  updateWorkspace: (workspaceId: string, patch: Partial<NewWorkspaceInput>) => void;
+  deleteWorkspace: (workspaceId: string) => void;
+
+  /* Membership. Each is its own action — leaving is not being removed. */
+  addMember: (workspaceId: string, user: UserSummary, role: WorkspaceRole) => void;
+  setMemberRole: (workspaceId: string, userId: string, role: WorkspaceRole) => void;
+  removeMember: (workspaceId: string, userId: string) => void;
+  leaveWorkspace: (workspaceId: string, userId: string) => void;
+
+  /** Who may see a node, as opposed to what they may do with it. */
+  setNodeAccessMode: (nodeId: string, mode: NodeAccessMode) => void;
 
   toggleExpanded: (nodeId: string) => void;
   expandToNode: (nodeId: string) => void;
@@ -219,12 +256,166 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   feedback: null,
   seed: 0,
 
-  setActiveWorkspace: (workspaceId) =>
-    set((state) =>
-      state.activeWorkspaceId === workspaceId
-        ? state
-        : { activeWorkspaceId: workspaceId, selectedIds: [], expandedIds: [] },
-    ),
+  /**
+   * Switching tenants clears everything scoped to the old one.
+   *
+   * Selection, expansion and the open preview all name nodes that do not exist
+   * in the workspace being switched to. Carrying them across would leave one
+   * workspace's ids briefly addressing another's tree, which is a data leak
+   * wearing the costume of a rendering glitch.
+   *
+   * Refused outright for a workspace the person is not in: the switcher only
+   * lists what they hold, but the switcher is not the only way in here.
+   */
+  setActiveWorkspace: (workspaceId) => {
+    const state = get();
+    if (state.activeWorkspaceId === workspaceId) return true;
+    if (!isWorkspaceMember(state.workspaces.find((item) => item.id === workspaceId), CURRENT_USER.id)) {
+      return false;
+    }
+
+    set({
+      activeWorkspaceId: workspaceId,
+      selectedIds: [],
+      expandedIds: [],
+      previewNodeId: null,
+      rowRequest: null,
+      renameRequestId: null,
+      titleFocusNodeId: null,
+    });
+
+    return true;
+  },
+
+  createWorkspace: (input, creator) => {
+    const state = get();
+    const seed = state.seed + 1;
+
+    const workspace = makeWorkspace(input, creator, {
+      id: `ws_${seed.toString(36)}_${slugify(input.name).slice(0, 12) || "workspace"}`,
+      slugsTaken: state.workspaces.map((item) => item.slug),
+      joinedAt: MOCK_NOW,
+    });
+
+    set({
+      seed,
+      workspaces: [...state.workspaces, workspace],
+      // A new workspace has no tree and no bin. Seeding it with either would
+      // put somebody else's fixtures inside something a person just made.
+      treeByWorkspace: { ...state.treeByWorkspace, [workspace.id]: [] },
+      trashByWorkspace: { ...state.trashByWorkspace, [workspace.id]: [] },
+      activeWorkspaceId: workspace.id,
+      selectedIds: [],
+      expandedIds: [],
+      previewNodeId: null,
+    });
+
+    return workspace.id;
+  },
+
+  updateWorkspace: (workspaceId, patch) =>
+    set((state) => ({
+      workspaces: state.workspaces.map((workspace) =>
+        workspace.id === workspaceId
+          ? {
+              ...workspace,
+              ...(patch.name?.trim() ? { name: patch.name.trim() } : {}),
+              ...(patch.description !== undefined
+                ? { description: patch.description.trim() }
+                : {}),
+              ...(patch.badge?.trim() ? { badge: patch.badge.trim().slice(0, 2).toUpperCase() } : {}),
+              ...(patch.color ? { color: patch.color } : {}),
+            }
+          : workspace,
+      ),
+    })),
+
+  /**
+   * Destroy a workspace and everything scoped to it. The active one falls back
+   * to another the person actually holds — never to whatever happens to be
+   * first in the list.
+   */
+  deleteWorkspace: (workspaceId) =>
+    set((state) => {
+      const workspaces = state.workspaces.filter((workspace) => workspace.id !== workspaceId);
+      const trees = { ...state.treeByWorkspace };
+      const bins = { ...state.trashByWorkspace };
+      delete trees[workspaceId];
+      delete bins[workspaceId];
+
+      const mine = visibleWorkspaces(workspaces, CURRENT_USER.id);
+      const nextActive =
+        state.activeWorkspaceId === workspaceId
+          ? mine[0]?.id ?? ""
+          : state.activeWorkspaceId;
+
+      return {
+        workspaces,
+        treeByWorkspace: trees,
+        trashByWorkspace: bins,
+        activeWorkspaceId: nextActive,
+        selectedIds: [],
+        expandedIds: [],
+      };
+    }),
+
+  addMember: (workspaceId, user, role) =>
+    set((state) => ({
+      workspaces: state.workspaces.map((workspace) =>
+        workspace.id === workspaceId ? withMember(workspace, user, role, MOCK_NOW) : workspace,
+      ),
+    })),
+
+  setMemberRole: (workspaceId, userId, role) =>
+    set((state) => ({
+      workspaces: state.workspaces.map((workspace) =>
+        workspace.id === workspaceId
+          ? {
+              ...workspace,
+              members: workspace.members.map((member) =>
+                member.id === userId ? { ...member, role } : member,
+              ),
+            }
+          : workspace,
+      ),
+    })),
+
+  /**
+   * Take somebody out. If it is the signed-in user losing the workspace they
+   * are standing in, the switch happens in the same write — so there is no
+   * frame in which the app is showing a tree they no longer hold.
+   */
+  removeMember: (workspaceId, userId) =>
+    set((state) => {
+      const workspaces = state.workspaces.map((workspace) =>
+        workspace.id === workspaceId ? withoutMember(workspace, userId) : workspace,
+      );
+
+      if (userId !== CURRENT_USER.id || state.activeWorkspaceId !== workspaceId) {
+        return { workspaces };
+      }
+
+      const mine = visibleWorkspaces(workspaces, CURRENT_USER.id);
+
+      return {
+        workspaces,
+        activeWorkspaceId: mine[0]?.id ?? "",
+        selectedIds: [],
+        expandedIds: [],
+        previewNodeId: null,
+        rowRequest: null,
+      };
+    }),
+
+  leaveWorkspace: (workspaceId, userId) => get().removeMember(workspaceId, userId),
+
+  setNodeAccessMode: (nodeId, mode) =>
+    set((state) => ({
+      ...writeTree(
+        state,
+        updateNode(currentTree(state), nodeId, (item) => ({ ...item, accessMode: mode })),
+      ),
+    })),
 
   toggleExpanded: (nodeId) =>
     set((state) => ({
@@ -353,12 +544,31 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         ? (findNodeById(tree, targetParentId)?.name ?? "workspace root")
         : "workspace root";
 
+      /**
+       * Moving something is a permission change wearing the costume of a drag.
+       * A board dropped into a restricted folder becomes invisible to everybody
+       * that folder is not shared with, and nothing about the board changed —
+       * so the move says who it just took it away from rather than letting them
+       * discover it as an item that quietly stopped existing.
+       */
+      const moved = result.moved;
+      const impact = moved
+        ? moveVisibilityImpact(visibilityInputFor(state), moved, targetParentId)
+        : { losing: [], gaining: [] };
+
+      const note =
+        impact.losing.length > 0
+          ? ` — ${impact.losing.length} ${impact.losing.length === 1 ? "person" : "people"} can no longer see it`
+          : impact.gaining.length > 0
+            ? ` — now visible to ${impact.gaining.length} more`
+            : "";
+
       return {
         ...writeTree(state, result.tree),
         feedback: makeFeedback(
           state,
-          `Moved “${result.moved?.name ?? "item"}” to ${targetName}`,
-          "success",
+          `Moved “${moved?.name ?? "item"}” to ${targetName}${note}`,
+          impact.losing.length > 0 ? "info" : "success",
         ),
       };
     }),
@@ -702,6 +912,19 @@ function currentTree(state: WorkspaceState): readonly DriveNode[] {
   return state.treeByWorkspace[state.activeWorkspaceId] ?? [];
 }
 
+/** Everything the visibility engine needs, read off the store's own state. */
+function visibilityInputFor(state: WorkspaceState): VisibilityInput {
+  const workspace =
+    state.workspaces.find((candidate) => candidate.id === state.activeWorkspaceId) ?? null;
+
+  return {
+    tree: currentTree(state),
+    rules: usePermissionStore.getState().rulesByWorkspace[state.activeWorkspaceId] ?? {},
+    members: workspace?.members ?? [],
+    isMember: isWorkspaceMember(workspace, CURRENT_USER.id),
+  };
+}
+
 /** Replace the active workspace tree without touching the other workspaces. */
 function writeTree(state: WorkspaceState, tree: readonly DriveNode[]) {
   return {
@@ -744,12 +967,103 @@ function rejectionMessage(rejection: NonNullable<ReturnType<typeof moveNodeInTre
 
 /* --------------------------------------------------------------- selectors */
 
-export const selectActiveWorkspace = (state: WorkspaceStore): Workspace =>
-  state.workspaces.find((workspace) => workspace.id === state.activeWorkspaceId) ??
-  (state.workspaces[0] as Workspace);
+const NO_WORKSPACE: Workspace = {
+  id: "",
+  name: "No workspace",
+  slug: "",
+  plan: "free",
+  badge: "—",
+  color: "var(--kind-other)",
+  members: [],
+  storage: { usedBytes: 0, totalBytes: 0 },
+};
 
-export const selectTree = (state: WorkspaceStore): readonly DriveNode[] =>
+/**
+ * The workspace in context.
+ *
+ * It no longer falls back to "whatever is first" — a person who holds nothing
+ * gets an empty placeholder, and the guard above them renders the first-run
+ * screen. Falling back put somebody inside a workspace they were never in.
+ */
+export const selectActiveWorkspace = (state: WorkspaceStore): Workspace =>
+  state.workspaces.find((workspace) => workspace.id === state.activeWorkspaceId) ?? NO_WORKSPACE;
+
+/** The workspaces the signed-in user is actually in — what the switcher lists. */
+export const selectMyWorkspaces = (state: WorkspaceStore): readonly Workspace[] =>
+  visibleWorkspaces(state.workspaces, CURRENT_USER.id);
+
+/** Whether the workspace in the URL is one the signed-in user may open. */
+export const selectWorkspaceAccess = (state: WorkspaceStore): WorkspaceAccess =>
+  workspaceAccess(state.workspaces, state.activeWorkspaceId, CURRENT_USER.id);
+
+/**
+ * The stored tree, unfiltered.
+ *
+ * Only two kinds of caller want this: the store's own writes, and the admin
+ * recovery console, which exists precisely to reach a folder its user cannot
+ * see. Everything else wants `selectTree`.
+ */
+export const selectFullTree = (state: WorkspaceStore): readonly DriveNode[] =>
   state.treeByWorkspace[state.activeWorkspaceId] ?? [];
+
+/**
+ * The tree as the signed-in user is allowed to know it.
+ *
+ * Filtering here rather than in each surface is the whole design: search,
+ * favourites, recent, breadcrumbs, relation pickers and the drive grid all read
+ * this, so none of them has to remember to ask — and none of them can forget.
+ *
+ * Memoised on identity, because a selector that rebuilds its result on every
+ * call re-renders every subscriber forever.
+ */
+export const selectTree = (state: WorkspaceStore): readonly DriveNode[] =>
+  visibleTreeFor(
+    state.treeByWorkspace[state.activeWorkspaceId] ?? [],
+    selectActiveWorkspace(state),
+  );
+
+interface TreeCacheKey {
+  readonly tree: readonly DriveNode[];
+  readonly rules: unknown;
+  readonly members: unknown;
+  readonly value: readonly DriveNode[];
+}
+
+let treeCache: TreeCacheKey | null = null;
+
+/**
+ * Prune once per (tree, rules, membership) triple.
+ *
+ * Rules live in a different store, so this cannot be a plain zustand selector
+ * over one of them. `useVisibleTree` subscribes to both and is what components
+ * should use; this exists so the imperative readers below get the same answer.
+ */
+export function visibleTreeFor(
+  tree: readonly DriveNode[],
+  workspace: Workspace,
+): readonly DriveNode[] {
+  const rules = usePermissionStore.getState().rulesByWorkspace[workspace.id] ?? {};
+
+  if (
+    treeCache &&
+    treeCache.tree === tree &&
+    treeCache.rules === rules &&
+    treeCache.members === workspace.members
+  ) {
+    return treeCache.value;
+  }
+
+  const input: VisibilityInput = {
+    tree,
+    rules,
+    members: workspace.members,
+    isMember: isWorkspaceMember(workspace, CURRENT_USER.id),
+  };
+
+  const value = visibleTree(input, { kind: "user", userId: CURRENT_USER.id });
+  treeCache = { tree, rules, members: workspace.members, value };
+  return value;
+}
 
 export const selectTrash = (state: WorkspaceStore): readonly TrashEntry[] =>
   state.trashByWorkspace[state.activeWorkspaceId] ?? [];
@@ -758,8 +1072,18 @@ export const selectTrash = (state: WorkspaceStore): readonly TrashEntry[] =>
 export const selectTrashCount = (state: WorkspaceStore): number =>
   (state.trashByWorkspace[state.activeWorkspaceId] ?? []).length;
 
-/** Tree of the active workspace, readable outside React. */
+/**
+ * Tree of the active workspace, readable outside React — already filtered.
+ *
+ * Every service reads the drive through this one function, which is why
+ * pruning here covers search, files, boards and documents at once. A service
+ * that wanted the unfiltered tree would have to say so, and none of them does.
+ */
 export function getActiveTree(): readonly DriveNode[] {
-  const state = useWorkspaceStore.getState();
-  return state.treeByWorkspace[state.activeWorkspaceId] ?? [];
+  return selectTree(useWorkspaceStore.getState());
+}
+
+/** The unfiltered tree, for the store's own writes and for admin recovery. */
+export function getFullTree(): readonly DriveNode[] {
+  return selectFullTree(useWorkspaceStore.getState());
 }

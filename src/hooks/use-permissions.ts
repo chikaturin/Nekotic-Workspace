@@ -9,9 +9,10 @@ import {
   resolverFor,
   type PermissionContext,
 } from "@/lib/permissions";
+import { memberRoleOf } from "@/lib/workspace-access";
 import { CURRENT_USER } from "@/mock/users";
 import { selectPreviewRole, selectRulesFor, usePermissionStore } from "@/store/permission-store";
-import { selectActiveWorkspace, selectTree, useWorkspaceStore } from "@/store/workspace-store";
+import { selectActiveWorkspace, selectFullTree, selectTree, useWorkspaceStore } from "@/store/workspace-store";
 import {
   roleRank,
   type CapabilitySet,
@@ -32,14 +33,17 @@ import {
  * backend still has to refuse the call.
  */
 
-/** Role the signed-in user holds on the workspace, before any node rules. */
-function useMemberRole(): WorkspaceRole {
+/**
+ * Role the signed-in user holds on the workspace, before any node rules.
+ *
+ * Null when they hold none. That distinction is the point: the old fallback to
+ * `viewer` quietly turned "not a member of this workspace" into "a member with
+ * the lowest role", which is read access to a tenant somebody was never in.
+ */
+function useMemberRole(): WorkspaceRole | null {
   const workspace = useWorkspaceStore(selectActiveWorkspace);
 
-  return useMemo(
-    () => workspace.members.find((member) => member.id === CURRENT_USER.id)?.role ?? "viewer",
-    [workspace],
-  );
+  return useMemo(() => memberRoleOf(workspace, CURRENT_USER.id), [workspace]);
 }
 
 /**
@@ -52,12 +56,24 @@ function clamp(real: WorkspaceRole, preview: WorkspaceRole | null): WorkspaceRol
   return roleRank(preview) < roleRank(real) ? preview : real;
 }
 
-/** Role held on the workspace as a whole, with any preview applied. */
+/**
+ * Role held on the workspace as a whole, with any preview applied.
+ *
+ * A non-member is reported as `viewer` *for rendering purposes only* — every
+ * surface above them is already blocked by the workspace guard, and their tree
+ * is empty. Nothing here grants access; `useIsWorkspaceMember` is the question
+ * to ask when membership itself is what matters.
+ */
 export function useWorkspaceRole(): WorkspaceRole {
   const real = useMemberRole();
   const preview = usePermissionStore(selectPreviewRole);
 
-  return clamp(real, preview);
+  return clamp(real ?? "viewer", preview);
+}
+
+/** Membership itself, for the surfaces that gate on being in at all. */
+export function useIsWorkspaceMember(): boolean {
+  return useMemberRole() !== null;
 }
 
 /**
@@ -66,7 +82,7 @@ export function useWorkspaceRole(): WorkspaceRole {
  */
 export function useEffectiveRole(node?: DriveNode | null): WorkspaceRole {
   const workspace = useWorkspaceStore(selectActiveWorkspace);
-  const tree = useWorkspaceStore(selectTree);
+  const tree = useWorkspaceStore(selectFullTree);
   const rules = usePermissionStore(selectRulesFor(workspace.id));
   const preview = usePermissionStore(selectPreviewRole);
   const nodeId = node?.id ?? null;

@@ -1,5 +1,25 @@
 import type { UserSummary } from "./user";
 
+/**
+ * How a node decides who may see it (SY-FAC).
+ *
+ * Three modes and no more: the point is that an ordinary person can look at a
+ * folder and say what it does. Anything finer belongs in the role matrix.
+ */
+export type NodeAccessMode =
+  /** Whatever the nearest ancestor decided. The default. */
+  | "inherit"
+  /** Every member of the workspace, regardless of what an ancestor said. */
+  | "workspace"
+  /** Only the subjects granted here. Stops inheritance at this node. */
+  | "restricted";
+
+export const NODE_ACCESS_MODES: readonly NodeAccessMode[] = [
+  "inherit",
+  "workspace",
+  "restricted",
+];
+
 /** Every addressable entity inside a workspace tree. */
 export type DriveNodeType = "project" | "folder" | "document" | "board" | "file";
 
@@ -44,8 +64,17 @@ interface DriveNodeBase {
    * `lib/archive`, never by reading this flag alone.
    */
   readonly isArchived?: boolean;
-  /** Access is restricted to a group the current user may not belong to. */
-  readonly isRestricted?: boolean;
+  /**
+   * Who may *see* this node, as opposed to what they may do with it.
+   *
+   * Absent means `inherit`, which is what almost every node is: whatever the
+   * nearest ancestor decided. `restricted` stops the flow and admits only the
+   * subjects granted here; `workspace` opens it back up to every member.
+   *
+   * This is resource access, not capability. It is resolved by
+   * `lib/permissions/visibility`, never by reading the flag on one node.
+   */
+  readonly accessMode?: NodeAccessMode;
 }
 
 export interface ProjectNode extends DriveNodeBase {

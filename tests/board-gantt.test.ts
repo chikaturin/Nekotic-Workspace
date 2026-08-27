@@ -16,7 +16,7 @@ import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useBoardStore } from "@/store/board-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardColumn, BoardColumnOf, BoardRow } from "@/types";
-import { buildTestTree, ID } from "./helpers";
+import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 
 /**
  * Gantt.
@@ -524,6 +524,7 @@ describe("the chart writes through the board", () => {
     boardService.reset();
 
     useWorkspaceStore.setState({
+      workspaces: [TEST_WORKSPACE],
       activeWorkspaceId: WORKSPACE_ID,
       treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
       feedback: null,

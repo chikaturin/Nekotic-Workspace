@@ -16,7 +16,7 @@ import { DIRECTORY } from "@/mock/users";
 import { useBoardStore } from "@/store/board-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardColumn, BoardRow } from "@/types";
-import { buildTestTree, ID } from "./helpers";
+import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 
 /**
  * SY-EXP-36 — export.
@@ -60,7 +60,8 @@ beforeEach(() => {
   boardService.reset();
 
   useWorkspaceStore.setState({
-    activeWorkspaceId: WORKSPACE_ID,
+    workspaces: [TEST_WORKSPACE],
+      activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
     trashByWorkspace: { [WORKSPACE_ID]: [] },
     feedback: null,

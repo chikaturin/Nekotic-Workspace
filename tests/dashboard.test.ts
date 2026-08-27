@@ -24,6 +24,8 @@ import type { DashboardWidget, DriveNode } from "@/types";
  * importantly, pin what happens to a label no bucket claims.
  */
 
+import { testWorkspace } from "./helpers";
+
 const WORKSPACE_ID = "ws_dash";
 const NOW = "2026-08-26T09:30:00.000Z";
 
@@ -65,7 +67,8 @@ beforeEach(() => {
   boardService.reset();
 
   useWorkspaceStore.setState({
-    activeWorkspaceId: WORKSPACE_ID,
+    workspaces: [testWorkspace(WORKSPACE_ID)],
+      activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: buildTree() },
     feedback: null,
     seed: 0,

@@ -57,15 +57,24 @@ describe("capability projection", () => {
 });
 
 describe("node-level rules", () => {
-  test("a restricted vault is invisible to everyone but its owner", () => {
-    const restricted: DriveNode = { ...node(ID.payment), isRestricted: true, owner: memberAt(3) };
+  /**
+   * Restriction is resource *access*, and this file is about capability. The
+   * two used to be one check, which meant a role could be a way past a shut
+   * folder; they are now resolved separately, and `lib/permissions/visibility`
+   * is what decides whether a node is reachable at all.
+   */
+  test("a restricted folder no longer changes what a role can do", () => {
+    const restricted: DriveNode = {
+      ...node(ID.payment),
+      accessMode: "restricted",
+      owner: memberAt(3),
+    };
 
     const asAdmin = capabilitiesFor({ role: "admin", user: CURRENT_USER, node: restricted });
-    const asOwner = capabilitiesFor({ role: "member", user: memberAt(3), node: restricted });
 
-    expect(asAdmin.view).toBe(false);
-    expect(asAdmin.edit).toBe(false);
-    expect(asOwner.view).toBe(true);
+    // Whether the admin gets to *see* it is asked elsewhere, and answered no.
+    expect(asAdmin.view).toBe(true);
+    expect(asAdmin.edit).toBe(true);
   });
 
   test("trashed nodes cannot be edited, uploaded to or shared", () => {
@@ -146,12 +155,14 @@ describe("document capabilities", () => {
 });
 
 describe("denied reason", () => {
-  test("names the restricted folder", () => {
-    const restricted: DriveNode = { ...node(ID.payment), isRestricted: true };
-    expect(deniedReason(restricted)).toContain("Payment");
-  });
+  /**
+   * A refusal that reads "Finance is restricted" hands the name of a private
+   * folder to the one person who was told they may not have it.
+   */
+  test("names nothing at all", () => {
+    const restricted: DriveNode = { ...node(ID.payment), accessMode: "restricted" };
 
-  test("falls back to a generic message", () => {
-    expect(deniedReason(null)).toContain("do not have permission");
+    expect(deniedReason()).not.toContain(restricted.name);
+    expect(deniedReason()).toContain("do not have access");
   });
 });

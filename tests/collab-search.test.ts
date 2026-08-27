@@ -12,6 +12,8 @@ import { CURRENT_USER } from "@/mock/users";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { DriveNode, SearchGroup, SearchResult, SearchResultKind } from "@/types";
 
+import { testWorkspace } from "./helpers";
+
 const WORKSPACE_ID = "ws_search";
 
 const ID = {
@@ -90,7 +92,8 @@ beforeEach(() => {
   watchService.reset();
 
   useWorkspaceStore.setState({
-    activeWorkspaceId: WORKSPACE_ID,
+    workspaces: [testWorkspace(WORKSPACE_ID)],
+      activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: buildSearchTree() },
     feedback: null,
     seed: 0,

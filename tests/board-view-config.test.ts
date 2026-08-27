@@ -16,7 +16,7 @@ import { useBoardStore, selectActiveView } from "@/store/board-store";
 import { selectCollapsedGroups, useGridStore } from "@/store/grid-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardColumnOf, BoardRow } from "@/types";
-import { buildTestTree, ID } from "./helpers";
+import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 
 const WORKSPACE_ID = "ws_test";
 
@@ -40,7 +40,8 @@ beforeEach(() => {
   useGridStore.getState().reset();
 
   useWorkspaceStore.setState({
-    activeWorkspaceId: WORKSPACE_ID,
+    workspaces: [TEST_WORKSPACE],
+      activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
     selectedIds: [],
     feedback: null,

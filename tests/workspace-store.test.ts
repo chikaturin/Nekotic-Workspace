@@ -8,14 +8,15 @@ import {
   useWorkspaceStore,
 } from "@/store/workspace-store";
 import { childrenOf, isFile, type FileAsset } from "@/types";
-import { buildTestTree, ID } from "./helpers";
+import { buildTestTree, ID, TEST_WORKSPACE, testWorkspace } from "./helpers";
 
 const WORKSPACE_ID = "ws_test";
 
 /** Point the store at the deterministic fixture tree before every test. */
 beforeEach(() => {
   useWorkspaceStore.setState({
-    activeWorkspaceId: WORKSPACE_ID,
+    workspaces: [TEST_WORKSPACE],
+      activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
     trashByWorkspace: { [WORKSPACE_ID]: [] },
     expandedIds: [],
@@ -281,14 +282,33 @@ describe("view state", () => {
   });
 
   test("switching workspace resets navigation state", () => {
+    const second = testWorkspace("ws_second", "Second");
+    useWorkspaceStore.setState({
+      workspaces: [TEST_WORKSPACE, second],
+      treeByWorkspace: { [WORKSPACE_ID]: buildTestTree(), ws_second: [] },
+    });
+
     actions().expandToNode(ID.payment);
     actions().setSelection([ID.payment]);
 
-    actions().setActiveWorkspace("ws_nexdrop");
+    expect(actions().setActiveWorkspace("ws_second")).toBe(true);
 
-    expect(selectActiveWorkspace(useWorkspaceStore.getState()).id).toBe("ws_nexdrop");
+    expect(selectActiveWorkspace(useWorkspaceStore.getState()).id).toBe("ws_second");
     expect(actions().selectedIds).toHaveLength(0);
     expect(actions().expandedIds).toHaveLength(0);
+  });
+
+  /**
+   * The switcher only lists what somebody holds, but the switcher is not the
+   * only way in — a restored session or a stale link arrives here too.
+   */
+  test("switching to a workspace you are not in is refused", () => {
+    useWorkspaceStore.setState({
+      workspaces: [TEST_WORKSPACE, { ...testWorkspace("ws_other", "Other"), members: [] }],
+    });
+
+    expect(actions().setActiveWorkspace("ws_other")).toBe(false);
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe(WORKSPACE_ID);
   });
 
   test("preview and sidebar toggles round-trip", () => {

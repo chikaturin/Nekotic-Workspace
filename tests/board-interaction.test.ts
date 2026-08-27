@@ -21,7 +21,7 @@ import {
 } from "@/store/grid-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { Board, BoardColumn, BoardColumnOf, BoardRow, SavedView, ViewFilter } from "@/types";
-import { buildTestTree, ID } from "./helpers";
+import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 
 const WORKSPACE_ID = "ws_test";
 const BOUNDS = { rowCount: 10, columnCount: 4 };
@@ -33,7 +33,8 @@ beforeEach(() => {
   useGridStore.getState().reset();
 
   useWorkspaceStore.setState({
-    activeWorkspaceId: WORKSPACE_ID,
+    workspaces: [TEST_WORKSPACE],
+      activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
     selectedIds: [],
     feedback: null,

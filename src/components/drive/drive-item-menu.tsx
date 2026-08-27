@@ -6,6 +6,7 @@ import {
   Download,
   Ellipsis,
   ExternalLink,
+  Lock,
   PenLine,
   Share2,
   ShieldCheck,
@@ -14,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
+import { FolderAccessDialog } from "@/components/permissions/folder-access-dialog";
 import { PermissionDialog } from "@/components/permissions/permission-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,7 +31,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import { isArchivedNode } from "@/lib/archive";
-import { isFile, type DriveNode } from "@/types";
+import { isContainer, isFile, type DriveNode } from "@/types";
 
 interface DriveItemMenuProps {
   readonly node: DriveNode;
@@ -50,6 +52,7 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
 
   const downloadFile = useFileDownload();
   const [isAccessOpen, setIsAccessOpen] = useState(false);
+  const [isRolesOpen, setIsRolesOpen] = useState(false);
 
   /**
    * A toast that says "copied" while nothing reached the clipboard is worse
@@ -105,12 +108,25 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
           <Share2 />
           Copy share link
         </DropdownMenuItem>
+        {/* Two separate things, and the menu keeps them apart on purpose.
+            "Manage access" answers who gets *in*; "Roles on this item" answers
+            what somebody who is already in may do. Folding them into one entry
+            is how a role becomes a way past a restriction. */}
+        {isContainer(node) && (
+          <DropdownMenuItem
+            disabled={!can("node.access.manage")}
+            onSelect={() => setIsAccessOpen(true)}
+          >
+            <Lock />
+            Manage access
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
           disabled={!can("workspace.permission.manage")}
-          onSelect={() => setIsAccessOpen(true)}
+          onSelect={() => setIsRolesOpen(true)}
         >
           <ShieldCheck />
-          Manage access
+          Roles on this item
         </DropdownMenuItem>
         {isFile(node) && (
           <DropdownMenuItem onSelect={() => void downloadFile(node)}>
@@ -145,10 +161,16 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
         </DropdownMenuItem>
       </DropdownMenuContent>
 
-      <PermissionDialog
+      <FolderAccessDialog
         node={node}
         isOpen={isAccessOpen}
         onClose={() => setIsAccessOpen(false)}
+      />
+
+      <PermissionDialog
+        node={node}
+        isOpen={isRolesOpen}
+        onClose={() => setIsRolesOpen(false)}
       />
     </DropdownMenu>
   );

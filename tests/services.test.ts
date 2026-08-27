@@ -14,7 +14,7 @@ import { delay, nextId } from "@/services/backend";
 import { resetSimulation, setSimulation, shouldFailSave, shouldFailUpload } from "@/services/simulation";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import { isFile, type FileNode } from "@/types";
-import { buildTestTree, ID } from "./helpers";
+import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 import { findNodeById } from "@/lib/tree";
 import { CURRENT_USER } from "@/mock/users";
 
@@ -30,7 +30,8 @@ beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
   useWorkspaceStore.setState({
-    activeWorkspaceId: WORKSPACE_ID,
+    workspaces: [TEST_WORKSPACE],
+      activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
     selectedIds: [],
     feedback: null,

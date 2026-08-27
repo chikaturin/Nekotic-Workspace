@@ -9,6 +9,7 @@ import { useDragSource, useDropTarget } from "@/hooks/use-node-dnd";
 import { useOpenNode } from "@/hooks/use-open-node";
 import { formatRelativeTime } from "@/lib/format";
 import { nodeVisual } from "@/lib/node-visuals";
+import { AccessBadge } from "@/components/shared/access-badge";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import { isContainer, isFile, type DriveNode } from "@/types";
@@ -67,6 +68,7 @@ export function DriveItemRow({ node, href, isSelected, onSelect }: DriveItemRowP
         <div role="cell" className="flex min-w-0 items-center gap-2">
           <Icon className={cn("size-4 shrink-0", colorClass)} />
           <span className="min-w-0 truncate text-[13px] text-foreground">{node.name}</span>
+          <AccessBadge node={node} />
           {node.isFavorite && <Star className="size-3 shrink-0 fill-accent text-accent" />}
           {node.isShared && <Users className="size-3 shrink-0 text-faint-foreground" />}
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Clock, FileQuestion, Table2, X } from "lucide-react";
+import { useMemo } from "react";
 import { EntityRow } from "@/components/collections/entity-row";
 import { EmptyState } from "@/components/drive/empty-state";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { RECENT_LIMIT } from "@/config/app";
 import { useOpenEntity } from "@/hooks/use-entity-navigation";
 import { useRecent } from "@/hooks/use-recent";
 import { refKey } from "@/lib/entity-ref";
+import { keepVisibleRefs } from "@/lib/permissions/visibility";
 import { formatRelativeTime } from "@/lib/format";
 import { nodeVisual } from "@/lib/node-visuals";
 import { findNodeById, pathLabel } from "@/lib/tree";
@@ -23,8 +25,19 @@ import type { EntityRef } from "@/types";
  */
 export function RecentPage() {
   const tree = useWorkspaceStore(selectTree);
-  const { entries, isHydrated, remove, clear } = useRecent();
+  const { entries: stored, isHydrated, remove, clear } = useRecent();
   const openEntity = useOpenEntity();
+
+  /**
+   * History is kept in this browser and carries the name of everything in it,
+   * so it has to be re-checked against the tree rather than trusted. An entry
+   * whose node this person can no longer see is dropped outright — rendering
+   * it as "no longer available" would still be printing the name.
+   */
+  const entries = useMemo(
+    () => keepVisibleRefs(stored, tree, (entry) => entry.ref.nodeId),
+    [stored, tree],
+  );
 
   return (
     <div className="flex h-full flex-col">

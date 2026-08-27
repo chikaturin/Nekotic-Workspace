@@ -15,9 +15,11 @@ import {
 
 const LABELS: Readonly<Record<PermissionKey, readonly [string, string]>> = {
   "workspace.manage": ["Manage workspace", "Rename the workspace, change its plan and settings"],
+  "workspace.settings.view": ["Open workspace settings", "See the workspace settings screen at all"],
   "workspace.member.manage": ["Manage members", "Invite people and change what role they hold"],
   "workspace.permission.manage": ["Manage access", "Write and remove access rules on any node"],
   "workspace.audit.view": ["Read the audit log", "Open the workspace audit trail"],
+  "workspace.delete": ["Delete the workspace", "Destroy the workspace and everything in it"],
 
   "node.create": ["Create folders", "Add projects and folders to the drive"],
   "node.rename": ["Rename items", "Change the name of a folder, board, page or file"],
@@ -25,6 +27,7 @@ const LABELS: Readonly<Record<PermissionKey, readonly [string, string]>> = {
   "node.delete": ["Delete items", "Send items to Trash"],
   "node.share": ["Share items", "Create links and invite people to one item"],
   "node.archive": ["Archive items", "Freeze an item and everything under it"],
+  "node.access.manage": ["Manage folder access", "Restrict a folder, and choose who may see it"],
 
   "board.create": ["Create boards", "Add a board from a template"],
   "board.manage": ["Manage boards", "Rename a board and change its settings"],

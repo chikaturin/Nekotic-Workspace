@@ -136,7 +136,7 @@ export function hydrate(specs: readonly NodeSpec[], context: HydrateContext): re
       isFavorite: spec.favorite ?? false,
       isTrashed: spec.trashed ?? false,
       isShared: spec.shared ?? false,
-      isRestricted: spec.restricted ?? false,
+      ...(spec.restricted ? { accessMode: "restricted" as const } : {}),
     } as const;
 
     const childContext: HydrateContext = {

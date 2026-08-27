@@ -50,7 +50,7 @@ import type {
   CellValue,
   TransitionRules,
 } from "@/types";
-import { buildTestTree, ID } from "./helpers";
+import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 
 /**
  * Rules are configuration.
@@ -909,6 +909,7 @@ describe("rules through the board store", () => {
     boardService.reset();
 
     useWorkspaceStore.setState({
+      workspaces: [TEST_WORKSPACE],
       activeWorkspaceId: WORKSPACE_ID,
       treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
       feedback: null,
@@ -1041,6 +1042,7 @@ describe("bulk writes obey the same rules", () => {
     boardService.reset();
 
     useWorkspaceStore.setState({
+      workspaces: [TEST_WORKSPACE],
       activeWorkspaceId: WORKSPACE_ID,
       treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
       feedback: null,

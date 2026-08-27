@@ -2,11 +2,9 @@
 
 import { useEffect, useMemo } from "react";
 import { filterByTab, unreadByTab } from "@/lib/notifications";
-import {
-  selectNotifications,
-  selectUnreadCount,
-  useNotificationStore,
-} from "@/store/notification-store";
+import { keepVisibleRefs } from "@/lib/permissions/visibility";
+import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
+import { selectNotifications, useNotificationStore } from "@/store/notification-store";
 import type { AppError, AppNotification, NotificationTab } from "@/types";
 
 export interface NotificationsController {
@@ -35,8 +33,8 @@ export function useNotifications(): NotificationsController {
   const status = useNotificationStore((state) => state.status);
   const error = useNotificationStore((state) => state.error);
   const tab = useNotificationStore((state) => state.tab);
-  const all = useNotificationStore(selectNotifications);
-  const unread = useNotificationStore(selectUnreadCount);
+  const delivered = useNotificationStore(selectNotifications);
+  const tree = useWorkspaceStore(selectTree);
 
   const load = useNotificationStore((state) => state.load);
   const refresh = useNotificationStore((state) => state.refresh);
@@ -48,6 +46,24 @@ export function useNotifications(): NotificationsController {
     void load();
   }, [load]);
 
+  /**
+   * An inbox outlives the access that filled it.
+   *
+   * A notification carries the name of what it is about, so one that arrived
+   * while somebody held a folder keeps naming that folder after they lose it.
+   * Every item is re-resolved against the tree they can see now, which also
+   * stops the click-through from being a way back in. Items with no target —
+   * workspace-level announcements — are kept.
+   */
+  const all = useMemo(
+    () =>
+      keepVisibleRefs(delivered, tree, (item) => item.target?.nodeId ?? "").concat(
+        delivered.filter((item) => item.target === null),
+      ),
+    [delivered, tree],
+  );
+
+  const unread = useMemo(() => all.filter((item) => !item.isRead).length, [all]);
   const visible = useMemo(() => filterByTab(all, tab), [all, tab]);
   const unreadPerTab = useMemo(() => unreadByTab(all), [all]);
 

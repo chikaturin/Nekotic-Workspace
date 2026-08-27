@@ -41,6 +41,10 @@ const MANAGER: readonly PermissionKey[] = [
   "node.move",
   "node.delete",
   "node.archive",
+  // Restricting a folder is structural, not administrative: a project lead
+  // shuts their own folder without waiting on a workspace admin. It only ever
+  // applies to a folder they can already see, so it hands out nothing.
+  "node.access.manage",
   "board.create",
   "board.manage",
   "board.column.create",
@@ -61,9 +65,11 @@ const MANAGER: readonly PermissionKey[] = [
 /** Admin: the workspace itself, its people, its audit trail and its secrets. */
 const ADMIN: readonly PermissionKey[] = [
   "workspace.manage",
+  "workspace.settings.view",
   "workspace.member.manage",
   "workspace.permission.manage",
   "workspace.audit.view",
+  "workspace.delete",
   "secret.reveal",
   "secret.rotate",
 ];

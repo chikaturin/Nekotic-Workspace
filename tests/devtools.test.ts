@@ -19,6 +19,8 @@ import { doc, board, file, folder, hydrate, project, type NodeSpec } from "@/moc
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardColumnOf, DriveNode } from "@/types";
 
+import { testWorkspace } from "./helpers";
+
 const WORKSPACE_ID = "ws_dev";
 
 /** A tree with the three developer-tool surfaces on it. */
@@ -69,7 +71,8 @@ beforeEach(() => {
   devtoolsService.reset();
 
   useWorkspaceStore.setState({
-    activeWorkspaceId: WORKSPACE_ID,
+    workspaces: [testWorkspace(WORKSPACE_ID)],
+      activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: buildDevTree() },
     selectedIds: [],
     feedback: null,

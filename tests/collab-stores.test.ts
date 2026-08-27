@@ -15,7 +15,7 @@ import { useRecentStore } from "@/store/recent-store";
 import { selectIsWatching, useWatchStore } from "@/store/watch-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardRow, EntityRef, RealtimeEvent } from "@/types";
-import { buildTestTree, ID } from "./helpers";
+import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 
 const WORKSPACE_ID = "ws_test";
 const ROADMAP_BOARD = boardIdFor(ID.roadmap);
@@ -66,7 +66,8 @@ beforeEach(() => {
   useRecentStore.setState({ entries: [], isHydrated: false });
 
   useWorkspaceStore.setState({
-    activeWorkspaceId: WORKSPACE_ID,
+    workspaces: [TEST_WORKSPACE],
+      activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
     rowRequest: null,
     feedback: null,

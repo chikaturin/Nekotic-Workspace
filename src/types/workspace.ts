@@ -12,6 +12,8 @@ export interface StorageQuota {
 export interface Workspace {
   readonly id: string;
   readonly name: string;
+  /** What the workspace is for. Shown in the switcher and in settings. */
+  readonly description?: string;
   /** URL-safe identifier, unique across the tenant. */
   readonly slug: string;
   readonly plan: WorkspacePlan;

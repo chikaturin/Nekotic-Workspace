@@ -15,7 +15,7 @@ import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useBoardStore } from "@/store/board-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardRow, CellAttachment, FileAsset } from "@/types";
-import { buildTestTree, ID } from "./helpers";
+import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 
 /**
  * Attachments on records.
@@ -106,6 +106,7 @@ describe("one field, two surfaces", () => {
     boardService.reset();
 
     useWorkspaceStore.setState({
+      workspaces: [TEST_WORKSPACE],
       activeWorkspaceId: WORKSPACE_ID,
       treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
       feedback: null,

@@ -1,5 +1,28 @@
 import { hydrate, board, file, folder, project, type NodeSpec } from "@/mock/factory";
-import type { DriveNode } from "@/types";
+import { MEMBERS } from "@/mock/users";
+import type { DriveNode, Workspace } from "@/types";
+
+/**
+ * The workspace the test tree belongs to.
+ *
+ * Membership is now the outermost gate: a tree mounted under a workspace id
+ * that names no workspace is a tree nobody is a member of, and therefore a tree
+ * nobody can see. Tests that mount `buildTestTree()` mount this beside it.
+ */
+export function testWorkspace(id: string, name = "Test workspace"): Workspace {
+  return { ...TEST_WORKSPACE, id, name, slug: id };
+}
+
+export const TEST_WORKSPACE: Workspace = {
+  id: "ws_test",
+  name: "Test workspace",
+  slug: "test",
+  plan: "team",
+  badge: "TW",
+  color: "var(--accent)",
+  members: MEMBERS,
+  storage: { usedBytes: 0, totalBytes: 1024 ** 3 },
+};
 
 /** Small, predictable forest used across the unit tests. */
 export function buildTestTree(): readonly DriveNode[] {

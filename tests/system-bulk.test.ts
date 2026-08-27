@@ -7,7 +7,7 @@ import { useBoardStore } from "@/store/board-store";
 import { useGridStore } from "@/store/grid-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardRow, BulkResult } from "@/types";
-import { buildTestTree, ID } from "./helpers";
+import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 
 /**
  * SY-BLK-34 — bulk actions.
@@ -40,7 +40,8 @@ beforeEach(() => {
   useGridStore.getState().reset();
 
   useWorkspaceStore.setState({
-    activeWorkspaceId: WORKSPACE_ID,
+    workspaces: [TEST_WORKSPACE],
+      activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
     trashByWorkspace: { [WORKSPACE_ID]: [] },
     selectedIds: [],

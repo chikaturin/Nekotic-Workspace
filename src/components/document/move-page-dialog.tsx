@@ -36,7 +36,7 @@ export function MovePageDialog({
 
     return flattenTree(tree)
       .filter(isContainer)
-      .filter((node) => node.id !== nodeId && !node.isTrashed && !node.isRestricted)
+      .filter((node) => node.id !== nodeId && !node.isTrashed)
       .filter((node) => needle.length === 0 || node.name.toLowerCase().includes(needle))
       .slice(0, 40);
   }, [tree, nodeId, query]);

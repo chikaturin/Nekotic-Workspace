@@ -2,6 +2,9 @@
 
 import { Check, ChevronsUpDown, Eye, Plus, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { CreateWorkspaceDialog } from "@/components/workspace/create-workspace-dialog";
+import { WorkspaceSettingsDialog } from "@/components/workspace/workspace-settings-dialog";
 import { DRIVE_ROOT_PATH } from "@/config/app";
 import {
   DropdownMenu,
@@ -16,7 +19,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useEffectiveRole } from "@/hooks/use-permissions";
+import { useEffectiveRole, usePermissions } from "@/hooks/use-permissions";
+import { useMyWorkspaces } from "@/hooks/use-workspace-access";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { selectPreviewRole, usePermissionStore } from "@/store/permission-store";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspace-store";
@@ -40,19 +44,29 @@ interface WorkspaceSwitcherProps {
   readonly isCollapsed: boolean;
 }
 
-/** Tenant switcher: swapping workspaces swaps the whole drive tree. */
+/**
+ * Tenant switcher: swapping workspaces swaps the whole drive tree.
+ *
+ * It lists the workspaces this person is a member of, and no others — read
+ * from `useMyWorkspaces` rather than filtered here, so a workspace they are not
+ * in is absent from the data the component holds rather than hidden by it.
+ */
 export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
   const router = useRouter();
-  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const workspaces = useMyWorkspaces();
+  const can = usePermissions();
   const role = useEffectiveRole();
+  const [isCreating, setIsCreating] = useState(false);
+  const [isConfiguring, setIsConfiguring] = useState(false);
   const previewRole = usePermissionStore(selectPreviewRole);
   const setPreviewRole = usePermissionStore((state) => state.setPreviewRole);
   const active = useWorkspaceStore(selectActiveWorkspace);
   const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
 
   function handleSelect(workspaceId: string) {
-    setActiveWorkspace(workspaceId);
-    router.push(DRIVE_ROOT_PATH);
+    // The store refuses a workspace this person is not in. It cannot happen
+    // from this menu — it can from a restored session or a stale link.
+    if (setActiveWorkspace(workspaceId)) router.push(DRIVE_ROOT_PATH);
   }
 
   return (
@@ -132,17 +146,26 @@ export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
 
         <DropdownMenuSeparator />
 
-        {/* Neither is part of this build. Disabled rather than silently inert:
-            a menu item that does nothing when pressed reads as a bug. */}
-        <DropdownMenuItem disabled title="Not part of this build">
+        <DropdownMenuItem onSelect={() => setIsCreating(true)}>
           <Plus />
           Create workspace
         </DropdownMenuItem>
-        <DropdownMenuItem disabled title="Not part of this build">
-          <Settings />
-          Workspace settings
-        </DropdownMenuItem>
+
+        {/* Settings is offered only to somebody with a reason to open it. The
+            dialog decides which tabs exist; this decides whether the door does. */}
+        {can("workspace.settings.view") && (
+          <DropdownMenuItem onSelect={() => setIsConfiguring(true)}>
+            <Settings />
+            Workspace settings
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
+
+      <CreateWorkspaceDialog isOpen={isCreating} onClose={() => setIsCreating(false)} />
+      <WorkspaceSettingsDialog
+        isOpen={isConfiguring}
+        onClose={() => setIsConfiguring(false)}
+      />
     </DropdownMenu>
   );
 }

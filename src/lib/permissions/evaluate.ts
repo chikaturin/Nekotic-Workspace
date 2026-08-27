@@ -1,6 +1,5 @@
 import { OWNER_ESCALATIONS, minimumRoleFor, roleHas, ROLE_LABELS } from "@/lib/permissions/roles";
 import {
-  NO_CAPABILITIES,
   isBoard,
   isDocument,
   isFile,
@@ -67,15 +66,7 @@ export interface PermissionContext {
 
 const isWrite = (key: PermissionKey): boolean => !READ_ONLY_KEYS.has(key);
 
-/** A restricted node is invisible to everyone but its owner, whatever the role. */
-function isBlocked(context: PermissionContext): boolean {
-  const { node, user } = context;
-  return Boolean(node?.isRestricted) && node?.owner.id !== user.id;
-}
-
 export function can(key: PermissionKey, context: PermissionContext): boolean {
-  if (isBlocked(context)) return false;
-
   const { role, user, node, isFrozen = false, isLocked = false } = context;
 
   const owns = Boolean(node) && node?.owner.id === user.id;
@@ -128,8 +119,6 @@ function editKeyFor(node: DriveNode | null | undefined): PermissionKey {
  * never disagree.
  */
 export function capabilitiesFor(context: PermissionContext): CapabilitySet {
-  if (isBlocked(context)) return NO_CAPABILITIES;
-
   const resolve = resolverFor(context);
 
   return {
@@ -163,12 +152,18 @@ export function canToggleLock(
   return resolve("document.lock") || document.owner.id === user.id;
 }
 
-/** Reason shown on the permission-denied screen. */
-export function deniedReason(node: DriveNode | null): string {
-  if (node?.isRestricted) {
-    return `“${node.name}” is restricted to a group you are not part of. Ask a workspace admin for access.`;
-  }
-  return "You do not have permission to view this content.";
+/**
+ * Reason shown on the permission-denied screen.
+ *
+ * It deliberately names nothing. A refusal that reads "Finance is restricted"
+ * hands the name of a private folder to the one person who was told they may
+ * not have it — the screen says only that access is needed, and who to ask.
+ */
+export const DENIED_REASON =
+  "You do not have access to this item. Ask somebody who does to share it with you.";
+
+export function deniedReason(): string {
+  return DENIED_REASON;
 }
 
 /**

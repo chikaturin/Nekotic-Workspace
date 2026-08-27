@@ -12,7 +12,7 @@ import {
   useWorkspaceStore,
 } from "@/store/workspace-store";
 import { isContainer, type DriveNode, type TrashEntry } from "@/types";
-import { buildTestTree, ID } from "./helpers";
+import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 
 /**
  * SY-ARC-37 and SY-TRH-38 — archive and soft delete.
@@ -29,7 +29,8 @@ const actions = () => useWorkspaceStore.getState();
 
 beforeEach(() => {
   useWorkspaceStore.setState({
-    activeWorkspaceId: WORKSPACE_ID,
+    workspaces: [TEST_WORKSPACE],
+      activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
     trashByWorkspace: { [WORKSPACE_ID]: [] },
     expandedIds: [],

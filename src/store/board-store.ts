@@ -77,6 +77,8 @@ interface BoardState {
 
 interface BoardActions {
   load: (nodeId: string) => Promise<void>;
+  /** Forget the loaded board outright — used when access to it is withdrawn. */
+  clear: () => void;
   reload: () => Promise<void>;
   setActiveView: (viewId: string) => void;
   setSearch: (query: string) => void;
@@ -279,6 +281,15 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
       const { nodeId } = get();
       if (nodeId) await get().load(nodeId);
     },
+
+    /**
+     * Drop the loaded board and everything derived from it.
+     *
+     * Records are a *copy*: the tree can be re-derived from the rules, a page
+     * of somebody's data already in memory cannot un-load itself. Losing access
+     * has to reach in and throw it away.
+     */
+    clear: () => set({ ...INITIAL }),
 
     setActiveView: (viewId) => set({ activeViewId: viewId }),
     setSearch: (query) => set({ search: query }),

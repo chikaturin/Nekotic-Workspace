@@ -48,7 +48,7 @@ export function DriveView({ segments: prerendered }: DriveViewProps) {
   const expandToNode = useWorkspaceStore((state) => state.expandToNode);
   const createFolder = useWorkspaceStore((state) => state.createFolder);
 
-  const { node, visibleChildren, isNotFound } = location;
+  const { node, visibleChildren, isNotFound, isDenied } = location;
   const capabilities = useCapabilities(node);
 
   /**
@@ -79,6 +79,24 @@ export function DriveView({ segments: prerendered }: DriveViewProps) {
     [segments],
   );
 
+  /**
+   * Refused before "not found", and refused *without naming anything*. The
+   * page never loaded the node's metadata, its children or its content — the
+   * tree it resolved against does not contain them.
+   */
+  if (isDenied) {
+    return (
+      <PermissionDeniedState
+        error={{
+          code: "permission_denied",
+          message: "You don't have access to this item",
+          detail: deniedReason(),
+          isRetryable: false,
+        }}
+      />
+    );
+  }
+
   if (isNotFound) {
     const matched = location.ancestors.length + (node ? 1 : 0);
     return <NotFoundState segment={segments[matched] ?? segments[segments.length - 1] ?? ""} />;
@@ -90,7 +108,7 @@ export function DriveView({ segments: prerendered }: DriveViewProps) {
         error={{
           code: "permission_denied",
           message: `“${node.name}” is not available to you`,
-          detail: deniedReason(node),
+          detail: deniedReason(),
           isRetryable: false,
         }}
       />

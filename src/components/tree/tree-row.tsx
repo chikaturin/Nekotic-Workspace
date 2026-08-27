@@ -6,6 +6,7 @@ import type { MouseEvent } from "react";
 import { TREE_INDENT } from "@/config/app";
 import { useDragSource, useDropTarget } from "@/hooks/use-node-dnd";
 import { nodeVisual } from "@/lib/node-visuals";
+import { AccessBadge } from "@/components/shared/access-badge";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import { isContainer, type DriveNode } from "@/types";
@@ -58,6 +59,7 @@ export function TreeRow({ node, depth, href, isExpanded, isActive, onToggle }: T
 
       <Icon className={cn("size-4 shrink-0", colorClass)} />
       <span className="min-w-0 flex-1 truncate">{node.name}</span>
+      <AccessBadge node={node} />
       {node.isFavorite && <Star className="size-3 shrink-0 fill-accent text-accent" />}
     </>
   );

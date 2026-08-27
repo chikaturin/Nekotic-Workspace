@@ -30,9 +30,11 @@ export function roleRank(role: WorkspaceRole): number {
  */
 export const PERMISSION_KEYS = [
   "workspace.manage",
+  "workspace.settings.view",
   "workspace.member.manage",
   "workspace.permission.manage",
   "workspace.audit.view",
+  "workspace.delete",
 
   "node.create",
   "node.rename",
@@ -40,6 +42,7 @@ export const PERMISSION_KEYS = [
   "node.delete",
   "node.share",
   "node.archive",
+  "node.access.manage",
 
   "board.create",
   "board.manage",

@@ -18,7 +18,7 @@ import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useBoardStore } from "@/store/board-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardColumnOf, BoardRow } from "@/types";
-import { buildTestTree, ID } from "./helpers";
+import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 
 /**
  * Task hierarchy.
@@ -264,6 +264,7 @@ describe("subtasks through the store and service", () => {
     boardService.reset();
 
     useWorkspaceStore.setState({
+      workspaces: [TEST_WORKSPACE],
       activeWorkspaceId: WORKSPACE_ID,
       treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
       feedback: null,

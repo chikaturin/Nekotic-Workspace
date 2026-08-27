@@ -129,10 +129,19 @@ describe("can()", () => {
     expect(can("row.update", { role: "viewer", user: CURRENT_USER })).toBe(false);
   });
 
-  test("a restricted node refuses everyone but its owner", () => {
-    const restricted: DriveNode = { ...node(ID.payment), isRestricted: true, owner: memberAt(3) };
+  /**
+   * Two questions, and `can` only answers the second. Whether a restricted node
+   * is reachable at all is resolved before this, by the visibility engine — so
+   * a role is never a way past a folder somebody deliberately shut.
+   */
+  test("restriction is not something can() decides", () => {
+    const restricted: DriveNode = {
+      ...node(ID.payment),
+      accessMode: "restricted",
+      owner: memberAt(3),
+    };
 
-    expect(can("board.export", { role: "admin", user: CURRENT_USER, node: restricted })).toBe(false);
+    expect(can("board.export", { role: "admin", user: CURRENT_USER, node: restricted })).toBe(true);
     expect(can("board.export", { role: "viewer", user: memberAt(3), node: restricted })).toBe(false);
     expect(can("row.update", { role: "member", user: memberAt(3), node: restricted })).toBe(true);
   });
@@ -191,7 +200,15 @@ describe("can()", () => {
  */
 describe("no role checks outside the permission library", () => {
   const ROOT = fileURLToPath(new URL("../src", import.meta.url));
-  const ALLOWED = ["lib/permissions", "types/permission.ts", "mock/users.ts"];
+  // `lib/workspace-access` joins the exemption: the "a workspace never loses
+  // its last admin" rule is *about* a specific role, and there is nowhere more
+  // central to put it than the membership library itself.
+  const ALLOWED = [
+    "lib/permissions",
+    "lib/workspace-access.ts",
+    "types/permission.ts",
+    "mock/users.ts",
+  ];
   const PATTERN = /\brole\s*[=!]==?\s*["']|["'](?:admin|manager|member|viewer)["']\s*===?\s*\brole\b/;
 
   function walk(directory: string): readonly string[] {

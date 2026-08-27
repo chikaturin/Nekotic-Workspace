@@ -18,7 +18,7 @@ import { watchService } from "@/services/watch-service";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { Comment, EntityRef } from "@/types";
-import { buildTestTree, ID } from "./helpers";
+import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 
 const WORKSPACE_ID = "ws_test";
 const MAI = directoryAt(1);
@@ -34,7 +34,8 @@ beforeEach(() => {
   boardService.reset();
 
   useWorkspaceStore.setState({
-    activeWorkspaceId: WORKSPACE_ID,
+    workspaces: [TEST_WORKSPACE],
+      activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
     feedback: null,
     seed: 0,

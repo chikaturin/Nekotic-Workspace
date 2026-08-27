@@ -16,7 +16,20 @@ export type RealtimePayload =
   | { readonly type: "comment.created"; readonly targetKey: string; readonly comment: Comment }
   | { readonly type: "comment.updated"; readonly targetKey: string; readonly comment: Comment }
   | { readonly type: "notification.created"; readonly notification: AppNotification }
-  | { readonly type: "notification.read"; readonly notificationIds: readonly string[] };
+  | { readonly type: "notification.read"; readonly notificationIds: readonly string[] }
+  /**
+   * Somebody's access changed. Carries no resource content on purpose — a
+   * frame announcing a revocation must not be the thing that leaks what was
+   * revoked. Receivers re-resolve their own access and drop what they may no
+   * longer hold.
+   */
+  | {
+      readonly type: "permission.changed";
+      readonly workspaceId: string;
+      /** Null when the change is workspace membership rather than one node. */
+      readonly nodeId: string | null;
+      readonly userIds: readonly string[];
+    };
 
 export type RealtimeEventType = RealtimePayload["type"];
 

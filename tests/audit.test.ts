@@ -25,6 +25,8 @@ import type { AuditEvent, DriveNode } from "@/types";
  * missing capability is the only kind of guarantee a UI cannot undo.
  */
 
+import { testWorkspace } from "./helpers";
+
 const WORKSPACE_ID = "ws_audit";
 
 function buildTree(): readonly DriveNode[] {
@@ -75,7 +77,8 @@ beforeEach(() => {
 
   tree = buildTree();
   useWorkspaceStore.setState({
-    activeWorkspaceId: WORKSPACE_ID,
+    workspaces: [testWorkspace(WORKSPACE_ID)],
+      activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: tree },
     feedback: null,
     seed: 0,

@@ -4,7 +4,7 @@ import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useUploadStore } from "@/store/upload-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import { childrenOf } from "@/types";
-import { buildTestTree, ID } from "./helpers";
+import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
 
 const WORKSPACE_ID = "ws_test";
 
@@ -23,7 +23,8 @@ beforeEach(() => {
 
   useUploadStore.setState({ tasks: [], isPanelOpen: false });
   useWorkspaceStore.setState({
-    activeWorkspaceId: WORKSPACE_ID,
+    workspaces: [TEST_WORKSPACE],
+      activeWorkspaceId: WORKSPACE_ID,
     treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
     feedback: null,
     seed: 0,
@@ -134,15 +135,25 @@ describe("queue management", () => {
 });
 
 describe("permission gate", () => {
+  /**
+   * The folder is not merely un-writable, it is not in the tree this person is
+   * handed — so the upload has nowhere to go, which is the same refusal for a
+   * stronger reason.
+   */
   test("uploads into a restricted folder someone else owns are refused", async () => {
     const tree = buildTestTree();
     const restricted = tree.map((node) =>
       node.id === ID.development
-        ? { ...node, isRestricted: true, owner: { ...node.owner, id: "usr_someone_else" } }
+        ? {
+            ...node,
+            accessMode: "restricted" as const,
+            owner: { ...node.owner, id: "usr_someone_else" },
+          }
         : node,
     );
 
     useWorkspaceStore.setState({
+      workspaces: [TEST_WORKSPACE],
       activeWorkspaceId: WORKSPACE_ID,
       treeByWorkspace: { [WORKSPACE_ID]: restricted },
       feedback: null,
