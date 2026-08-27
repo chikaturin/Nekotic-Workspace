@@ -9,8 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import type { ListboxOption } from "@/components/ui/listbox";
+import { Select } from "@/components/ui/select";
 import { SelectField } from "@/components/ui/select-field";
-import { SELECT_COLORS, SELECT_COLOR_CLASSES } from "@/lib/board-schema";
+import { SELECT_COLORS } from "@/lib/board-schema";
 import { describeConditionGroup, isConditionGroupEmpty, makeConditionGroup } from "@/lib/conditions";
 import { NO_TRANSITION_RULES, pruneTransitionRules } from "@/lib/transition-rules";
 import { cn } from "@/lib/utils";
@@ -23,6 +25,21 @@ import type {
   TransitionRules,
   UnavailableOptionBehavior,
 } from "@/types";
+
+/**
+ * The palette, as design-system options.
+ *
+ * It used to be a native `<select>` with the colour painted onto the element
+ * itself, which is the one thing a native select cannot show: the popup the
+ * browser draws is the browser's, so the list you actually pick from was eight
+ * lowercase words and no colour anywhere. The dot is what a colour picker is
+ * for, and `Select` has drawn one on both the row and the trigger all along.
+ */
+const COLOUR_OPTIONS: readonly ListboxOption[] = SELECT_COLORS.map((color) => ({
+  value: color,
+  label: `${color.charAt(0).toUpperCase()}${color.slice(1)}`,
+  color,
+}));
 
 interface SelectColumnDialogProps {
   readonly column: BoardColumnOf<"select"> | null;
@@ -256,21 +273,17 @@ export function SelectColumnDialog({
                         className={cn("h-7 w-40 text-ui", option.isDisabled && "is-disabled")}
                       />
 
-                      <SelectField
+                      <Select
+                        size="sm"
                         aria-label={`Colour for ${option.label}`}
-                        disabled={!canEdit}
+                        isDisabled={!canEdit}
+                        options={COLOUR_OPTIONS}
                         value={option.color}
-                        onChange={(event) =>
-                          patchOption(option.id, { color: event.target.value as SelectColor })
+                        onValueChange={(value) =>
+                          value && patchOption(option.id, { color: value as SelectColor })
                         }
-                        className={cn("w-24", SELECT_COLOR_CLASSES[option.color])}
-                      >
-                        {SELECT_COLORS.map((color) => (
-                          <option key={color} value={color}>
-                            {color}
-                          </option>
-                        ))}
-                      </SelectField>
+                        className="w-28"
+                      />
 
                       <label className="flex items-center gap-1 text-body text-muted-foreground">
                         <Checkbox
