@@ -124,12 +124,7 @@ export function FileManager({ folderId, title, description }: FileManagerProps) 
         canUpload={capabilities.upload}
       />
 
-      <FilePreviewDialog
-        node={previewNode}
-        siblings={files}
-        onClose={() => setPreviewId(null)}
-        onSelect={setPreviewId}
-      />
+      <FilePreviewDialog node={previewNode} onClose={() => setPreviewId(null)} />
     </div>
   );
 }

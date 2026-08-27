@@ -6,7 +6,6 @@ import {
   attachmentKind,
   attachmentPreview,
   attachmentsOf,
-  imagesAmong,
   isImageAttachment,
   isReachable,
   NON_RENDERABLE_TYPES,
@@ -69,11 +68,11 @@ describe("attachment classification", () => {
     expect(attachmentKind(attachment({ name: "a.request", mimeType: "" }))).toBe("other");
   });
 
-  test("an attachment with no session URL is unreachable, and skipped by the lightbox", () => {
+  test("an attachment with no session URL is unreachable, so the viewer offers a download", () => {
     const gone = attachment({ url: null, thumbnailUrl: null });
 
     expect(isReachable(gone)).toBe(false);
-    expect(imagesAmong([attachment(), gone])).toHaveLength(1);
+    expect(isReachable(attachment())).toBe(true);
   });
 
   test("an asset becomes metadata, never bytes", () => {

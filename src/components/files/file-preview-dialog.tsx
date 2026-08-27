@@ -1,12 +1,10 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 import { PreviewSurface } from "@/components/files/preview/preview-surface";
 import { ViewerDetails } from "@/components/files/preview/viewer-details";
 import { ViewerHeader } from "@/components/files/preview/viewer-header";
 import { AsyncBoundary } from "@/components/shared/async-boundary";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,44 +12,29 @@ import { useCapabilities } from "@/hooks/use-permissions";
 import { useFilePreview } from "@/hooks/use-file-preview";
 import { useHotkey } from "@/hooks/use-hotkey";
 import { fileSummaryLine } from "@/lib/file-metadata";
-import { cn } from "@/lib/utils";
 import type { FileNode } from "@/types";
 
 interface FilePreviewDialogProps {
   readonly node: FileNode | null;
-  /** Files the ←/→ keys walk through. */
-  readonly siblings: readonly FileNode[];
   readonly onClose: () => void;
-  readonly onSelect: (nodeId: string) => void;
 }
 
 /**
  * Full-page file viewer: the file fills the screen, its details sit beside it,
  * and every file — previewable or not — offers metadata plus a download.
+ *
+ * It opens the file that was asked for and nothing else. There is no paging to
+ * the file beside it: a spreadsheet is not a slide, and arrow keys that quietly
+ * swap the document under the reader are a way to lose your place, not a way to
+ * browse. Choosing a different file happens in the list that opened this one.
  */
-export function FilePreviewDialog({ node, siblings, onClose, onSelect }: FilePreviewDialogProps) {
+export function FilePreviewDialog({ node, onClose }: FilePreviewDialogProps) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(true);
   const capabilities = useCapabilities(node);
   const { state, reload, download } = useFilePreview(node?.id ?? null);
 
-  const index = useMemo(
-    () => (node ? siblings.findIndex((candidate) => candidate.id === node.id) : -1),
-    [node, siblings],
-  );
-
-  const step = useCallback(
-    (delta: number) => {
-      if (index < 0 || siblings.length === 0) return;
-      const next = siblings[(index + delta + siblings.length) % siblings.length];
-      if (next) onSelect(next.id);
-    },
-    [index, siblings, onSelect],
-  );
-
   const isOpen = Boolean(node);
 
-  useHotkey("arrowright", () => step(1), { enabled: isOpen });
-  useHotkey("arrowleft", () => step(-1), { enabled: isOpen });
   useHotkey("i", () => setIsDetailsOpen((open) => !open), { enabled: isOpen });
 
   return (
@@ -63,8 +46,7 @@ export function FilePreviewDialog({ node, siblings, onClose, onSelect }: FilePre
                 announceable: without a title it opens as an unnamed region. */}
             <DialogTitle className="sr-only">{node.name}</DialogTitle>
             <DialogDescription className="sr-only">
-              File preview. Use the left and right arrow keys to move between files, and I to
-              toggle the details panel.
+              File preview. Press I to toggle the details panel.
             </DialogDescription>
 
             <ViewerHeader
@@ -99,13 +81,6 @@ export function FilePreviewDialog({ node, siblings, onClose, onSelect }: FilePre
                     />
                   )}
                 </AsyncBoundary>
-
-                {siblings.length > 1 && (
-                  <>
-                    <StepButton side="left" onClick={() => step(-1)} />
-                    <StepButton side="right" onClick={() => step(1)} />
-                  </>
-                )}
               </main>
 
               {isDetailsOpen && <ViewerDetails node={node} />}
@@ -120,37 +95,10 @@ export function FilePreviewDialog({ node, siblings, onClose, onSelect }: FilePre
                 <Kbd>I</Kbd> details
                 <Kbd>Esc</Kbd> close
               </span>
-
-              {siblings.length > 1 && (
-                <span className="metric flex items-center gap-2 text-[11px] text-faint-foreground">
-                  <Kbd>←</Kbd>
-                  <Kbd>→</Kbd>
-                  {index + 1} / {siblings.length}
-                </span>
-              )}
             </footer>
           </>
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-function StepButton({ side, onClick }: { side: "left" | "right"; onClick: () => void }) {
-  const Icon = side === "left" ? ChevronLeft : ChevronRight;
-
-  return (
-    <Button
-      size="icon"
-      variant="outline"
-      onClick={onClick}
-      aria-label={side === "left" ? "Previous file" : "Next file"}
-      className={cn(
-        "absolute top-1/2 z-10 size-9 -translate-y-1/2 rounded-full shadow-lg",
-        side === "left" ? "left-4" : "right-4",
-      )}
-    >
-      <Icon />
-    </Button>
   );
 }

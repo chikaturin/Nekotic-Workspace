@@ -199,11 +199,11 @@ export function ImageBlock({ block, onChange, isEditable, folderId }: ImageBlock
         }}
       />
 
+      {/* One picture at a time: clicking a thumbnail opens that thumbnail, and
+          closing returns to the gallery, which is where choosing happens. */}
       <ImageLightbox
-        images={images}
-        index={openIndex}
+        image={openIndex === null ? null : (images[openIndex] ?? null)}
         caption={block.caption}
-        onIndexChange={setOpenIndex}
         onClose={() => setOpenIndex(null)}
       />
     </figure>

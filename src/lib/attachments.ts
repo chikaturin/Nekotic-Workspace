@@ -119,8 +119,3 @@ export function allAttachmentsOf(
 ): readonly CellAttachment[] {
   return attachmentColumns(columns).flatMap((column) => attachmentsOf(row, column.id));
 }
-
-/** The images among a set, in order — what the lightbox pages through. */
-export function imagesAmong(files: readonly CellAttachment[]): readonly CellAttachment[] {
-  return files.filter((file) => isImageAttachment(file) && isReachable(file));
-}
