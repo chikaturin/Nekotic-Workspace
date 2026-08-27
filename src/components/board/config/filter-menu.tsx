@@ -2,10 +2,12 @@
 
 import { Filter, Plus, X } from "lucide-react";
 import { useCallback, useMemo } from "react";
-import { Badge } from "@/components/ui/badge";
+import { CountBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { ListboxOption } from "@/components/ui/listbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select } from "@/components/ui/select";
 import { SelectField } from "@/components/ui/select-field";
 import type { BoardViewModel } from "@/hooks/use-board-view";
 import {
@@ -15,8 +17,16 @@ import {
   reconcileOperator,
   valueKindFor,
 } from "@/lib/board-filters";
+import { columnVisual } from "@/lib/board-visuals";
 import { useBoardStore } from "@/store/board-store";
 import type { BoardColumn, DirectoryUser, FilterOperator, ViewFilter } from "@/types";
+
+/**
+ * One step for every control in a condition row. A row mixing a 32px picker
+ * with a 28px input reads as two rows that happen to be on the same line, and
+ * the four controls here were previously split across both heights.
+ */
+const CONTROL_SIZE = "sm" as const;
 
 /**
  * Filter engine UI. Conditions are stored on the saved view, so the same set
@@ -29,6 +39,22 @@ export function FilterMenu({ model }: { model: BoardViewModel }) {
   const people = useBoardStore((state) => state.people);
 
   const filters = useMemo<readonly ViewFilter[]>(() => view?.filters ?? [], [view?.filters]);
+
+  /**
+   * The type icon is the reason this one picker is not native: a column list of
+   * bare names says nothing about which entries will offer "is before" and
+   * which will offer "contains", and the operator list below only makes sense
+   * once you can see what kind of column it belongs to.
+   */
+  const columnOptions = useMemo<readonly ListboxOption[]>(
+    () =>
+      columns.map((column) => ({
+        value: column.id,
+        label: column.name,
+        icon: columnVisual(column.type).Icon,
+      })),
+    [columns],
+  );
 
   const update = useCallback(
     (id: string, patch: Partial<ViewFilter>) => {
@@ -52,7 +78,7 @@ export function FilterMenu({ model }: { model: BoardViewModel }) {
         <Button size="sm" variant={filters.length > 0 ? "subtle" : "ghost"} className="gap-1.5">
           <Filter />
           Filter
-          {filters.length > 0 && <Badge variant="count">{filters.length}</Badge>}
+          {filters.length > 0 && <CountBadge>{filters.length}</CountBadge>}
         </Button>
       </PopoverTrigger>
 
@@ -74,6 +100,7 @@ export function FilterMenu({ model }: { model: BoardViewModel }) {
                     ) : index === 1 ? (
                       <SelectField
                         aria-label="Combine conditions"
+                        size={CONTROL_SIZE}
                         value={view?.filterConjunction ?? "and"}
                         onChange={(event) =>
                           void setConjunction(event.target.value === "or" ? "or" : "and")
@@ -88,11 +115,17 @@ export function FilterMenu({ model }: { model: BoardViewModel }) {
                     )}
                   </span>
 
-                  <SelectField
+                  <Select
                     aria-label="Column"
+                    size={CONTROL_SIZE}
+                    // A board carries dozens of columns and the native select
+                    // this replaces had the platform's typeahead; the search
+                    // field is what hands that back rather than dropping it.
+                    isSearchable
+                    options={columnOptions}
                     value={filter.columnId}
-                    onChange={(event) => {
-                      const next = columns.find((item) => item.id === event.target.value);
+                    onValueChange={(value) => {
+                      const next = columns.find((item) => item.id === value);
                       if (!next) return;
                       update(filter.id, {
                         columnId: next.id,
@@ -100,22 +133,20 @@ export function FilterMenu({ model }: { model: BoardViewModel }) {
                         value: "",
                       });
                     }}
-                    className="w-32 flex-shrink-0"
-                  >
-                    {columns.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </SelectField>
+                    className="w-32 shrink-0"
+                  />
 
+                  {/* The operators are a plain list of words, so this one stays
+                      native: it keeps the platform's keyboard and adds no
+                      second portal inside an already-open popover. */}
                   <SelectField
                     aria-label="Condition"
+                    size={CONTROL_SIZE}
                     value={filter.operator}
                     onChange={(event) =>
                       update(filter.id, { operator: event.target.value as FilterOperator })
                     }
-                    className="w-36 flex-shrink-0"
+                    className="w-36 shrink-0"
                   >
                     {operatorsFor(column?.type ?? "text").map((operator) => (
                       <option key={operator} value={operator}>
@@ -164,7 +195,6 @@ export function FilterMenu({ model }: { model: BoardViewModel }) {
             </Button>
           )}
         </div>
-
       </PopoverContent>
     </Popover>
   );
@@ -189,37 +219,53 @@ function FilterValue({ filter, column, people, onChange }: FilterValueProps) {
 
   if (kind === "option" && column.type === "select") {
     return (
-      <SelectField
+      <Select
         aria-label="Value"
-        value={filter.value}
-        onChange={(event) => onChange(event.target.value)}
+        size={CONTROL_SIZE}
+        isSearchable
+        // "Choose…" used to be a real <option>, and picking it wrote "" back.
+        // The placeholder plus the clear button are the same two states — an
+        // empty filter is still expressible, just not as a fake option.
+        isClearable
+        placeholder="Choose…"
+        options={column.config.options.map((option) => ({
+          value: option.id,
+          label: option.label,
+          color: option.color,
+          // `isDisabled` is deliberately not carried over. It means "no longer
+          // offered for data entry", and filtering for a retired status is
+          // exactly how you find the records still holding one.
+        }))}
+        value={filter.value === "" ? null : filter.value}
+        onValueChange={(value) => onChange(value ?? "")}
         className="min-w-0 flex-1"
-      >
-        <option value="">Choose…</option>
-        {column.config.options.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.label}
-          </option>
-        ))}
-      </SelectField>
+      />
     );
   }
 
   if (kind === "user") {
     return (
-      <SelectField
+      <Select
         aria-label="Value"
-        value={filter.value}
-        onChange={(event) => onChange(event.target.value)}
+        size={CONTROL_SIZE}
+        isSearchable
+        isClearable
+        placeholder="Choose…"
+        options={people.map((person) => ({
+          value: person.id,
+          // The inactive marker stays in the label rather than moving to a
+          // description, because the trigger only ever shows the label and
+          // "who is this filtered to" should not need the list reopened.
+          label: person.isActive ? person.name : `${person.name} (inactive)`,
+          // Empty rather than undefined: the visual branches on
+        // presence, and an absent url would drop the row to no
+        // glyph at all instead of falling back to initials.
+        avatarUrl: person.avatarUrl ?? "",
+        }))}
+        value={filter.value === "" ? null : filter.value}
+        onValueChange={(value) => onChange(value ?? "")}
         className="min-w-0 flex-1"
-      >
-        <option value="">Choose…</option>
-        {people.map((person) => (
-          <option key={person.id} value={person.id}>
-            {person.isActive ? person.name : `${person.name} (inactive)`}
-          </option>
-        ))}
-      </SelectField>
+      />
     );
   }
 
@@ -227,10 +273,11 @@ function FilterValue({ filter, column, people, onChange }: FilterValueProps) {
     <Input
       type={kind === "date" ? "date" : "text"}
       aria-label="Value"
+      size={CONTROL_SIZE}
       value={filter.value}
       placeholder="Value"
       onChange={(event) => onChange(event.target.value)}
-      className="h-7 min-w-0 flex-1 text-ui"
+      className="min-w-0 flex-1"
     />
   );
 }

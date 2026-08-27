@@ -78,7 +78,7 @@ export function WorkspaceRestrictedTab() {
                   {row.path}
                 </span>
               </span>
-              <Badge variant="default">
+              <Badge variant="neutral">
                 {row.granted} {row.granted === 1 ? "person" : "people"}
               </Badge>
               <Button size="sm" variant="outline" onClick={() => setManaging(row.node)}>

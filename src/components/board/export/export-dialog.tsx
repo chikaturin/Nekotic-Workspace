@@ -1,13 +1,21 @@
 "use client";
 
-import { Download, FileSpreadsheet, FileText, LoaderCircle, ShieldOff, Table2 } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, ShieldOff, Table2 } from "lucide-react";
 import { useState, type ComponentType } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { RadioCard, RadioGroup } from "@/components/ui/radio-group";
 import type { ExportController } from "@/hooks/use-board-export";
 import { EXPORT_FORMAT_LABELS, EXPORT_SCOPE_LABELS } from "@/lib/board-export";
 import { formatCount } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import type { ExportFormat, ExportScope } from "@/types";
 
 interface ExportDialogProps {
@@ -54,90 +62,69 @@ export function ExportDialog({
         onClose();
       }}
     >
-      <DialogContent className="max-w-lg p-0">
-        <header className="border-b border-border px-5 py-4 pr-12">
-          <DialogTitle className="text-lead font-semibold text-foreground">Export records</DialogTitle>
-          <DialogDescription className="mt-1 text-ui text-muted-foreground">
+      <DialogContent size="lg">
+        <DialogHeader>
+          <DialogTitle>Export records</DialogTitle>
+          <DialogDescription>
             Every format is written from the same values, so the three files always agree.
           </DialogDescription>
-        </header>
+        </DialogHeader>
 
-        <div className="space-y-4 px-5 py-4">
-          <fieldset>
-            <legend className="mb-1.5 text-body font-semibold uppercase tracking-wider text-faint-foreground">
-              Format
-            </legend>
-            <div className="grid grid-cols-3 gap-2">
-              {FORMATS.map((candidate) => {
-                const Icon = FORMAT_ICONS[candidate];
-                const isActive = candidate === format;
+        <DialogBody className="space-y-4">
+          {/* Both groups are one question with one answer, so both are radios
+              rather than the `aria-pressed` cards this dialog used to draw:
+              three independent toggles is not what "pick a format" means, and
+              a screen reader had no way to say which of the three was on.
+              RadioCard over ToggleGroup for the same reason in both places —
+              it carries the icon, the hint line, the trailing count and the
+              disabled treatment as slots, which is every piece these two
+              groups need and all of what would otherwise be re-written by
+              hand at the call site. */}
+          <RadioGroup
+            label="Format"
+            value={format}
+            // The group hands back a plain string; the only ones it can hand
+            // back are the three `FORMATS` rendered just below.
+            onValueChange={(value) => setFormat(value as ExportFormat)}
+            listClassName="grid grid-cols-3 gap-2"
+          >
+            {FORMATS.map((candidate) => {
+              const Icon = FORMAT_ICONS[candidate];
 
-                return (
-                  <button
-                    key={candidate}
-                    type="button"
-                    aria-pressed={isActive}
-                    onClick={() => setFormat(candidate)}
-                    className={cn(
-                      "flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors",
-                      isActive
-                        ? "border-accent bg-accent-soft"
-                        : "border-border bg-surface hover:border-border-strong",
-                    )}
-                  >
-                    <Icon className={cn("size-4", isActive ? "text-accent" : "text-faint-foreground")} />
-                    <span className="text-ui font-medium text-foreground">
-                      {EXPORT_FORMAT_LABELS[candidate]}
-                    </span>
-                    <span className="text-micro leading-snug text-faint-foreground">
-                      {FORMAT_HINTS[candidate]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
+              return (
+                <RadioCard
+                  key={candidate}
+                  layout="stack"
+                  value={candidate}
+                  icon={<Icon />}
+                  label={EXPORT_FORMAT_LABELS[candidate]}
+                  description={FORMAT_HINTS[candidate]}
+                />
+              );
+            })}
+          </RadioGroup>
 
-          <fieldset>
-            <legend className="mb-1.5 text-body font-semibold uppercase tracking-wider text-faint-foreground">
-              Scope
-            </legend>
-            <div className="space-y-1">
-              {SCOPES.map((candidate) => {
-                const count = controller.rowCounts[candidate];
-                const isDisabled = count === 0;
+          <RadioGroup
+            label="Scope"
+            value={scope}
+            onValueChange={(value) => setScope(value as ExportScope)}
+          >
+            {SCOPES.map((candidate) => {
+              const count = controller.rowCounts[candidate];
 
-                return (
-                  <label
-                    key={candidate}
-                    className={cn(
-                      "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 transition-colors",
-                      scope === candidate
-                        ? "border-accent bg-accent-soft"
-                        : "border-border hover:bg-hover",
-                      isDisabled && "cursor-not-allowed opacity-50",
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="export-scope"
-                      value={candidate}
-                      checked={scope === candidate}
-                      disabled={isDisabled}
-                      onChange={() => setScope(candidate)}
-                      className="size-3.5 accent-[var(--accent)]"
-                    />
-                    <span className="flex-1 text-ui text-foreground">
-                      {EXPORT_SCOPE_LABELS[candidate]}
-                    </span>
-                    <span className="metric text-body text-faint-foreground">
-                      {formatCount(count, "record")}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
+              return (
+                <RadioCard
+                  key={candidate}
+                  value={candidate}
+                  label={EXPORT_SCOPE_LABELS[candidate]}
+                  // A scope with nothing in it stays visible and unpickable,
+                  // so the reason the export is empty is on screen.
+                  disabled={count === 0}
+                  meta={<span className="metric">{formatCount(count, "record")}</span>}
+                />
+              );
+            })}
+          </RadioGroup>
 
           {controller.omittedColumns.length > 0 && (
             <p className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-body leading-relaxed text-foreground">
@@ -149,25 +136,28 @@ export function ExportDialog({
               </span>
             </p>
           )}
-        </div>
+        </DialogBody>
 
-        <footer className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
+        <DialogFooter>
           <Button size="sm" variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
             size="sm"
             variant="default"
-            className="gap-1.5"
-            disabled={isEmpty || controller.isExporting}
+            // `isLoading` already blocks the click and swaps the leading icon
+            // for the spinner, so the only reason left to disable is an empty
+            // scope.
+            isLoading={controller.isExporting}
+            disabled={isEmpty}
             onClick={() => {
               void controller.run(format, scope).then(onClose);
             }}
           >
-            {controller.isExporting ? <LoaderCircle className="animate-spin" /> : <Download />}
+            <Download />
             Export {formatCount(rowCount, "record")}
           </Button>
-        </footer>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

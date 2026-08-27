@@ -6,15 +6,19 @@ import { AccessList } from "@/components/permissions/access-list";
 import { RoleMatrix } from "@/components/permissions/role-matrix";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { SelectField } from "@/components/ui/select-field";
+import type { ListboxOption } from "@/components/ui/listbox";
+import { Select } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAccessList, useEffectiveRole, usePermissions } from "@/hooks/use-permissions";
-import { ROLE_LABELS } from "@/lib/permissions";
+import { ROLE_LABELS, ROLE_SUMMARIES } from "@/lib/permissions";
 import { findPathToId } from "@/lib/tree";
-import { cn } from "@/lib/utils";
 import {
   selectPreviewRole,
   usePermissionStore,
@@ -28,6 +32,20 @@ const TABS: readonly { readonly id: TabId; readonly label: string }[] = [
   { id: "access", label: "Access" },
   { id: "roles", label: "Roles" },
 ];
+
+/**
+ * "My role" is the id the store spells as `null`, and it has to be a real
+ * option value because a popover list has no equivalent of a native select's
+ * empty `<option>`.
+ */
+const SELF_VALUE = "self";
+
+/** The roles, each answering the "what would I lose?" the preview is asking. */
+const PREVIEW_ROLE_OPTIONS: readonly ListboxOption[] = WORKSPACE_ROLES.map((role) => ({
+  value: role,
+  label: ROLE_LABELS[role],
+  description: ROLE_SUMMARIES[role],
+}));
 
 interface PermissionDialogProps {
   readonly node: DriveNode | null;
@@ -62,6 +80,20 @@ export function PermissionDialog({ node, isOpen, onClose }: PermissionDialogProp
     return path[path.length - 2] ?? null;
   }, [tree, node]);
 
+  // Rebuilt only when the viewer's own role changes, because that is the only
+  // thing the leading row's label restates.
+  const previewOptions = useMemo<readonly ListboxOption[]>(
+    () => [
+      {
+        value: SELF_VALUE,
+        label: `My role (${ROLE_LABELS[myRole]})`,
+        description: "The interface as you actually hold it.",
+      },
+      ...PREVIEW_ROLE_OPTIONS,
+    ],
+    [myRole],
+  );
+
   const canManage = can("workspace.permission.manage");
 
   function grant(subject: AccessSubject, role: WorkspaceRole) {
@@ -74,14 +106,14 @@ export function PermissionDialog({ node, isOpen, onClose }: PermissionDialogProp
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="flex max-h-[82vh] w-full max-w-2xl flex-col p-0">
-        <header className="flex shrink-0 items-start gap-2.5 border-b border-border px-4 py-3">
+      <DialogContent size="xl" className="flex max-h-[82vh] flex-col p-0">
+        <DialogHeader size="sm" className="flex items-start gap-2.5 space-y-0">
           <span className="mt-0.5 flex size-8 items-center justify-center rounded-lg border border-border bg-surface">
             <ShieldCheck className="size-4 text-accent" />
           </span>
 
           <div className="min-w-0 flex-1">
-            <DialogTitle className="truncate text-lead font-semibold text-foreground">
+            <DialogTitle className="truncate text-lead">
               Access · {node?.name ?? workspace.name}
             </DialogTitle>
             <DialogDescription className="metric truncate text-body text-faint-foreground">
@@ -90,79 +122,60 @@ export function PermissionDialog({ node, isOpen, onClose }: PermissionDialogProp
                 : "Top level — the workspace role is the floor under everything below"}
             </DialogDescription>
           </div>
-        </header>
+        </DialogHeader>
 
-        <div role="tablist" aria-label="Permission sections" className="flex shrink-0 gap-0.5 border-b border-border px-3">
-          {TABS.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              role="tab"
-              id={`permission-tab-${entry.id}`}
-              aria-selected={tab === entry.id}
-              aria-controls={`permission-panel-${entry.id}`}
-              onClick={() => setTab(entry.id)}
-              className={cn(
-                "-mb-px border-b-2 px-3 py-2 text-ui transition-colors",
-                tab === entry.id
-                  ? "border-accent font-medium text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {entry.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <section
-            role="tabpanel"
-            id="permission-panel-access"
-            aria-labelledby="permission-tab-access"
-            hidden={tab !== "access"}
-          >
-            <AccessList
-              entries={entries}
-              canManage={canManage}
-              onGrant={grant}
-              onReset={reset}
-            />
-
-            {!canManage && (
-              <p className="pt-3 text-ui text-muted-foreground">
-                You hold {ROLE_LABELS[myRole]} here, which can read this list but not change it.
-              </p>
-            )}
-          </section>
-
-          <section
-            role="tabpanel"
-            id="permission-panel-roles"
-            aria-labelledby="permission-tab-roles"
-            hidden={tab !== "roles"}
-          >
-            <RoleMatrix highlight={previewRole ?? myRole} />
-          </section>
-        </div>
-
-        <footer className="flex shrink-0 flex-wrap items-center gap-2 border-t border-border px-4 py-2.5">
-          <label htmlFor="role-preview" className="text-ui text-muted-foreground">
-            Preview as
-          </label>
-          <SelectField
-            id="role-preview"
-            value={previewRole ?? "self"}
-            onChange={(event) =>
-              setPreviewRole(event.target.value === "self" ? null : (event.target.value as WorkspaceRole))
-            }
-          >
-            <option value="self">My role ({ROLE_LABELS[myRole]})</option>
-            {WORKSPACE_ROLES.map((role) => (
-              <option key={role} value={role}>
-                {ROLE_LABELS[role]}
-              </option>
+        <Tabs
+          value={tab}
+          onValueChange={(next) => setTab(next as TabId)}
+          className="min-h-0 flex-1"
+        >
+          <TabsList aria-label="Permission sections">
+            {TABS.map((entry) => (
+              <TabsTrigger key={entry.id} value={entry.id}>
+                {entry.label}
+              </TabsTrigger>
             ))}
-          </SelectField>
+          </TabsList>
+
+          <DialogBody size="sm">
+            <TabsContent value="access">
+              <AccessList
+                entries={entries}
+                canManage={canManage}
+                onGrant={grant}
+                onReset={reset}
+              />
+
+              {!canManage && (
+                <p className="pt-3 text-ui text-muted-foreground">
+                  You hold {ROLE_LABELS[myRole]} here, which can read this list but not change it.
+                </p>
+              )}
+            </TabsContent>
+
+            <TabsContent value="roles">
+              <RoleMatrix highlight={previewRole ?? myRole} />
+            </TabsContent>
+          </DialogBody>
+        </Tabs>
+
+        <DialogFooter size="sm" align="start">
+          {/* A popover listbox is a div, so it cannot be the target of a real
+              <label>. The caption names it through `aria-labelledby` instead,
+              which is the association that actually survives. */}
+          <span id="role-preview-label" className="text-ui text-muted-foreground">
+            Preview as
+          </span>
+          <Select
+            size="sm"
+            value={previewRole ?? SELF_VALUE}
+            options={previewOptions}
+            aria-labelledby="role-preview-label"
+            onValueChange={(next) =>
+              setPreviewRole(next === null || next === SELF_VALUE ? null : (next as WorkspaceRole))
+            }
+            className="w-48"
+          />
 
           {/* Said here rather than in a doc nobody opens: this whole dialog is
               about what the interface offers, not about what is enforced. */}
@@ -170,7 +183,7 @@ export function PermissionDialog({ node, isOpen, onClose }: PermissionDialogProp
             Preview only narrows what you see. The server re-checks every one of
             these on its own.
           </p>
-        </footer>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

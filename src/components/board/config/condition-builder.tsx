@@ -1,9 +1,13 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { ListboxOption } from "@/components/ui/listbox";
+import { MultiSelect, Select } from "@/components/ui/select";
 import { SelectField } from "@/components/ui/select-field";
+import { columnVisual } from "@/lib/board-visuals";
 import {
   conditionOperatorsFor,
   makeCondition,
@@ -37,6 +41,13 @@ interface ConditionBuilderProps {
   readonly onRemove?: () => void;
 }
 
+/**
+ * One step for every control in a condition row. The builder is nested inside
+ * a dialog that is already dense, and a row mixing 32px pickers with a 28px
+ * value field reads as two rows sharing a line.
+ */
+const CONTROL_SIZE = "sm" as const;
+
 let seed = 0;
 const nextId = (prefix: string): string => `${prefix}_${(seed += 1).toString(36)}`;
 
@@ -56,6 +67,21 @@ export function ConditionBuilder({
   onRemove,
 }: ConditionBuilderProps) {
   const isEmpty = group.conditions.length === 0 && group.groups.length === 0;
+
+  /**
+   * The type icon is the reason the field picker is not native: the operator
+   * list beside it changes with the column's type, and a list of bare names
+   * gives no warning that picking one will rewrite the operator.
+   */
+  const columnOptions = useMemo<readonly ListboxOption[]>(
+    () =>
+      columns.map((column) => ({
+        value: column.id,
+        label: column.name,
+        icon: columnVisual(column.type).Icon,
+      })),
+    [columns],
+  );
 
   function addCondition() {
     const column = columns[0];
@@ -111,11 +137,17 @@ export function ConditionBuilder({
                 onChange={(conjunction) => onChange({ ...group, conjunction })}
               />
 
-              <SelectField
+              <Select
                 aria-label="Field"
+                size={CONTROL_SIZE}
+                // A board carries dozens of columns and the native select this
+                // replaces had the platform's typeahead; the search field is
+                // what hands that back rather than dropping it.
+                isSearchable
+                options={columnOptions}
                 value={condition.columnId}
-                onChange={(event) => {
-                  const next = columns.find((item) => item.id === event.target.value);
+                onValueChange={(value) => {
+                  const next = columns.find((item) => item.id === value);
                   if (!next) return;
                   patch(condition.id, {
                     columnId: next.id,
@@ -125,16 +157,14 @@ export function ConditionBuilder({
                   });
                 }}
                 className="w-32 shrink-0"
-              >
-                {columns.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </SelectField>
+              />
 
+              {/* The operators are a plain list of words, so this one stays
+                  native: it keeps the platform's keyboard and adds no second
+                  portal inside a dialog that is already one. */}
               <SelectField
                 aria-label="Condition"
+                size={CONTROL_SIZE}
                 value={condition.operator}
                 onChange={(event) =>
                   patch(condition.id, { operator: event.target.value as ConditionOperator })
@@ -181,14 +211,14 @@ export function ConditionBuilder({
       ))}
 
       <div className="flex items-center gap-1">
-        <Button size="sm" variant="ghost" className="h-6 gap-1 px-1.5 text-body" onClick={addCondition}>
+        <Button size="xs" variant="ghost" className="gap-1" onClick={addCondition}>
           <Plus />
           Add condition
         </Button>
         {/* One level of nesting is enough for `A and (B or C)`; more is a
             workflow engine, which this deliberately is not. */}
         {depth === 0 && (
-          <Button size="sm" variant="ghost" className="h-6 gap-1 px-1.5 text-body" onClick={addGroup}>
+          <Button size="xs" variant="ghost" className="gap-1" onClick={addGroup}>
             <Plus />
             Add group
           </Button>
@@ -215,6 +245,7 @@ function Conjunction({
     return (
       <SelectField
         aria-label="Combine conditions"
+        size={CONTROL_SIZE}
         value={group.conjunction}
         onChange={(event) => onChange(event.target.value === "or" ? "or" : "and")}
         className="w-14 shrink-0"
@@ -249,48 +280,77 @@ function ConditionValue({ condition, column, people, onChange }: ConditionValueP
   }
 
   if (column.type === "select") {
-    const selected = arity === "list" ? (condition.values ?? []) : [condition.value];
+    // `isDisabled` is deliberately not carried onto these rows. It means "no
+    // longer offered for data entry", and a rule about a retired status is
+    // precisely how the records still holding one get caught.
+    const options: readonly ListboxOption[] = column.config.options.map((option) => ({
+      value: option.id,
+      label: option.label,
+      color: option.color,
+    }));
+
+    /**
+     * "Is any of" used to be a `<select multiple>` reading `selectedOptions`.
+     * That list had no affordance saying it took more than one — the gesture
+     * was ctrl-click — and on touch there is no ctrl to hold, which made this
+     * the one control in the app a phone could not operate. The stored shape
+     * is untouched: a `string[]` in `values`, with `value` still mirroring the
+     * first entry for the evaluator that reads single-value operators.
+     */
+    if (arity === "list") {
+      return (
+        <MultiSelect
+          aria-label="Value"
+          size={CONTROL_SIZE}
+          placeholder="Choose…"
+          options={options}
+          values={condition.values ?? []}
+          onValuesChange={(values) => onChange({ values, value: values[0] ?? "" })}
+          className="min-w-0 flex-1"
+        />
+      );
+    }
 
     return (
-      <SelectField
-        multiple={arity === "list"}
+      <Select
         aria-label="Value"
-        value={arity === "list" ? [...selected] : condition.value}
-        onChange={(event) => {
-          const picked = [...event.target.selectedOptions].map((option) => option.value);
-          onChange(
-            arity === "list"
-              ? { values: picked, value: picked[0] ?? "" }
-              : { value: event.target.value, values: [] },
-          );
-        }}
-        className={cn("min-w-0 flex-1", arity === "list" && "h-16")}
-      >
-        {arity === "single" && <option value="">Choose…</option>}
-        {column.config.options.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.label}
-          </option>
-        ))}
-      </SelectField>
+        size={CONTROL_SIZE}
+        isSearchable
+        // "Choose…" used to be a real <option>, and picking it wrote "" back.
+        // The placeholder plus the clear button are those same two states.
+        isClearable
+        placeholder="Choose…"
+        options={options}
+        value={condition.value === "" ? null : condition.value}
+        onValueChange={(value) => onChange({ value: value ?? "", values: [] })}
+        className="min-w-0 flex-1"
+      />
     );
   }
 
   if (column.type === "user") {
     return (
-      <SelectField
+      <Select
         aria-label="Value"
-        value={condition.value}
-        onChange={(event) => onChange({ value: event.target.value })}
+        size={CONTROL_SIZE}
+        isSearchable
+        isClearable
+        placeholder="Choose…"
+        options={people.map((person) => ({
+          value: person.id,
+          // The inactive marker stays in the label rather than moving to a
+          // description, because the trigger only ever shows the label and a
+          // rule pointed at a departed teammate should say so on its face.
+          label: person.isActive ? person.name : `${person.name} (inactive)`,
+          // Empty rather than undefined: the visual branches on
+        // presence, and an absent url would drop the row to no
+        // glyph at all instead of falling back to initials.
+        avatarUrl: person.avatarUrl ?? "",
+        }))}
+        value={condition.value === "" ? null : condition.value}
+        onValueChange={(value) => onChange({ value: value ?? "" })}
         className="min-w-0 flex-1"
-      >
-        <option value="">Choose…</option>
-        {people.map((person) => (
-          <option key={person.id} value={person.id}>
-            {person.isActive ? person.name : `${person.name} (inactive)`}
-          </option>
-        ))}
-      </SelectField>
+      />
     );
   }
 
@@ -298,10 +358,11 @@ function ConditionValue({ condition, column, people, onChange }: ConditionValueP
     <Input
       type={column.type === "date" ? "date" : "text"}
       aria-label="Value"
+      size={CONTROL_SIZE}
       value={condition.value}
       placeholder="Value"
       onChange={(event) => onChange({ value: event.target.value })}
-      className="h-7 min-w-0 flex-1 text-ui"
+      className="min-w-0 flex-1"
     />
   );
 }

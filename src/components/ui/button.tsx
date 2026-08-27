@@ -85,6 +85,15 @@ export function Button({
   return (
     <Comp
       data-slot="button"
+      /**
+       * A <button> inside a <form> defaults to type="submit", so a button that
+       * meant to do something else silently submits the form instead. Raw
+       * elements in this app all wrote `type="button"` by hand; the component
+       * that replaced them has to keep the default it inherits from them.
+       * `asChild` skips it — Slot forwards to whatever the consumer rendered,
+       * and forcing a type onto an <a> is nonsense.
+       */
+      {...(asChild ? {} : { type: "button" as const })}
       data-loading={isLoading ? "" : undefined}
       aria-busy={isLoading || undefined}
       disabled={disabled || isLoading}

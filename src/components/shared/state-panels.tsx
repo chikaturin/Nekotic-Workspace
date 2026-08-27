@@ -2,9 +2,10 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { LoaderCircle, RotateCcw, ShieldAlert, TriangleAlert, type LucideIcon } from "lucide-react";
+import { RotateCcw, ShieldAlert, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import type { AppError } from "@/types";
 
@@ -15,11 +16,41 @@ interface StatePanelAction {
   readonly onClick?: () => void;
 }
 
+/**
+ * How much the panel is claiming.
+ *
+ * `neutral` is "there is nothing here yet", which is the ordinary state of an
+ * empty list and should not be dressed up as a fault. `danger` is "something
+ * failed". `warning` is the step between them that was missing: the request
+ * worked and the answer is unwelcome — a path that no longer resolves — which
+ * a red panel overstates and a grey one understates, leaving the caution icon
+ * sitting in chrome that disagrees with it.
+ */
+export type StatePanelTone = "neutral" | "warning" | "danger";
+
+/*
+ * Built the same way as the badge ramp — a tenth of the colour behind it, a
+ * third of it on the border, the colour itself on the glyph — so a state panel
+ * and a status badge on the same screen read as one family, and a fourth tone
+ * is two lines rather than a design decision.
+ */
+const TONE_FRAME: Record<StatePanelTone, string> = {
+  neutral: "border-border bg-surface",
+  warning: "border-warning/30 bg-warning/10",
+  danger: "border-danger/30 bg-danger/10",
+};
+
+const TONE_GLYPH: Record<StatePanelTone, string> = {
+  neutral: "text-faint-foreground",
+  warning: "text-warning",
+  danger: "text-danger",
+};
+
 interface StatePanelProps {
   readonly icon: LucideIcon;
   readonly title: string;
   readonly description: string;
-  readonly tone?: "neutral" | "danger";
+  readonly tone?: StatePanelTone;
   readonly action?: StatePanelAction;
   readonly className?: string;
   /** Retry is the common case, so the icon is opt-out rather than opt-in. */
@@ -47,20 +78,26 @@ export function StatePanel({
         className,
       )}
     >
+      {/* `shadow-raise` is the shallowest step on the elevation ladder and is
+          what stops the frame reading as a hole in the canvas: it is the same
+          lift a button carries, which is the note this glyph wants — present,
+          not floating. */}
       <span
+        aria-hidden="true"
         className={cn(
-          "flex size-12 items-center justify-center rounded-xl border",
-          tone === "danger" ? "border-danger/30 bg-danger/10" : "border-border bg-surface",
+          "flex size-12 items-center justify-center rounded-xl border shadow-raise",
+          TONE_FRAME[tone],
         )}
       >
-        <Icon
-          className={cn("size-5", tone === "danger" ? "text-danger" : "text-faint-foreground")}
-          strokeWidth={1.5}
-        />
+        <Icon className={cn("size-5", TONE_GLYPH[tone])} strokeWidth={1.5} />
       </span>
 
       <div className="space-y-1">
-        <p className="text-lead font-medium text-foreground">{title}</p>
+        {/* The title is the section heading for whatever is missing, so it
+            takes the title step rather than sharing the body step with the
+            sentence under it — with both at 13px the only thing separating
+            them was the font weight. */}
+        <p className="text-title font-semibold text-foreground">{title}</p>
         <p className="mx-auto max-w-sm text-lead text-muted-foreground">{description}</p>
       </div>
 
@@ -70,7 +107,7 @@ export function StatePanel({
             <Link href={action.href}>{action.label}</Link>
           </Button>
         ) : (
-          <Button variant="outline" size="sm" onClick={action.onClick} className="gap-1.5">
+          <Button variant="outline" size="sm" onClick={action.onClick}>
             {hasActionIcon && <RotateCcw />}
             {action.label}
           </Button>
@@ -104,7 +141,10 @@ export function PermissionDeniedState({ error }: { error: AppError }) {
 export function InlineSpinner({ label }: { label: string }) {
   return (
     <span className="flex items-center gap-1.5 text-body text-muted-foreground">
-      <LoaderCircle className="size-3 animate-spin" />
+      {/* The label is right there in the markup, so the spinner stays silent
+          rather than announcing the same word a second time as its own live
+          region. */}
+      <Spinner size="sm" />
       {label}
     </span>
   );

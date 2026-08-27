@@ -3,7 +3,10 @@
 import { Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
+import type { ListboxOption } from "@/components/ui/listbox";
+import { Select } from "@/components/ui/select";
 import { SelectField } from "@/components/ui/select-field";
 import { resolveOptionAvailability } from "@/lib/select-availability";
 import type { BoardColumn, CellValue, DirectoryUser } from "@/types";
@@ -26,6 +29,11 @@ interface SubtaskComposerProps {
  * A new subtask is a full record, so the status list is offered from the
  * column's own options with the availability rules already applied; a status a
  * rule forbids is never on the menu here either.
+ *
+ * The four controls all sit on the 28px step of the control ladder. They used
+ * to be three heights — the inputs were pinned to h-7 by hand and the two
+ * selects were left at the 32px default — which is what a row of controls
+ * looks like when each one picks its own size.
  */
 export function SubtaskComposer({
   columns,
@@ -62,6 +70,24 @@ export function SubtaskComposer({
       }).filter((entry) => entry.isAvailable)
     : [];
 
+  /**
+   * People, with their faces. A `<option>` can hold a name and nothing else,
+   * which is why picking an owner here used to look nothing like picking one
+   * in the grid.
+   */
+  const assigneeOptions: readonly ListboxOption[] = people.map((person) => ({
+    value: person.id,
+    // The marker stays inside the label rather than moving to the description
+    // slot, because the trigger renders the label alone: someone who has left
+    // the workspace has to still say so after the popover has closed.
+    label: person.isActive ? person.name : `${person.name} (inactive)`,
+    // Nobody in the directory carries a photo, and an absent `avatarUrl` skips
+    // the avatar branch entirely — the row would draw no visual at all. An
+    // empty src is reported as a load error, which is what puts the initials
+    // in the circle.
+    avatarUrl: person.avatarUrl ?? "",
+  }));
+
   async function submit() {
     const trimmed = title.trim();
     if (trimmed.length === 0 || isSaving) return;
@@ -93,6 +119,7 @@ export function SubtaskComposer({
       <div className="flex items-center gap-1.5">
         <Input
           ref={inputRef}
+          size="sm"
           value={title}
           placeholder="Subtask title"
           aria-label="Subtask title"
@@ -108,21 +135,17 @@ export function SubtaskComposer({
               onCancel();
             }
           }}
-          className="h-7 flex-1 text-ui"
+          className="flex-1"
         />
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          aria-label="Cancel adding a subtask"
-          onClick={onCancel}
-        >
+        <IconButton variant="ghost" aria-label="Cancel adding a subtask" onClick={onCancel}>
           <X />
-        </Button>
+        </IconButton>
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
         {statusColumn && (
           <SelectField
+            size="sm"
             aria-label={statusColumn.name}
             value={optionId}
             onChange={(event) => setOptionId(event.target.value)}
@@ -138,28 +161,32 @@ export function SubtaskComposer({
         )}
 
         {userColumn && (
-          <SelectField
+          <Select
+            size="sm"
             aria-label={userColumn.name}
-            value={assigneeId}
-            onChange={(event) => setAssigneeId(event.target.value)}
+            options={assigneeOptions}
+            // The state stays a string so `submit` is untouched; the empty
+            // string and null are the same "nobody yet" on either side of it.
+            value={assigneeId === "" ? null : assigneeId}
+            onValueChange={(next) => setAssigneeId(next ?? "")}
+            placeholder={`${userColumn.name}…`}
+            // What the native select's blank first option used to do: take an
+            // owner back off a subtask that has not been created yet.
+            isClearable
             className="min-w-0 flex-1"
-          >
-            <option value="">{userColumn.name}…</option>
-            {people.map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.isActive ? person.name : `${person.name} (inactive)`}
-              </option>
-            ))}
-          </SelectField>
+          />
         )}
 
         {dateColumn && (
+          /* Native on purpose: no date library is installed, and the platform
+             picker is better than a text field pretending to be one. */
           <Input
             type="date"
+            size="sm"
             aria-label={dateColumn.name}
             value={due}
             onChange={(event) => setDue(event.target.value)}
-            className="h-7 min-w-0 flex-1 text-ui"
+            className="min-w-0 flex-1"
           />
         )}
 
@@ -168,7 +195,6 @@ export function SubtaskComposer({
           variant="default"
           disabled={title.trim().length === 0 || isSaving}
           onClick={() => void submit()}
-          className="h-7 gap-1.5 px-2 text-body"
         >
           <Plus />
           Add

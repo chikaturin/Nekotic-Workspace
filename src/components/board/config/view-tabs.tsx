@@ -15,6 +15,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import type { BoardViewModel } from "@/hooks/use-board-view";
 import { VIEW_TYPE_LABELS, viewVisual } from "@/lib/board-visuals";
@@ -30,6 +31,14 @@ const VIEW_TYPES: readonly BoardViewType[] = ["table", "kanban", "calendar", "ga
  * Switching a tab changes which configuration the shared query runs — it never
  * loads or copies a record. That is the whole point of keeping views separate
  * from the board.
+ *
+ * These are hand-built rather than `<Tabs>` because a tab here is not only a
+ * tab: it turns into a text field on a double-click and it carries a menu that
+ * renames, duplicates, retypes and deletes the view. `TabsTrigger` is a single
+ * button and would have to lose one of those to fit. What the strip was
+ * missing was the semantics, not the component — no `role`, so a screen reader
+ * read a row of unrelated buttons and never said which view was open — and
+ * those are spelled out below.
  */
 /**
  * Creating, renaming and deleting a saved view changes what the whole team
@@ -45,18 +54,31 @@ export function ViewTabs({ model, can }: { model: BoardViewModel; can: Permissio
 
   return (
     <div className="flex items-center gap-1 overflow-x-auto px-3">
-      {board?.views.map((saved) => (
-        <ViewTab
-          key={saved.id}
-          view={saved}
-          isActive={saved.id === view?.id}
-          isRenaming={renamingId === saved.id}
-          canManage={canManage}
-          onSelect={() => setActiveView(saved.id)}
-          onRenameStart={() => setRenamingId(saved.id)}
-          onRenameEnd={() => setRenamingId(null)}
-        />
-      ))}
+      {/*
+        A toolbar, not a tablist.
+        A tablist may own nothing but tabs, and every entry here carries an
+        options menu beside the tab, and a text field instead of it while a
+        rename is in flight — so the roles would announce a mixture of tabs,
+        buttons and a textbox as siblings, and the strip would momentarily
+        contain no selected tab at all. `role="toolbar"` with `aria-current`
+        on the active entry describes what this actually is: a row of controls
+        where one is the place you are. Nothing is lost — these were plain
+        buttons with no roles before.
+      */}
+      <div role="toolbar" aria-label="Saved views" className="flex shrink-0 items-center gap-1">
+        {board?.views.map((saved) => (
+          <ViewTab
+            key={saved.id}
+            view={saved}
+            isActive={saved.id === view?.id}
+            isRenaming={renamingId === saved.id}
+            canManage={canManage}
+            onSelect={() => setActiveView(saved.id)}
+            onRenameStart={() => setRenamingId(saved.id)}
+            onRenameEnd={() => setRenamingId(null)}
+          />
+        ))}
+      </div>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -127,6 +149,10 @@ function ViewTab({
     .join(" · ");
 
   return (
+    // `presentation` makes this wrapper transparent to the tablist above, so
+    // The box holds the switch control, the menu trigger, and — while a rename
+    // is in flight — a text field, so it is a group of controls rather than
+    // any one of them.
     <div
       className={cn(
         "flex shrink-0 items-center gap-1 rounded-t-md border-b-2 px-2 py-1.5 transition-colors",
@@ -139,6 +165,7 @@ function ViewTab({
 
       {isRenaming ? (
         <Input
+          size="xs"
           value={draft}
           autoFocus
           aria-label="View name"
@@ -154,16 +181,23 @@ function ViewTab({
               onRenameEnd();
             }
           }}
-          className="h-6 w-28 text-ui"
+          // The 24px step is the tab's own height; the type step is the tab
+          // label's, so the name does not resize the moment you start editing it.
+          className="w-28 text-ui"
         />
       ) : (
+        // Every tab keeps its own tab stop rather than a roving one. A roving
+        // tabindex needs arrow keys to reach the tabs it takes out of the
+        // order, and an arrow-key handler on this strip would swallow the
+        // cursor keys of the rename field living inside it.
         <button
           type="button"
+          aria-current={isActive ? "page" : undefined}
           onClick={onSelect}
           onDoubleClick={() => canManage && onRenameStart()}
           className={cn(
             "flex items-baseline gap-1.5 text-ui",
-            isActive ? "text-foreground" : "text-muted-foreground",
+            isActive ? "font-medium text-foreground" : "text-muted-foreground",
           )}
         >
           {view.name}
@@ -175,13 +209,16 @@ function ViewTab({
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
-            type="button"
+          {/* Sized below the control ladder on purpose: this is an affordance
+              inside a tab, not a control beside one, and the smallest rung
+              would be taller than the tab it sits in. */}
+          <IconButton
+            variant="ghost"
             aria-label={`${view.name} view options`}
-            className="flex size-4 items-center justify-center rounded text-faint-foreground hover:text-foreground"
+            className="size-4 rounded text-faint-foreground [&_svg]:size-3"
           >
-            <MoreHorizontal className="size-3" />
-          </button>
+            <MoreHorizontal />
+          </IconButton>
         </DropdownMenuTrigger>
 
         <DropdownMenuContent align="start" className="w-52">

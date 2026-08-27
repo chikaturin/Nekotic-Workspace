@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Minus } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ROLE_LABELS, ROLE_SUMMARIES, permissionsByModule, roleHas } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { WORKSPACE_ROLES, type WorkspaceRole } from "@/types";
@@ -23,13 +24,31 @@ export function RoleMatrix({ highlight }: { highlight?: WorkspaceRole | null }) 
               <th
                 key={role}
                 scope="col"
-                title={ROLE_SUMMARIES[role]}
                 className={cn(
                   "px-2 py-2 text-center font-medium",
                   role === highlight ? "text-accent" : "text-muted-foreground",
                 )}
               >
-                {ROLE_LABELS[role]}
+                {/* The summary used to ride on the native `title`, which never
+                    appears for a keyboard or a touch user and cannot be styled
+                    to match the hint on every other explanation in this dialog.
+                    The trigger is a span rather than the cell itself so the
+                    hover target is the word, not the whole column head. */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    {/* Focusable, or the tooltip is mouse-only — Radix merges
+                        its handlers onto the child but never makes one
+                        focusable, and `onFocus` on a bare span never fires.
+                        The `title` this replaced was at least read out. */}
+                    <span
+                      tabIndex={0}
+                      className="inline-flex rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {ROLE_LABELS[role]}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-56">{ROLE_SUMMARIES[role]}</TooltipContent>
+                </Tooltip>
               </th>
             ))}
           </tr>

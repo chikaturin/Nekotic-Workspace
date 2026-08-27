@@ -1,12 +1,20 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, LoaderCircle, Upload } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Upload } from "lucide-react";
 import { ImportMappingStep } from "@/components/board/import/import-mapping-step";
 import { ImportResultStep } from "@/components/board/import/import-result-step";
 import { ImportUploadStep } from "@/components/board/import/import-upload-step";
 import { ImportValidationStep } from "@/components/board/import/import-validation-step";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { BoardViewModel } from "@/hooks/use-board-view";
 import { useImportWizard } from "@/hooks/use-import-wizard";
 import { cn } from "@/lib/utils";
@@ -43,13 +51,13 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-      <DialogContent className="flex max-h-[86vh] max-w-4xl flex-col p-0">
-        <header className="shrink-0 border-b border-border px-5 py-4 pr-12">
-          <DialogTitle className="flex items-center gap-2 text-lead font-semibold text-foreground">
+      <DialogContent size="2xl" className="flex max-h-[86vh] flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
             <Upload className="size-4 text-accent" />
             Import into {model.board?.name ?? "this board"}
           </DialogTitle>
-          <DialogDescription className="mt-1 text-ui text-muted-foreground">
+          <DialogDescription>
             Nothing is written to the board until you confirm on the last step.
           </DialogDescription>
 
@@ -79,9 +87,11 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
               </li>
             ))}
           </ol>
-        </header>
+        </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        {/* `inline` because every step pads itself — the body only has to be
+            the part of the card that scrolls. */}
+        <DialogBody variant="inline">
           {wizard.step === "upload" && (
             <ImportUploadStep
               error={wizard.error}
@@ -113,23 +123,18 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
           {wizard.step === "result" && wizard.outcome && (
             <ImportResultStep outcome={wizard.outcome} />
           )}
-        </div>
+        </DialogBody>
 
-        <footer className="flex shrink-0 items-center gap-2 border-t border-border px-5 py-3">
+        <DialogFooter align="start">
           {wizard.step === "mapping" && (
-            <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => wizard.reset()}>
+            <Button size="sm" variant="ghost" onClick={() => wizard.reset()}>
               <ArrowLeft />
               Choose another file
             </Button>
           )}
 
           {wizard.step === "validation" && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="gap-1.5"
-              onClick={() => wizard.goTo("mapping")}
-            >
+            <Button size="sm" variant="ghost" onClick={() => wizard.goTo("mapping")}>
               <ArrowLeft />
               Back to mapping
             </Button>
@@ -144,7 +149,6 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
               <Button
                 size="sm"
                 variant="default"
-                className="gap-1.5"
                 disabled={(wizard.plan?.mappedColumnCount ?? 0) === 0}
                 title={
                   (wizard.plan?.mappedColumnCount ?? 0) === 0
@@ -162,11 +166,13 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
               <Button
                 size="sm"
                 variant="default"
-                className="gap-1.5"
-                disabled={wizard.isBusy}
+                // `isLoading` blocks the click and swaps the leading check for
+                // the spinner, which is the pair of things the hand-rolled
+                // version did with a ternary and a separate `disabled`.
+                isLoading={wizard.isBusy}
                 onClick={() => void wizard.confirm()}
               >
-                {wizard.isBusy ? <LoaderCircle className="animate-spin" /> : <Check />}
+                <Check />
                 Import{" "}
                 {wizard.policy === "skip"
                   ? wizard.plan.validCount
@@ -175,7 +181,7 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
               </Button>
             )}
           </span>
-        </footer>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

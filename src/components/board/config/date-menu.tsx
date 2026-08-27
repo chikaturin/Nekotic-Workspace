@@ -7,6 +7,13 @@ import { SelectField } from "@/components/ui/select-field";
 import type { BoardViewModel } from "@/hooks/use-board-view";
 import { useBoardStore } from "@/store/board-store";
 
+/**
+ * One step for both pickers, matching the other menus on this bar. Every
+ * option here is a date column, so there is nothing an icon or a swatch could
+ * add — this stays a native select and keeps the platform's keyboard.
+ */
+const CONTROL_SIZE = "sm" as const;
+
 /** Which date columns the calendar and the timeline anchor on. */
 export function DateMenu({ model }: { model: BoardViewModel }) {
   const { view, columns } = model;
@@ -31,6 +38,7 @@ export function DateMenu({ model }: { model: BoardViewModel }) {
             {isTimeline ? "Start" : "Date"}
           </span>
           <SelectField
+            size={CONTROL_SIZE}
             value={view?.dateColumnId ?? ""}
             onChange={(event) => void setDateColumn(event.target.value || null)}
             className="min-w-0 flex-1"
@@ -48,6 +56,7 @@ export function DateMenu({ model }: { model: BoardViewModel }) {
           <label className="flex items-center gap-2 px-1 py-1">
             <span className="w-16 shrink-0 text-body text-muted-foreground">End</span>
             <SelectField
+              size={CONTROL_SIZE}
               value={view?.endDateColumnId ?? ""}
               onChange={(event) => void setEndDateColumn(event.target.value || null)}
               className="min-w-0 flex-1"

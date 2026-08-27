@@ -1,7 +1,9 @@
 "use client";
 
 import { GanttChartSquare } from "lucide-react";
-import { SelectField } from "@/components/ui/select-field";
+import { FormField } from "@/components/ui/field";
+import type { ListboxOption } from "@/components/ui/listbox";
+import { Select } from "@/components/ui/select";
 import { useBoardStore } from "@/store/board-store";
 import type { BoardColumn } from "@/types";
 
@@ -10,6 +12,15 @@ interface GanttSetupProps {
   readonly startColumnId: string | null;
   readonly endColumnId: string | null;
 }
+
+/**
+ * The row that puts a picker back to "no column chosen".
+ *
+ * It stays an offered option rather than becoming the Select's clear button:
+ * unsetting a date column is a normal thing to do here, and a row in the list
+ * says so where a small × in the corner of the trigger only hints at it.
+ */
+const NOT_SET_OPTION: ListboxOption = { value: "", label: "Not set" };
 
 /**
  * What the Gantt shows before it can show anything.
@@ -23,6 +34,11 @@ export function GanttSetup({ columns, startColumnId, endColumnId }: GanttSetupPr
   const setDateColumn = useBoardStore((state) => state.setDateColumn);
   const setEndDateColumn = useBoardStore((state) => state.setEndDateColumn);
   const dateColumns = columns.filter((column) => column.type === "date");
+
+  const dateOptions: readonly ListboxOption[] = [
+    NOT_SET_OPTION,
+    ...dateColumns.map((column) => ({ value: column.id, label: column.name })),
+  ];
 
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center p-6">
@@ -40,39 +56,37 @@ export function GanttSetup({ columns, startColumnId, endColumnId }: GanttSetupPr
 
         {dateColumns.length > 0 && (
           <div className="mt-4 space-y-2 text-left">
-            <label className="block">
-              <span className="mb-1 block text-body text-muted-foreground">Start date</span>
-              <SelectField
-                aria-label="Start date column"
-                value={startColumnId ?? ""}
-                onChange={(event) => void setDateColumn(event.target.value || null)}
-                className="w-full"
-              >
-                <option value="">Not set</option>
-                {dateColumns.map((column) => (
-                  <option key={column.id} value={column.id}>
-                    {column.name}
-                  </option>
-                ))}
-              </SelectField>
-            </label>
+            {/* Each picker keeps its own `aria-label`. `FormField` gives the
+                caption an `htmlFor`, but a Select's trigger is a
+                `role="combobox"` div rather than a labelable element, so the
+                label alone would not name the control. */}
+            <FormField label="Start date">
+              {(field) => (
+                <Select
+                  id={field.id}
+                  aria-describedby={field["aria-describedby"]}
+                  aria-label="Start date column"
+                  options={dateOptions}
+                  value={startColumnId ?? ""}
+                  onValueChange={(value) => void setDateColumn(value || null)}
+                  className="w-full"
+                />
+              )}
+            </FormField>
 
-            <label className="block">
-              <span className="mb-1 block text-body text-muted-foreground">End date</span>
-              <SelectField
-                aria-label="End date column"
-                value={endColumnId ?? ""}
-                onChange={(event) => void setEndDateColumn(event.target.value || null)}
-                className="w-full"
-              >
-                <option value="">Not set</option>
-                {dateColumns.map((column) => (
-                  <option key={column.id} value={column.id}>
-                    {column.name}
-                  </option>
-                ))}
-              </SelectField>
-            </label>
+            <FormField label="End date">
+              {(field) => (
+                <Select
+                  id={field.id}
+                  aria-describedby={field["aria-describedby"]}
+                  aria-label="End date column"
+                  options={dateOptions}
+                  value={endColumnId ?? ""}
+                  onValueChange={(value) => void setEndDateColumn(value || null)}
+                  className="w-full"
+                />
+              )}
+            </FormField>
           </div>
         )}
       </div>

@@ -6,11 +6,16 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FormField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { DRIVE_ROOT_PATH } from "@/config/app";
 import {
   badgeFor,
@@ -68,72 +73,75 @@ export function CreateWorkspaceDialog({ isOpen, onClose }: CreateWorkspaceDialog
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-      <DialogContent className="max-w-md p-5">
-        <DialogTitle className="text-title">Create workspace</DialogTitle>
-        <DialogDescription className="mt-1 text-ui text-muted-foreground">
-          A workspace holds its own drive, its own people and its own permissions.
-          Nothing is shared with the ones you are already in.
-        </DialogDescription>
+      <DialogContent size="md" className="flex max-h-[85vh] flex-col">
+        <DialogHeader>
+          <DialogTitle>Create workspace</DialogTitle>
+          <DialogDescription>
+            A workspace holds its own drive, its own people and its own permissions.
+            Nothing is shared with the ones you are already in.
+          </DialogDescription>
+        </DialogHeader>
 
+        {/* The form wraps the action row as well as the fields, because the
+            submit button is in the footer: pressing Enter in the name field
+            has always created the workspace, and a footer outside the form
+            would quietly turn that into a no-op. */}
         <form
-          className="mt-4 space-y-3"
+          className="flex min-h-0 flex-1 flex-col"
           onSubmit={(event) => {
             event.preventDefault();
             submit();
           }}
         >
-          <label className="block">
-            <span className="mb-1 block text-body font-medium text-muted-foreground">
-              Workspace name <span className="text-danger">*</span>
-            </span>
-            <Input
-              value={name}
-              autoFocus
-              maxLength={WORKSPACE_NAME_MAX}
-              placeholder="NexDrop Development"
-              aria-label="Workspace name"
-              aria-invalid={error !== null}
-              onChange={(event) => {
-                setName(event.target.value);
-                setError(null);
-              }}
-            />
-          </label>
+          <DialogBody className="space-y-3">
+            {/* The only thing that can fail validation is the name, so the
+                refusal is rendered against that field rather than as a loose
+                sentence at the bottom — which is also what puts the field
+                itself into its invalid state. */}
+            <FormField label="Workspace name" error={error} isRequired>
+              {(field) => (
+                <Input
+                  {...field}
+                  value={name}
+                  autoFocus
+                  maxLength={WORKSPACE_NAME_MAX}
+                  placeholder="NexDrop Development"
+                  onChange={(event) => {
+                    setName(event.target.value);
+                    setError(null);
+                  }}
+                />
+              )}
+            </FormField>
 
-          <label className="block">
-            <span className="mb-1 block text-body font-medium text-muted-foreground">
-              Description
-            </span>
-            <textarea
-              value={description}
-              rows={3}
-              maxLength={WORKSPACE_DESCRIPTION_MAX}
-              placeholder="Development workspace for NexDrop products."
-              aria-label="Workspace description"
-              onChange={(event) => setDescription(event.target.value)}
-              className="w-full resize-none rounded-md border border-border bg-surface px-2 py-1.5 text-ui text-foreground outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          </label>
+            <FormField label="Description">
+              {(field) => (
+                <Textarea
+                  {...field}
+                  value={description}
+                  rows={3}
+                  maxLength={WORKSPACE_DESCRIPTION_MAX}
+                  showCount
+                  placeholder="Development workspace for NexDrop products."
+                  onChange={(event) => setDescription(event.target.value)}
+                />
+              )}
+            </FormField>
 
-          <div className="flex items-center gap-2 rounded-md border border-hairline bg-surface px-2.5 py-2">
-            <span
-              className="metric flex size-7 shrink-0 items-center justify-center rounded-md bg-accent-soft text-body font-bold text-accent"
-              aria-hidden
-            >
-              {badgeFor(name || "Workspace")}
-            </span>
-            <span className="text-body text-faint-foreground">
-              The tile the switcher shows. Taken from the name.
-            </span>
-          </div>
+            <div className="flex items-center gap-2 rounded-md border border-hairline bg-surface px-2.5 py-2">
+              <span
+                className="metric flex size-7 shrink-0 items-center justify-center rounded-md bg-accent-soft text-body font-bold text-accent"
+                aria-hidden
+              >
+                {badgeFor(name || "Workspace")}
+              </span>
+              <span className="text-body text-faint-foreground">
+                The tile the switcher shows. Taken from the name.
+              </span>
+            </div>
+          </DialogBody>
 
-          {error && (
-            <p role="alert" className="text-body text-danger">
-              {error}
-            </p>
-          )}
-
-          <div className="flex justify-end gap-2 pt-1">
+          <DialogFooter>
             <Button type="button" size="sm" variant="ghost" onClick={close}>
               Cancel
             </Button>
@@ -141,7 +149,7 @@ export function CreateWorkspaceDialog({ isOpen, onClose }: CreateWorkspaceDialog
               <Plus />
               Create workspace
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

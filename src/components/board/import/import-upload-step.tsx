@@ -1,8 +1,9 @@
 "use client";
 
-import { CircleAlert, FileSpreadsheet, LoaderCircle } from "lucide-react";
+import { CircleAlert, FileSpreadsheet } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { IMPORT_MAX_ROWS } from "@/config/app";
 import { hasExternalFiles, readDroppedFiles } from "@/lib/dnd";
 import { cn } from "@/lib/utils";
@@ -52,8 +53,11 @@ export function ImportUploadStep({ error, isBusy, onFile }: ImportUploadStepProp
             isOver ? "bg-accent text-accent-foreground" : "bg-hover text-muted-foreground",
           )}
         >
+          {/* No `label` on the spinner: the line underneath already changes to
+              "Reading the file…", and announcing the same fact twice is noise
+              rather than access. */}
           {isBusy ? (
-            <LoaderCircle className="size-6 animate-spin" />
+            <Spinner size="lg" />
           ) : (
             <FileSpreadsheet className="size-6" strokeWidth={1.5} />
           )}

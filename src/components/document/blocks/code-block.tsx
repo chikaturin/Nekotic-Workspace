@@ -2,8 +2,8 @@
 
 import { Check, Copy } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { SelectField } from "@/components/ui/select-field";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import type { CodeBlock as CodeBlockModel, CodeLanguage } from "@/types";
 
 const LANGUAGES: readonly CodeLanguage[] = [
@@ -90,22 +90,26 @@ export function CodeBlock({
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-surface">
       <div className="flex items-center gap-2 border-b border-hairline px-2 py-1.5">
-        <select
+        {/* Ghost, because the code block already draws its own frame and a
+            second bordered box inside the chrome bar reads as a field where
+            there is only a label. The `metric` face is the block's, not the
+            control's — a language name belongs in the same face as the code
+            underneath it. */}
+        <SelectField
+          variant="ghost"
+          size="xs"
           value={block.language}
           disabled={!isEditable}
           onChange={(event) => onLanguageChange(event.target.value as CodeLanguage)}
           aria-label="Code language"
-          className={cn(
-            "metric h-6 rounded border border-transparent bg-transparent px-1 text-[11px] text-muted-foreground outline-none",
-            "hover:border-border focus-visible:border-accent disabled:cursor-default",
-          )}
+          className="metric text-muted-foreground"
         >
           {LANGUAGES.map((language) => (
             <option key={language} value={language}>
               {language}
             </option>
           ))}
-        </select>
+        </SelectField>
 
         <Button size="icon-sm" variant="ghost" className="ml-auto" onClick={copy} aria-label="Copy code">
           {isCopied ? <Check className="text-success" /> : <Copy />}

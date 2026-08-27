@@ -2,7 +2,15 @@
 
 import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ConfirmDialogProps {
   readonly isOpen: boolean;
@@ -20,6 +28,12 @@ interface ConfirmDialogProps {
  * The one confirmation surface. Irreversible actions — purging from Trash,
  * deleting records outright — go through it so the wording, the focus order
  * and the escape hatch are the same wherever they are asked for.
+ *
+ * The card is the dialog's three bands rather than a hand-measured `p-5` block:
+ * a question, its consequence, and the two answers, each in the section that
+ * owns its padding. `size="sm"` is the narrow step of the width ladder, which
+ * is what a two-button question wants — a wider card sets the description in a
+ * single long line and pushes the answers away from the reading eye.
  */
 export function ConfirmDialog({
   isOpen,
@@ -33,35 +47,46 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md p-5">
-        <div className="flex gap-3">
+      <DialogContent size="sm" className="flex max-h-[85vh] flex-col">
+        <DialogHeader size="sm" className="flex items-center gap-3 space-y-0">
           {isDestructive && (
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-danger/10">
+            // Decorative: the title says what is about to happen, and a reader
+            // announcing "warning" ahead of it adds nothing it does not
+            // already carry.
+            <span
+              aria-hidden="true"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-danger/10"
+            >
               <TriangleAlert className="size-4 text-danger" />
             </span>
           )}
+          <DialogTitle className="min-w-0 flex-1">{title}</DialogTitle>
+        </DialogHeader>
 
-          <div className="min-w-0 flex-1">
-            <DialogTitle className="text-lead font-semibold text-foreground">{title}</DialogTitle>
-            <DialogDescription className="mt-1 text-ui leading-relaxed text-muted-foreground">
-              {description}
-            </DialogDescription>
-          </div>
-        </div>
+        <DialogBody size="sm">
+          <DialogDescription className="leading-relaxed">{description}</DialogDescription>
+        </DialogBody>
 
-        <div className="mt-5 flex justify-end gap-2">
+        <DialogFooter size="sm">
           <Button size="sm" variant="outline" onClick={onClose}>
             Cancel
           </Button>
+          {/*
+            `isLoading` rather than a swap to "Working…": the label has to stay
+            put while the work runs, because a button that changes width under
+            a pointer already resting on it is how a second confirmation lands
+            on whatever slid into that spot. It disables the button too, so the
+            click is still blocked exactly as it was.
+          */}
           <Button
             size="sm"
             variant={isDestructive ? "danger" : "default"}
-            disabled={isBusy}
+            isLoading={isBusy}
             onClick={onConfirm}
           >
-            {isBusy ? "Working…" : confirmLabel}
+            {confirmLabel}
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

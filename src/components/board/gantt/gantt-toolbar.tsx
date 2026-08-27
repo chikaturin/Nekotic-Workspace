@@ -1,7 +1,10 @@
 "use client";
 
-import { CalendarClock, GitBranch, Link2Off } from "lucide-react";
+import { CalendarClock, GitBranch } from "lucide-react";
+import { useId } from "react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TIMELINE_ZOOMS, ZOOM_LABELS } from "@/lib/board-timeline";
 import { cn } from "@/lib/utils";
 import type { GanttZoom } from "@/types";
@@ -15,6 +18,15 @@ interface GanttToolbarProps {
   readonly linkCount: number;
   readonly onToday: () => void;
   readonly summary: string;
+}
+
+/**
+ * A segmented control speaks in plain strings, because it has no idea what its
+ * values mean. This is how one becomes a zoom again without a cast, and it is
+ * why a value the timeline does not recognise never reaches the store.
+ */
+function isGanttZoom(value: string): value is GanttZoom {
+  return TIMELINE_ZOOMS.some((level) => level === value);
 }
 
 /**
@@ -32,6 +44,15 @@ export function GanttToolbar({
   onToday,
   summary,
 }: GanttToolbarProps) {
+  const hasLinks = linkCount > 0;
+  const hintId = useId();
+
+  // One sentence for the hover hint whichever way the switch is sitting, so
+  // the two states cannot drift into explaining different things.
+  const dependencyHint = hasLinks
+    ? `Draw the ${linkCount} blocked-by connector${linkCount === 1 ? "" : "s"}`
+    : "Nothing on this board is blocked by another record yet — fill in a Blocked by field to see connectors";
+
   return (
     <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
       <Button
@@ -45,45 +66,61 @@ export function GanttToolbar({
         Today
       </Button>
 
-      <div className="flex items-center gap-0.5 rounded-md border border-border bg-surface p-0.5">
-        {TIMELINE_ZOOMS.map((level) => (
-          <button
-            key={level}
-            type="button"
-            aria-pressed={zoom === level}
-            onClick={() => onZoomChange(level)}
-            className={cn(
-              "rounded px-2 py-1 text-body transition-colors",
-              zoom === level
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {ZOOM_LABELS[level]}
-          </button>
-        ))}
-      </div>
-
-      {/* The count is the point: on a board where nothing is blocked by
-          anything there is nothing to draw, and a toggle that looks identical
-          either way reads as a button that does not work. */}
-      <Button
+      {/* One choice out of four, which is what a radiogroup means and what the
+          old `aria-pressed` buttons did not: four independent toggles, none of
+          which said which one was on, and no arrow keys between them. */}
+      <ToggleGroup
         size="sm"
-        variant={showDependencies ? "subtle" : "ghost"}
-        aria-pressed={showDependencies}
-        disabled={linkCount === 0}
-        className="gap-1.5"
-        title={
-          linkCount === 0
-            ? "Nothing on this board is blocked by another record yet — fill in a Blocked by field to see connectors"
-            : `Draw the ${linkCount} blocked-by connector${linkCount === 1 ? "" : "s"}`
-        }
-        onClick={onToggleDependencies}
+        aria-label="Timeline zoom"
+        value={zoom}
+        onValueChange={(next) => {
+          if (isGanttZoom(next)) onZoomChange(next);
+        }}
       >
-        {showDependencies ? <GitBranch /> : <Link2Off />}
-        <span className="hidden sm:inline">Dependencies</span>
+        {TIMELINE_ZOOMS.map((level) => (
+          <ToggleGroupItem key={level} value={level}>
+            {ZOOM_LABELS[level]}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+
+      {/* Whether the connectors are drawn is saved onto the view, so this is a
+          switch rather than a pressed button: `aria-pressed` announces a
+          momentary action, and this setting is still where you left it the
+          next time anyone opens the board.
+
+          The count is the point: on a board where nothing is blocked by
+          anything there is nothing to draw, and a toggle that looks identical
+          either way reads as a control that does not work. The label carries
+          the hint and the dimming because the switch is disabled at zero, and
+          a disabled control has no hover of its own to hang a title on. */}
+      <label
+        className={cn(
+          "flex h-[var(--control-sm)] items-center gap-2 rounded-md border border-border bg-surface px-[var(--control-pad-sm)]",
+          hasLinks ? "cursor-pointer" : "is-disabled",
+        )}
+      >
+        <GitBranch aria-hidden="true" className="size-3.5 shrink-0 text-faint-foreground" />
+        <span className="hidden text-body text-muted-foreground sm:inline">Dependencies</span>
         <span className="metric text-micro text-faint-foreground">{linkCount}</span>
-      </Button>
+        {/* The hint rides on the control, not on the label around it: a
+            `title` on a <label> contributes to neither the input's name nor
+            its description, so the sentence explaining why the switch is
+            refusing would have been hover-only — which is exactly the
+            explanation a disabled control most needs to give. */}
+        <Switch
+          size="sm"
+          checked={showDependencies}
+          disabled={!hasLinks}
+          title={dependencyHint}
+          aria-label="Draw dependency connectors"
+          aria-describedby={hintId}
+          onCheckedChange={() => onToggleDependencies()}
+        />
+        <span id={hintId} className="sr-only">
+          {dependencyHint}
+        </span>
+      </label>
 
       <span className="metric ml-auto truncate text-body text-faint-foreground">{summary}</span>
     </header>

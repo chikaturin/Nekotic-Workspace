@@ -19,6 +19,13 @@ const ROW_HEIGHTS: readonly RowHeight[] = ["short", "medium", "tall"];
 const SUBTASK_DISPLAYS: readonly SubtaskDisplay[] = ["nested", "flat", "hidden"];
 
 /**
+ * The bar's own step, shared with the menus it opens. Both selects here are
+ * fixed lists of plain words, so they stay native — there is no icon, colour
+ * or avatar for an option to carry, and the platform's keyboard is free.
+ */
+const CONTROL_SIZE = "sm" as const;
+
+/**
  * One configuration bar for every view type. Filter, sort and group are shared
  * by all four; the date anchors only appear where they mean something.
  */
@@ -69,9 +76,9 @@ export function ViewConfigBar({ model }: { model: BoardViewModel }) {
         <span className="sr-only">Subtasks</span>
         <SelectField
           aria-label="Subtasks"
+          size={CONTROL_SIZE}
           value={subtaskDisplay}
           onChange={(event) => void setSubtaskDisplay(event.target.value as SubtaskDisplay)}
-          className="h-7"
         >
           {SUBTASK_DISPLAYS.map((display) => (
             <option key={display} value={display}>
@@ -84,9 +91,10 @@ export function ViewConfigBar({ model }: { model: BoardViewModel }) {
       {view?.type === "table" && (
         <SelectField
           aria-label="Row height"
+          size={CONTROL_SIZE}
           value={view.rowHeight}
           onChange={(event) => void setRowHeight(event.target.value as RowHeight)}
-          className="ml-1 h-7"
+          className="ml-1"
         >
           {ROW_HEIGHTS.map((height) => (
             <option key={height} value={height}>
@@ -104,19 +112,22 @@ export function ViewConfigBar({ model }: { model: BoardViewModel }) {
               key={filter.id}
               type="button"
               onClick={() => void setFilters(filters.filter((item) => item.id !== filter.id))}
-              className="flex max-w-56 items-center gap-1 rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-body text-accent"
+              className="group flex max-w-56 items-center gap-1 rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-body text-accent"
             >
               <span className="truncate">{describeFilter(filter, columns)}</span>
-              <X className="size-2.5 shrink-0 opacity-70" />
+              {/* A faded glyph is how the system spells a state — disabled,
+                  pending, frozen — and this one is in none of them. It is
+                  simply quieter than the label beside it, which is a colour,
+                  and it brightens with the pill rather than only under its
+                  own two pixels. */}
+              <X
+                aria-hidden="true"
+                className="size-2.5 shrink-0 text-faint-foreground transition-colors group-hover:text-foreground"
+              />
             </button>
           ))}
 
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 px-1.5 text-body"
-            onClick={() => void setFilters([])}
-          >
+          <Button size="xs" variant="ghost" onClick={() => void setFilters([])}>
             Clear all
           </Button>
         </div>

@@ -12,6 +12,7 @@ import {
   Trash2,
   Upload,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -26,10 +27,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { IconButton } from "@/components/ui/icon-button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCapabilities } from "@/hooks/use-permissions";
 import { findNodeById } from "@/lib/tree";
-import { cn } from "@/lib/utils";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
 import type { SortKey, ViewMode } from "@/types";
 
@@ -38,6 +40,17 @@ const SORT_OPTIONS: readonly { key: SortKey; label: string }[] = [
   { key: "updatedAt", label: "Last modified" },
   { key: "size", label: "Size" },
   { key: "type", label: "Type" },
+];
+
+interface ViewModeOption {
+  readonly value: ViewMode;
+  readonly icon: LucideIcon;
+  readonly label: string;
+}
+
+const VIEW_MODES: readonly ViewModeOption[] = [
+  { value: "grid", icon: LayoutGrid, label: "Grid" },
+  { value: "list", icon: List, label: "List" },
 ];
 
 interface DriveToolbarProps {
@@ -81,26 +94,24 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
       {hasSelection ? (
         <div className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-1.5 py-1">
           <span className="metric px-1 text-body text-accent">{selectedIds.length} selected</span>
-          <Button
-            size="icon-sm"
+          <IconButton
             variant="ghost"
             aria-label="Favorite selected"
             onClick={() => selectedIds.forEach(toggleFavorite)}
           >
             <Star />
-          </Button>
-          <Button
-            size="icon-sm"
+          </IconButton>
+          <IconButton
             variant="ghost"
             aria-label="Trash selected"
             // One state write for the whole selection, not one per item.
             onClick={() => trashNodes(selectedIds)}
           >
             <Trash2 />
-          </Button>
-          <Button size="icon-sm" variant="ghost" aria-label="Clear selection" onClick={clearSelection}>
+          </IconButton>
+          <IconButton variant="ghost" aria-label="Clear selection" onClick={clearSelection}>
             <X />
-          </Button>
+          </IconButton>
         </div>
       ) : null}
 
@@ -139,24 +150,29 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
 
         <ViewToggle mode={viewMode} onChange={setViewMode} />
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button size="icon" variant="outline" aria-label="Manage files" asChild>
-              <Link href={filesHref}>
-                <HardDrive />
-              </Link>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Open file manager</TooltipContent>
-        </Tooltip>
+        <IconButton
+          size="icon"
+          variant="outline"
+          aria-label="Manage files"
+          tooltip="Open file manager"
+          asChild
+        >
+          <Link href={filesHref}>
+            <HardDrive />
+          </Link>
+        </IconButton>
 
         <DropdownMenu>
+          {/* The tooltip stays wrapped around the menu trigger rather than
+              moving inside `IconButton`: `DropdownMenuTrigger asChild` has to
+              clone a DOM element, and `IconButton`'s own tooltip would hand it
+              a Tooltip root instead. */}
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="outline" aria-label="Create here">
+                <IconButton size="icon" variant="outline" aria-label="Create here">
                   <FilePlus2 />
-                </Button>
+                </IconButton>
               </DropdownMenuTrigger>
             </TooltipTrigger>
             <TooltipContent>Create here</TooltipContent>
@@ -170,19 +186,15 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon"
-              variant="outline"
-              aria-label="New folder"
-              onClick={() => createFolder(targetId, "Untitled folder")}
-            >
-              <FolderPlus />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>New folder here</TooltipContent>
-        </Tooltip>
+        <IconButton
+          size="icon"
+          variant="outline"
+          aria-label="New folder"
+          tooltip="New folder here"
+          onClick={() => createFolder(targetId, "Untitled folder")}
+        >
+          <FolderPlus />
+        </IconButton>
 
         <Button size="sm" variant="default" className="gap-1.5" onClick={() => setUploaderOpen(true)}>
           <Upload />
@@ -201,36 +213,29 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
   );
 }
 
+/**
+ * A segmented control hands back a plain string, so this is where one becomes
+ * a view mode again — without a cast, and without a value the store has never
+ * heard of reaching it.
+ */
+function isViewMode(value: string): value is ViewMode {
+  return VIEW_MODES.some((option) => option.value === value);
+}
+
 function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (mode: ViewMode) => void }) {
   return (
-    <div
-      role="radiogroup"
+    <ToggleGroup
       aria-label="View mode"
-      className="flex items-center rounded-md border border-border bg-surface p-0.5"
+      value={mode}
+      onValueChange={(next) => {
+        if (isViewMode(next)) onChange(next);
+      }}
     >
-      {(
-        [
-          { value: "grid", icon: LayoutGrid, label: "Grid" },
-          { value: "list", icon: List, label: "List" },
-        ] as const
-      ).map(({ value, icon: Icon, label }) => (
-        <button
-          key={value}
-          type="button"
-          role="radio"
-          aria-checked={mode === value}
-          aria-label={`${label} view`}
-          onClick={() => onChange(value)}
-          className={cn(
-            "flex size-6 items-center justify-center rounded transition-colors",
-            mode === value
-              ? "bg-accent-soft text-accent"
-              : "text-faint-foreground hover:text-foreground",
-          )}
-        >
-          <Icon className="size-3.5" />
-        </button>
+      {VIEW_MODES.map(({ value, icon: Icon, label }) => (
+        <ToggleGroupItem key={value} value={value} aria-label={`${label} view`}>
+          <Icon />
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }

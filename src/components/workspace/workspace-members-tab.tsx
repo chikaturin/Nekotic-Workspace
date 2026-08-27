@@ -6,10 +6,12 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { InviteMemberDialog } from "@/components/workspace/invite-member-dialog";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
-import { SelectField } from "@/components/ui/select-field";
+import type { ListboxOption } from "@/components/ui/listbox";
+import { Select } from "@/components/ui/select";
 import { usePermissions } from "@/hooks/use-permissions";
-import { ROLE_LABELS } from "@/lib/permissions";
+import { ROLE_LABELS, ROLE_SUMMARIES } from "@/lib/permissions";
 import {
   canChangeRole,
   canLeaveWorkspace,
@@ -19,6 +21,28 @@ import { formatDate } from "@/lib/format";
 import { CURRENT_USER } from "@/mock/users";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspace-store";
 import { WORKSPACE_ROLES, type WorkspaceMember, type WorkspaceRole } from "@/types";
+
+/**
+ * The four roles as picker rows.
+ *
+ * The second line on each is `ROLE_SUMMARIES` from the role matrix rather than
+ * a fresh set of words written here: what a role is *said* to do and what it
+ * actually holds drift the moment they live in two files, and the matrix is
+ * the one that decides. A native <option> cannot carry a second line at all,
+ * which is the whole reason this list feeds the popover Select — picking
+ * somebody's role is exactly the moment the difference between Manager and
+ * Admin needs stating.
+ */
+const ROLE_OPTIONS: readonly ListboxOption[] = WORKSPACE_ROLES.map((role) => ({
+  value: role,
+  label: ROLE_LABELS[role],
+  description: ROLE_SUMMARIES[role],
+}));
+
+/** Narrows the picker's plain string back to a role before it reaches the store. */
+function isWorkspaceRole(value: string): value is WorkspaceRole {
+  return WORKSPACE_ROLES.some((role) => role === value);
+}
 
 /**
  * Who is in the workspace.
@@ -119,7 +143,7 @@ export function WorkspaceMembersTab() {
               <tr key={member.id} className="border-t border-hairline">
                 <td className="px-3 py-2">
                   <span className="flex items-center gap-2">
-                    <UserAvatar user={member} className="size-6" />
+                    <UserAvatar user={member} size="md" />
                     <span className="truncate text-foreground">{member.name}</span>
                     {member.id === CURRENT_USER.id && (
                       <span className="text-micro text-faint-foreground">you</span>
@@ -129,19 +153,19 @@ export function WorkspaceMembersTab() {
                 <td className="truncate px-3 py-2 text-muted-foreground">{member.email}</td>
                 <td className="px-3 py-2">
                   {canManage ? (
-                    <SelectField
+                    <Select
+                      options={ROLE_OPTIONS}
                       value={member.role}
                       aria-label={`Role for ${member.name}`}
-                      onChange={(event) =>
-                        changeRole(member, event.target.value as WorkspaceRole)
-                      }
-                    >
-                      {WORKSPACE_ROLES.map((role) => (
-                        <option key={role} value={role}>
-                          {ROLE_LABELS[role]}
-                        </option>
-                      ))}
-                    </SelectField>
+                      className="w-36"
+                      onValueChange={(next) => {
+                        // Nothing here clears the value, so `null` never
+                        // arrives; the guard is what turns the row's id back
+                        // into the role the rule check expects. Every refusal
+                        // still comes from `canChangeRole`, untouched.
+                        if (next !== null && isWorkspaceRole(next)) changeRole(member, next);
+                      }}
+                    />
                   ) : (
                     <span className="text-muted-foreground">{ROLE_LABELS[member.role]}</span>
                   )}
@@ -149,15 +173,15 @@ export function WorkspaceMembersTab() {
                 <td className="px-3 py-2 text-faint-foreground">{formatDate(member.joinedAt)}</td>
                 <td className="px-3 py-2">
                   {canManage && member.id !== CURRENT_USER.id && (
-                    <button
-                      type="button"
+                    <IconButton
                       aria-label={`Remove ${member.name}`}
-                      title={`Remove ${member.name} from ${workspace.name}`}
+                      tooltip={`Remove ${member.name} from ${workspace.name}`}
+                      variant="ghost"
+                      className="text-faint-foreground hover:text-danger"
                       onClick={() => confirmRemove(member)}
-                      className="flex size-5 items-center justify-center rounded text-faint-foreground hover:bg-hover hover:text-danger"
                     >
-                      <X className="size-3.5" />
-                    </button>
+                      <X />
+                    </IconButton>
                   )}
                 </td>
               </tr>

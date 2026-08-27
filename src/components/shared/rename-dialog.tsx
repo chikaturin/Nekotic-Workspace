@@ -2,7 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { findNodeById } from "@/lib/tree";
 import { nodeVisual } from "@/lib/node-visuals";
@@ -19,6 +27,12 @@ import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
  * It replaced a `window.prompt`, which could not be styled, could not be
  * dismissed with Escape consistently, and was blocked outright in some
  * browsers.
+ *
+ * It is built from the dialog's own bands, and its Cancel is the same outline
+ * button as the confirmation dialog's. The two surfaces are asked the same
+ * question — commit or back out — and while each drew its own footer they
+ * answered it in different colours, which teaches that ghost-Cancel and
+ * outline-Cancel mean different things when they do not.
  */
 export function RenameDialog() {
   const nodeId = useWorkspaceStore((state) => state.renameRequestId);
@@ -55,36 +69,37 @@ export function RenameDialog() {
 
   return (
     <Dialog open={node !== null} onOpenChange={(open) => !open && clearRenameRequest()}>
-      <DialogContent className="max-w-sm p-5">
+      <DialogContent size="sm" className="flex max-h-[85vh] flex-col">
         {node && visual && (
           <>
-            <DialogTitle className="flex items-center gap-2 text-lead font-semibold text-foreground">
-              <visual.Icon className={`size-4 ${visual.colorClass}`} />
-              Name this {visual.label.toLowerCase()}
-            </DialogTitle>
-            <DialogDescription className="mt-1 text-ui text-muted-foreground">
-              Press Enter to save, Escape to keep the current name.
-            </DialogDescription>
+            <DialogHeader size="sm">
+              <DialogTitle className="flex items-center gap-2">
+                <visual.Icon aria-hidden="true" className={`size-4 ${visual.colorClass}`} />
+                Name this {visual.label.toLowerCase()}
+              </DialogTitle>
+              <DialogDescription>
+                Press Enter to save, Escape to keep the current name.
+              </DialogDescription>
+            </DialogHeader>
 
-            <Input
-              ref={inputRef}
-              value={draft}
-              autoFocus
-              aria-label="Name"
-              onChange={(event) =>
-                setEdited({ nodeId: node.id, value: event.target.value })
-              }
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  commit();
-                }
-              }}
-              className="mt-3"
-            />
+            <DialogBody size="sm">
+              <Input
+                ref={inputRef}
+                value={draft}
+                autoFocus
+                aria-label="Name"
+                onChange={(event) => setEdited({ nodeId: node.id, value: event.target.value })}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    commit();
+                  }
+                }}
+              />
+            </DialogBody>
 
-            <div className="mt-4 flex justify-end gap-2">
-              <Button size="sm" variant="ghost" onClick={clearRenameRequest}>
+            <DialogFooter size="sm">
+              <Button size="sm" variant="outline" onClick={clearRenameRequest}>
                 Cancel
               </Button>
               <Button
@@ -95,7 +110,7 @@ export function RenameDialog() {
               >
                 Save name
               </Button>
-            </div>
+            </DialogFooter>
           </>
         )}
       </DialogContent>

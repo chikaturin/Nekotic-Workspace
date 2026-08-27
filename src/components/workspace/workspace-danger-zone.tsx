@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { DRIVE_ROOT_PATH } from "@/config/app";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspace-store";
@@ -47,17 +48,25 @@ export function WorkspaceDangerZone({ onDeleted }: { readonly onDeleted: () => v
         </p>
       </div>
 
-      <label className="block">
-        <span className="mb-1 block text-body font-medium text-muted-foreground">
-          Type <span className="text-foreground">{workspace.name}</span> to confirm
-        </span>
-        <Input
-          value={typed}
-          aria-label="Type the workspace name to confirm"
-          placeholder={workspace.name}
-          onChange={(event) => setTyped(event.target.value)}
-        />
-      </label>
+      {/* The caption carries the name the field is waiting for, so it is also
+          the field's accessible name — a reader hears which word to type
+          rather than a generic instruction to type something. */}
+      <FormField
+        label={
+          <>
+            Type <span className="text-foreground">{workspace.name}</span> to confirm
+          </>
+        }
+      >
+        {(field) => (
+          <Input
+            {...field}
+            value={typed}
+            placeholder={workspace.name}
+            onChange={(event) => setTyped(event.target.value)}
+          />
+        )}
+      </FormField>
 
       <Button
         size="sm"

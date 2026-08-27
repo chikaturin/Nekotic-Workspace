@@ -2,11 +2,12 @@
 
 import { RotateCcw, Users } from "lucide-react";
 import { UserAvatar } from "@/components/shared/user-avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { SelectField } from "@/components/ui/select-field";
+import { Badge, type BadgeVariant } from "@/components/ui/badge";
+import { IconButton } from "@/components/ui/icon-button";
+import type { ListboxOption } from "@/components/ui/listbox";
+import { Select } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ACCESS_SOURCE_LABELS, ROLE_LABELS, subjectKey } from "@/lib/permissions";
+import { ACCESS_SOURCE_LABELS, ROLE_LABELS, ROLE_SUMMARIES, subjectKey } from "@/lib/permissions";
 import { DIRECTORY } from "@/mock/users";
 import { WORKSPACE_ROLES, type AccessSource, type AccessSubject, type ResolvedAccess, type WorkspaceRole } from "@/types";
 
@@ -25,12 +26,32 @@ interface AccessListProps {
   readonly onReset: (subject: AccessSubject) => void;
 }
 
-const SOURCE_VARIANT: Readonly<Record<AccessSource, "default" | "accent" | "success">> = {
-  workspace: "default",
-  inherited: "default",
+/**
+ * One tone ramp, read as a sentence: access that merely arrived is chrome,
+ * access written here is a fact about this item, and access written here that
+ * *replaced* something is the one worth spotting from across the row.
+ *
+ * `neutral` and `info` are the ramp's own names for the tones these badges
+ * have always worn, so the row looks exactly as it did — only now the names
+ * mean something next to the other five.
+ */
+const SOURCE_VARIANT: Readonly<Record<AccessSource, BadgeVariant>> = {
+  workspace: "neutral",
+  inherited: "neutral",
   explicit: "success",
-  override: "accent",
+  override: "info",
 };
+
+/**
+ * The roles, each carrying what it actually permits. That sentence is the
+ * reason this is a popover list rather than a native select: "Manager" on its
+ * own does not tell you that granting it also hands over the structure.
+ */
+const ROLE_OPTIONS: readonly ListboxOption[] = WORKSPACE_ROLES.map((role) => ({
+  value: role,
+  label: ROLE_LABELS[role],
+  description: ROLE_SUMMARIES[role],
+}));
 
 function subjectName(subject: AccessSubject): string {
   if (subject.kind === "role") return `Everyone · ${ROLE_LABELS[subject.role]}`;
@@ -64,6 +85,7 @@ export function AccessList({ entries, canManage, onGrant, onReset }: AccessListP
             ? DIRECTORY.find((candidate) => candidate.id === subject.userId)
             : undefined;
         const isWritten = entry.source === "explicit" || entry.source === "override";
+        const name = subjectName(entry.subject);
 
         return (
           <li
@@ -71,7 +93,7 @@ export function AccessList({ entries, canManage, onGrant, onReset }: AccessListP
             className="flex items-center gap-2.5 border-b border-hairline px-1 py-2 last:border-0"
           >
             {person ? (
-              <UserAvatar user={person} className="size-7" />
+              <UserAvatar user={person} size="lg" />
             ) : (
               <span className="flex size-7 items-center justify-center rounded-full border border-border bg-surface">
                 <Users className="size-3.5 text-faint-foreground" />
@@ -79,7 +101,7 @@ export function AccessList({ entries, canManage, onGrant, onReset }: AccessListP
             )}
 
             <div className="min-w-0 flex-1">
-              <p className="truncate text-lead text-foreground">{subjectName(entry.subject)}</p>
+              <p className="truncate text-lead text-foreground">{name}</p>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="inline-flex">
@@ -94,33 +116,37 @@ export function AccessList({ entries, canManage, onGrant, onReset }: AccessListP
               </Tooltip>
             </div>
 
-            <SelectField
+            <Select
+              size="sm"
               value={entry.role}
-              aria-label={`Access for ${subjectName(entry.subject)}`}
-              disabled={!canManage}
-              onChange={(event) => onGrant(entry.subject, event.target.value as WorkspaceRole)}
-            >
-              {WORKSPACE_ROLES.map((role) => (
-                <option key={role} value={role}>
-                  {ROLE_LABELS[role]}
-                </option>
-              ))}
-            </SelectField>
+              options={ROLE_OPTIONS}
+              aria-label={`Access for ${name}`}
+              isDisabled={!canManage}
+              onValueChange={(next) => {
+                if (next !== null) onGrant(entry.subject, next as WorkspaceRole);
+              }}
+              className="w-32 shrink-0"
+            />
 
             {/* Only a rule written here can be taken away; there is nothing to
-                reset on access that is merely flowing through. */}
+                reset on access that is merely flowing through.
+
+                The tooltip stays wrapped by hand rather than moving to
+                `IconButton`'s own `tooltip` prop, because the moment it is most
+                needed is the moment the button is disabled — and a disabled
+                button fires no pointer events for a trigger to hear. The span
+                is the element that keeps hearing them. */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <span className="inline-flex">
-                  <Button
-                    size="icon-sm"
+                  <IconButton
                     variant="ghost"
                     disabled={!canManage || !isWritten}
-                    aria-label={`Reset ${subjectName(entry.subject)} to inherited access`}
+                    aria-label={`Reset ${name} to inherited access`}
                     onClick={() => onReset(entry.subject)}
                   >
                     <RotateCcw />
-                  </Button>
+                  </IconButton>
                 </span>
               </TooltipTrigger>
               <TooltipContent>

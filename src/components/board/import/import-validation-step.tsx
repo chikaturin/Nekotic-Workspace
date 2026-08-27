@@ -1,6 +1,7 @@
 "use client";
 
 import { CircleCheck, TriangleAlert } from "lucide-react";
+import { RadioCard, RadioGroup } from "@/components/ui/radio-group";
 import { IMPORT_ISSUE_LIMIT } from "@/config/app";
 import { formatCount } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -56,32 +57,21 @@ export function ImportValidationStep({ plan, policy, onSetPolicy }: ImportValida
 
       {!isClean && (
         <>
-          <fieldset className="space-y-1">
-            <legend className="mb-1 text-body font-semibold uppercase tracking-wider text-faint-foreground">
-              Rows with a value the column cannot read
-            </legend>
-
+          <RadioGroup
+            label="Rows with a value the column cannot read"
+            value={policy}
+            // The group speaks in plain strings; the only ones it can hand back
+            // are the keys of `POLICY_LABELS` rendered just below.
+            onValueChange={(value) => onSetPolicy(value as ImportInvalidPolicy)}
+          >
             {(Object.keys(POLICY_LABELS) as ImportInvalidPolicy[]).map((candidate) => (
-              <label
+              <RadioCard
                 key={candidate}
-                className={cn(
-                  "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-ui transition-colors",
-                  policy === candidate
-                    ? "border-accent bg-accent-soft text-foreground"
-                    : "border-border text-muted-foreground hover:bg-hover",
-                )}
-              >
-                <input
-                  type="radio"
-                  name="import-policy"
-                  checked={policy === candidate}
-                  onChange={() => onSetPolicy(candidate)}
-                  className="size-3.5 accent-[var(--accent)]"
-                />
-                {POLICY_LABELS[candidate]}
-              </label>
+                value={candidate}
+                label={POLICY_LABELS[candidate]}
+              />
             ))}
-          </fieldset>
+          </RadioGroup>
 
           <div className="max-h-64 overflow-auto rounded-lg border border-border">
             <table className="w-full border-collapse text-left text-body">

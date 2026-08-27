@@ -7,12 +7,14 @@ import { WorkspaceMembersTab } from "@/components/workspace/workspace-members-ta
 import { WorkspaceRestrictedTab } from "@/components/workspace/workspace-restricted-tab";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
+  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePermissions } from "@/hooks/use-permissions";
-import { cn } from "@/lib/utils";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspace-store";
 import type { PermissionKey, PermissionResolver } from "@/types";
 
@@ -58,36 +60,53 @@ export function WorkspaceSettingsDialog({ isOpen, onClose }: WorkspaceSettingsDi
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="flex max-h-[85vh] w-[min(46rem,92vw)] max-w-none flex-col p-0">
-        <header className="border-b border-border px-5 pt-5 pb-0">
-          <DialogTitle className="text-title">Workspace settings</DialogTitle>
-          <DialogDescription className="mt-1 text-ui text-muted-foreground">
-            {workspace.name}
-          </DialogDescription>
+      <DialogContent size="xl" className="flex max-h-[85vh] flex-col">
+        <Tabs
+          variant="underline"
+          value={active?.id ?? ""}
+          onValueChange={(next) => {
+            // Looked up rather than cast: the strip only ever reports one of
+            // these ids back, and the lookup is what says so to the compiler.
+            const chosen = TABS.find((candidate) => candidate.id === next);
+            if (chosen) setTab(chosen.id);
+          }}
+          className="min-h-0 flex-1"
+        >
+          {/* The rule under this block belongs to the tab strip below, which
+              draws its own and hangs the active indicator off it. A second
+              border here would read as two lines with the tabs trapped
+              between them. */}
+          <DialogHeader className="border-b-0">
+            <DialogTitle>Workspace settings</DialogTitle>
+            <DialogDescription>{workspace.name}</DialogDescription>
+          </DialogHeader>
 
-          <nav className="-mb-px flex gap-1 pt-3" aria-label="Settings sections">
+          <TabsList aria-label="Settings sections">
             {allowed.map((candidate) => (
-              <button
-                key={candidate.id}
-                type="button"
-                aria-current={candidate.id === active?.id}
-                onClick={() => setTab(candidate.id)}
-                className={cn(
-                  "rounded-t-md border-b-2 px-2.5 py-1.5 text-ui transition-colors",
-                  candidate.id === active?.id
-                    ? "border-accent text-foreground"
-                    : "border-transparent text-muted-foreground hover:bg-hover",
-                )}
-              >
+              <TabsTrigger key={candidate.id} value={candidate.id}>
                 {candidate.label}
-              </button>
+              </TabsTrigger>
             ))}
-          </nav>
-        </header>
+          </TabsList>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          <SettingsBody tab={active?.id ?? null} can={can} onClose={onClose} />
-        </div>
+          <DialogBody>
+            {active === null ? (
+              <p className="text-ui text-muted-foreground">
+                You do not have access to any workspace settings.
+              </p>
+            ) : (
+              // One panel per permitted tab, and only the selected one is
+              // mounted — `TabsContent` returns nothing for the rest, so the
+              // members table and the restricted-folder list are not built
+              // behind a tab nobody is looking at.
+              allowed.map((candidate) => (
+                <TabsContent key={candidate.id} value={candidate.id}>
+                  <SettingsBody tab={candidate.id} can={can} onClose={onClose} />
+                </TabsContent>
+              ))
+            )}
+          </DialogBody>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
@@ -98,18 +117,10 @@ function SettingsBody({
   can,
   onClose,
 }: {
-  readonly tab: TabId | null;
+  readonly tab: TabId;
   readonly can: PermissionResolver;
   readonly onClose: () => void;
 }) {
-  if (tab === null) {
-    return (
-      <p className="text-ui text-muted-foreground">
-        You do not have access to any workspace settings.
-      </p>
-    );
-  }
-
   if (tab === "members") return <WorkspaceMembersTab />;
   if (tab === "access") return <WorkspaceRestrictedTab />;
   if (tab === "danger") return <WorkspaceDangerZone onDeleted={onClose} />;

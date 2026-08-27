@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   badgeFor,
   validateWorkspaceName,
@@ -65,36 +67,38 @@ export function WorkspaceGeneralTab({ canEdit }: { readonly canEdit: boolean }) 
         save();
       }}
     >
-      <label className="block">
-        <span className="mb-1 block text-body font-medium text-muted-foreground">
-          Workspace name
-        </span>
-        <Input
-          value={name}
-          disabled={!canEdit}
-          maxLength={WORKSPACE_NAME_MAX}
-          aria-label="Workspace name"
-          onChange={(event) => {
-            setName(event.target.value);
-            setError(null);
-          }}
-        />
-      </label>
+      {/* `validateWorkspaceName` is the only thing that can refuse this form,
+          so its message hangs off the name field — which is also what marks
+          that field invalid rather than leaving a red sentence floating under
+          a control that still looks fine. */}
+      <FormField label="Workspace name" error={error}>
+        {(field) => (
+          <Input
+            {...field}
+            value={name}
+            disabled={!canEdit}
+            maxLength={WORKSPACE_NAME_MAX}
+            onChange={(event) => {
+              setName(event.target.value);
+              setError(null);
+            }}
+          />
+        )}
+      </FormField>
 
-      <label className="block">
-        <span className="mb-1 block text-body font-medium text-muted-foreground">
-          Description
-        </span>
-        <textarea
-          value={description}
-          rows={3}
-          disabled={!canEdit}
-          maxLength={WORKSPACE_DESCRIPTION_MAX}
-          aria-label="Workspace description"
-          onChange={(event) => setDescription(event.target.value)}
-          className="w-full resize-none rounded-md border border-border bg-surface px-2 py-1.5 text-ui text-foreground outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-[var(--disabled-opacity)]"
-        />
-      </label>
+      <FormField label="Description">
+        {(field) => (
+          <Textarea
+            {...field}
+            value={description}
+            rows={3}
+            disabled={!canEdit}
+            maxLength={WORKSPACE_DESCRIPTION_MAX}
+            showCount
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        )}
+      </FormField>
 
       <div className="flex items-center gap-2 rounded-md border border-hairline bg-surface px-2.5 py-2">
         <span
@@ -111,12 +115,6 @@ export function WorkspaceGeneralTab({ canEdit }: { readonly canEdit: boolean }) 
           Workspace tile. Taken from the name — there is no separate upload in this build.
         </span>
       </div>
-
-      {error && (
-        <p role="alert" className="text-body text-danger">
-          {error}
-        </p>
-      )}
 
       {canEdit ? (
         <Button type="submit" size="sm" disabled={!isDirty}>

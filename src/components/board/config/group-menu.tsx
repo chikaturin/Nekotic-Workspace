@@ -1,11 +1,14 @@
 "use client";
 
 import { Group } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { useId } from "react";
+import { CountBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { SelectField } from "@/components/ui/select-field";
+import { Select } from "@/components/ui/select";
 import type { BoardViewModel } from "@/hooks/use-board-view";
+import { columnVisual } from "@/lib/board-visuals";
 import { useBoardStore } from "@/store/board-store";
 import { useGridStore } from "@/store/grid-store";
 
@@ -26,42 +29,53 @@ export function GroupMenu({ model }: { model: BoardViewModel }) {
   const isGrouped = Boolean(view?.groupByColumnId);
   const isKanban = view?.type === "kanban";
 
+  // The picker's trigger is a div rather than a control the browser will
+  // associate with a wrapping <label>, so the visible caption is pointed at
+  // explicitly instead.
+  const groupByLabelId = useId();
+
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button size="sm" variant={isGrouped ? "subtle" : "ghost"} className="gap-1.5">
           <Group />
           Group
-          {isGrouped && groups && <Badge variant="count">{groups.length}</Badge>}
+          {isGrouped && groups && <CountBadge>{groups.length}</CountBadge>}
         </Button>
       </PopoverTrigger>
 
       <PopoverContent className="w-72">
-        <label className="flex items-center gap-2 px-1 py-1">
-          <span className="w-16 shrink-0 text-body text-muted-foreground">Group by</span>
-          <SelectField
-            value={view?.groupByColumnId ?? ""}
-            onChange={(event) => void setGroupBy(event.target.value || null)}
+        <div className="flex items-center gap-2 px-1 py-1">
+          <span id={groupByLabelId} className="w-16 shrink-0 text-body text-muted-foreground">
+            Group by
+          </span>
+          {/* The type icon is what distinguishes the four groupable kinds:
+              grouping by a date column buckets by day and grouping by a text
+              one buckets by exact string, and the names alone never said so.
+              Clearing the picker is the old "None" option — same null. */}
+          <Select
+            aria-labelledby={groupByLabelId}
+            size="sm"
+            isClearable
+            placeholder={isKanban ? "Required for Kanban" : "None"}
+            options={candidates.map((column) => ({
+              value: column.id,
+              label: column.name,
+              icon: columnVisual(column.type).Icon,
+            }))}
+            value={view?.groupByColumnId ?? null}
+            onValueChange={(value) => void setGroupBy(value)}
             className="min-w-0 flex-1"
-          >
-            <option value="">{isKanban ? "Required for Kanban" : "None"}</option>
-            {candidates.map((column) => (
-              <option key={column.id} value={column.id}>
-                {column.name}
-              </option>
-            ))}
-          </SelectField>
-        </label>
+          />
+        </div>
 
         {isGrouped && (
           <>
             <label className="mt-1 flex items-center gap-2 px-1 py-1 text-ui text-muted-foreground">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={view?.hideEmptyGroups ?? false}
                 disabled={isKanban}
                 onChange={(event) => void setHideEmptyGroups(event.target.checked)}
-                className="size-3.5 accent-[var(--accent)]"
               />
               Hide empty groups
               {isKanban && (

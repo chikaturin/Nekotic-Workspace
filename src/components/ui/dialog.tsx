@@ -198,15 +198,22 @@ const dialogHeaderVariants = cva(
   // The close button occupies the top-right corner, so a title allowed to run
   // the full width slides underneath it. This gutter is the fix, and it lives
   // here because eight of the twenty dialogs forgot to write it themselves.
-  "shrink-0 space-y-1 pr-12",
+  //
+  // The gutter is spelled per compound variant rather than once in the base
+  // string, and that is not a style choice: `px-4` and `pr-12` are the same
+  // tailwind-merge group, so a base `pr-12` loses to a variant's `px-*` and
+  // the gutter silently disappears. Half the call sites had already noticed
+  // and restated it by hand; the other half had not, which is how one dialog
+  // clears the close button and the next one does not.
+  "shrink-0 space-y-1",
   {
     variants: {
-      variant: { padded: "border-b border-border", inline: "" },
+      variant: { padded: "border-b border-border", inline: "pr-12" },
       size: { sm: "", md: "" },
     },
     compoundVariants: [
-      { variant: "padded", size: "sm", class: "px-4 py-3" },
-      { variant: "padded", size: "md", class: "px-5 py-4" },
+      { variant: "padded", size: "sm", class: "py-3 pl-4 pr-12" },
+      { variant: "padded", size: "md", class: "py-4 pl-5 pr-12" },
     ],
     defaultVariants: { variant: "padded", size: "md" },
   },

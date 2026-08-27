@@ -14,7 +14,15 @@ import { ESCAPE_OWNER_ATTRIBUTE } from "@/components/comments/mention-textarea";
 import { DrawerField } from "@/components/board/drawer/drawer-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
+import {
+  Drawer,
+  DrawerBody,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
 import type { BoardViewModel } from "@/hooks/use-board-view";
 import { isRowArchived } from "@/lib/archive";
@@ -115,6 +123,10 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
       }}
     >
       <DrawerContent
+        // Named rather than left to the default: `md` is the 36rem the record
+        // drawer has always been, and saying so keeps a later width change a
+        // decision about this surface instead of a side effect of the ladder.
+        size="md"
         aria-describedby={undefined}
         // A mention picker or a reply composer owns its own Escape; the drawer
         // only closes on presses nothing inside it claimed.
@@ -127,7 +139,7 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
       >
         {row && board && (
           <>
-            <header className="shrink-0 border-b border-border px-5 py-4 pr-12">
+            <DrawerHeader>
               <div className="flex items-center gap-2">
                 <Badge variant="accent">{row.displayId}</Badge>
                 {isArchived && (
@@ -160,11 +172,13 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
               <DrawerTitle className="mt-2 truncate text-display font-semibold tracking-tight text-foreground">
                 {title || "Untitled record"}
               </DrawerTitle>
-            </header>
+            </DrawerHeader>
 
             <DrawerTabs active={tab} onChange={setTab} />
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            {/* `inline` because the three panels below pad themselves, and the
+                Activity timeline deliberately runs to the edges. */}
+            <DrawerBody variant="inline">
               <section
                 role="tabpanel"
                 id="drawer-panel-details"
@@ -257,13 +271,15 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
               >
                 <ActivityTimeline boardId={board.id} rowId={row.id} />
               </section>
-            </div>
+            </DrawerBody>
 
-            <footer className="flex shrink-0 items-center gap-2 border-t border-border px-5 py-3">
+            {/* The actions read left to right and the status note is pushed to
+                the far end by its own margin, so the row starts rather than
+                ends — the opposite of a dialog's confirm/cancel pair. */}
+            <DrawerFooter align="start">
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-1.5"
                 disabled={!isEditable}
                 onClick={() => void duplicateRow(row.id)}
               >
@@ -274,7 +290,6 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-1.5"
                 disabled={!canEdit}
                 onClick={() => void bulkArchive([row.id], !isArchived)}
               >
@@ -285,7 +300,6 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
               <Button
                 size="sm"
                 variant="danger"
-                className="gap-1.5"
                 disabled={!canEdit}
                 onClick={() => setIsConfirmingDelete(true)}
               >
@@ -296,7 +310,7 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
               <span className="metric ml-auto text-micro text-faint-foreground">
                 {isArchived ? "Archived — read-only" : "Edits save as you make them"}
               </span>
-            </footer>
+            </DrawerFooter>
           </>
         )}
       </DrawerContent>

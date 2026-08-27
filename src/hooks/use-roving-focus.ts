@@ -35,7 +35,7 @@ const NOOP_REF: RefCallback<HTMLElement> = () => {};
 
 const ALWAYS_ENABLED = (): boolean => true;
 
-interface StepInput {
+export interface StepInput {
   readonly from: number;
   readonly delta: 1 | -1;
   readonly count: number;
@@ -50,7 +50,7 @@ interface StepInput {
  * disabled would otherwise wrap forever looking for a landing spot. Returning
  * `from` in that case leaves focus exactly where the user put it.
  */
-function stepIndex({ from, delta, count, loop, isEnabled }: StepInput): number {
+export function stepIndex({ from, delta, count, loop, isEnabled }: StepInput): number {
   if (count === 0) return -1;
 
   let candidate = from;

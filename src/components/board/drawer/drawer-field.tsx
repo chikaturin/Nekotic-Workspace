@@ -1,7 +1,9 @@
 "use client";
 
+import { useId } from "react";
 import { CellEditor } from "@/components/board/cells/cell-editor";
 import { CellRenderer } from "@/components/board/cells/cell-renderer";
+import { Label } from "@/components/ui/field";
 import { columnVisual } from "@/lib/board-visuals";
 import type { CellContext } from "@/lib/cell-values";
 import { cn } from "@/lib/utils";
@@ -50,16 +52,28 @@ export function DrawerField({
   onCreateOption,
 }: DrawerFieldProps) {
   const visual = columnVisual(column.type);
+  const fieldId = useId();
+  const labelId = `${fieldId}-label`;
+  const valueId = `${fieldId}-value`;
 
   return (
     <div
       data-drawer-field={column.id}
       className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-start gap-3 py-1.5"
     >
-      <div className="flex items-center gap-1.5 pt-1.5">
+      {/*
+        The caption carries `Label`'s type step so a field name here and a
+        field name in a dialog are the same words at the same size, but it
+        deliberately has no `htmlFor`: the thing it names swaps identity — a
+        button while the field is at rest, whatever control the CellEditor
+        mounts once it is open — so an id to point at exists only half the
+        time. `aria-labelledby` on the button reads the same caption without
+        turning the caption into a second way to open the editor.
+      */}
+      <Label id={labelId} className="mb-0 flex min-w-0 items-center gap-1.5 pt-1.5">
         <visual.Icon className="size-3.5 shrink-0 text-faint-foreground" />
-        <span className="truncate text-ui text-muted-foreground">{column.name}</span>
-      </div>
+        <span className="truncate">{column.name}</span>
+      </Label>
 
       <div className="relative min-w-0">
         {isEditing ? (
@@ -83,9 +97,19 @@ export function DrawerField({
         ) : (
           <button
             type="button"
+            id={valueId}
+            // Caption first, then the button's own contents: "Due date, 14
+            // March". Naming it from the caption alone would announce every
+            // field without its value, and from the value alone — which is
+            // what a bare button does — without saying which field it is.
+            aria-labelledby={`${labelId} ${valueId}`}
             onClick={() => onEditingChange(true)}
             className={cn(
-              "flex min-h-8 w-full items-center rounded-md border border-transparent text-left",
+              // The floor is the control ladder's own 32px step rather than a
+              // loose min-h-8, so a field at rest is exactly as tall as the
+              // editor that replaces it and the row never jumps on open.
+              "flex min-h-[var(--control-md)] w-full items-center rounded-md text-left",
+              "border border-transparent outline-none transition-colors",
               "hover:border-border hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring",
             )}
           >

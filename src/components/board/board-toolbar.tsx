@@ -1,9 +1,9 @@
 "use client";
 
-import { Archive, Download, Eye, LoaderCircle, Plus, RotateCcw, Search, Upload } from "lucide-react";
+import { Archive, Download, Eye, Plus, RotateCcw, Search, Upload } from "lucide-react";
 import { WatchButton } from "@/components/collab/watch-button";
 import { SimulationMenu } from "@/components/files/simulation-menu";
-import { Badge } from "@/components/ui/badge";
+import { Badge, CountBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,7 +12,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { IconButton } from "@/components/ui/icon-button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { ViewConfigBar } from "@/components/board/config/view-config-bar";
 import { ViewTabs } from "@/components/board/config/view-tabs";
@@ -49,6 +50,10 @@ export function BoardToolbar({
 
   const hiddenCount = columns.filter((column) => column.hidden).length;
 
+  // One sentence for the button's name and its hover hint, so the two cannot
+  // describe different halves of the same toggle.
+  const archivedHint = isShowingArchived ? "Hide archived records" : "Show archived records";
+
   const boardTarget: EntityRef | null = board
     ? { kind: "board", nodeId: board.nodeId, label: board.name }
     : null;
@@ -59,7 +64,7 @@ export function BoardToolbar({
         <div className="min-w-0 flex-1">
           <h1 className="flex items-center gap-2 truncate text-title font-semibold tracking-tight text-foreground">
             {board?.name}
-            <Badge variant="default">{board?.rowIdPrefix}-000</Badge>
+            <Badge variant="neutral">{board?.rowIdPrefix}-000</Badge>
           </h1>
           <p className="metric truncate text-body text-faint-foreground">
             {rowIds.length === totalRows
@@ -69,16 +74,21 @@ export function BoardToolbar({
           </p>
         </div>
 
-        {pendingWrites > 0 && <LoaderCircle className="size-3.5 animate-spin text-accent" />}
+        {/* No label on the spinner: the line above it already says "saving…",
+            and a second announcement of the same fact is noise. */}
+        {pendingWrites > 0 && <Spinner className="text-accent" />}
 
         <div className="relative">
           <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-faint-foreground" />
           <Input
+            size="md"
             value={search}
             placeholder="Search records…"
             onChange={(event) => setSearch(event.target.value)}
             aria-label="Search records"
-            className="h-8 w-56 pl-7 text-ui"
+            // The left padding clears the search glyph drawn over the field,
+            // which is the one thing the size variant cannot know about.
+            className="w-56 pl-7"
           />
         </div>
 
@@ -87,7 +97,7 @@ export function BoardToolbar({
             <Button size="sm" variant="outline" className="gap-1.5">
               <Eye />
               Columns
-              {hiddenCount > 0 && <Badge variant="count">{hiddenCount}</Badge>}
+              {hiddenCount > 0 && <CountBadge>{hiddenCount}</CountBadge>}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
@@ -106,23 +116,21 @@ export function BoardToolbar({
         </DropdownMenu>
 
         {archivedRows > 0 && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="sm"
-                variant={isShowingArchived ? "subtle" : "outline"}
-                aria-pressed={isShowingArchived}
-                className="gap-1.5"
-                onClick={() => setShowArchived(!isShowingArchived)}
-              >
-                <Archive />
-                <Badge variant="count">{archivedRows}</Badge>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {isShowingArchived ? "Hide archived records" : "Show archived records"}
-            </TooltipContent>
-          </Tooltip>
+          // Its only text is a number, so without a name it announces as
+          // "seven, button". `IconButton` is the one that will not let that
+          // happen, and it carries the tooltip this already had.
+          <IconButton
+            size="sm"
+            variant={isShowingArchived ? "subtle" : "outline"}
+            aria-pressed={isShowingArchived}
+            aria-label={archivedHint}
+            tooltip={archivedHint}
+            className="gap-1.5"
+            onClick={() => setShowArchived(!isShowingArchived)}
+          >
+            <Archive />
+            <CountBadge>{archivedRows}</CountBadge>
+          </IconButton>
         )}
 
         <WatchButton target={boardTarget} />
@@ -149,9 +157,9 @@ export function BoardToolbar({
           <span className="hidden lg:inline">Export</span>
         </Button>
 
-        <Button size="icon" variant="outline" aria-label="Reload board" onClick={onReload}>
+        <IconButton size="icon" variant="outline" aria-label="Reload board" onClick={onReload}>
           <RotateCcw />
-        </Button>
+        </IconButton>
 
         <SimulationMenu />
 

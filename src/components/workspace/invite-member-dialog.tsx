@@ -6,10 +6,14 @@ import { UserAvatar } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FormField } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/ui/select-field";
 import { ROLE_LABELS } from "@/lib/permissions";
@@ -35,6 +39,16 @@ interface InviteMemberDialogProps {
  * away — this build has no invitation mailbox, and inventing one would mean
  * shipping a flow whose second half does not exist. An address that matches
  * nobody says so rather than silently creating an account.
+ *
+ * The search and the result list stay hand-built rather than becoming a
+ * `Combobox`, and the reason is the paragraph at the bottom of this file. That
+ * message is a function of what was typed — it only appears for something that
+ * looks like an address, and it quotes the address back — whereas a Combobox
+ * owns its query internally and offers the caller one static `emptyMessage`.
+ * A picked row here also *performs* the invitation rather than setting a
+ * value, which is not the shape `value`/`onValueChange` describes. Everything
+ * that could move without losing that has: the field, the role select and the
+ * rows are all primitives now.
  */
 export function InviteMemberDialog({ isOpen, onClose }: InviteMemberDialogProps) {
   const workspace = useWorkspaceStore(selectActiveWorkspace);
@@ -78,84 +92,98 @@ export function InviteMemberDialog({ isOpen, onClose }: InviteMemberDialogProps)
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md p-5">
-        <DialogTitle className="text-title">Invite members</DialogTitle>
-        <DialogDescription className="mt-1 text-ui text-muted-foreground">
-          People are added to {workspace.name} straight away. Their role decides what
-          they can do; folder access is decided separately, on the folder.
-        </DialogDescription>
+      <DialogContent size="md" className="flex max-h-[85vh] flex-col">
+        <DialogHeader>
+          <DialogTitle>Invite members</DialogTitle>
+          <DialogDescription>
+            People are added to {workspace.name} straight away. Their role decides what
+            they can do; folder access is decided separately, on the folder.
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="mt-4 flex items-end gap-2">
-          <label className="min-w-0 flex-1">
-            <span className="mb-1 block text-body font-medium text-muted-foreground">
-              Name or email
-            </span>
-            <Input
-              value={query}
-              autoFocus
-              placeholder="developer@nexdrop.vn"
-              aria-label="Find somebody to invite"
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
+        <DialogBody className="space-y-3">
+          <div className="flex gap-2">
+            <FormField label="Name or email" className="flex-1">
+              {(field) => (
+                <Input
+                  {...field}
+                  value={query}
+                  autoFocus
+                  placeholder="developer@nexdrop.vn"
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              )}
+            </FormField>
 
-          <label>
-            <span className="mb-1 block text-body font-medium text-muted-foreground">Role</span>
-            <SelectField
-              value={role}
-              aria-label="Role for the new member"
-              onChange={(event) => setRole(event.target.value as WorkspaceRole)}
-              className="h-8"
-            >
-              {WORKSPACE_ROLES.map((candidate) => (
-                <option key={candidate} value={candidate}>
-                  {ROLE_LABELS[candidate]}
-                </option>
-              ))}
-            </SelectField>
-          </label>
-        </div>
+            {/* Stays the native select: four plain words, no icon, no second
+                line, and it sits inside a dialog where a second portal buys
+                nothing. The role picker in Members is the popover one because
+                a table row has space for the descriptions and this row does
+                not. */}
+            <FormField label="Role" className="shrink-0">
+              {(field) => (
+                <SelectField
+                  {...field}
+                  value={role}
+                  onChange={(event) => setRole(event.target.value as WorkspaceRole)}
+                >
+                  {WORKSPACE_ROLES.map((candidate) => (
+                    <option key={candidate} value={candidate}>
+                      {ROLE_LABELS[candidate]}
+                    </option>
+                  ))}
+                </SelectField>
+              )}
+            </FormField>
+          </div>
 
-        <ul className="mt-3 max-h-56 space-y-0.5 overflow-y-auto">
-          {candidates.map((person) => (
-            <li key={person.id}>
-              <button
-                type="button"
-                onClick={() => invite(person)}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-hover"
-              >
-                <UserAvatar user={person} className="size-6" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-ui text-foreground">{person.name}</span>
-                  <span className="block truncate text-body text-faint-foreground">
-                    {person.email}
+          <ul className="max-h-56 space-y-0.5 overflow-y-auto">
+            {candidates.map((person) => (
+              <li key={person.id}>
+                {/* A row is an action, not a selection — clicking it invites
+                    the person — so it is a Button rather than a listbox row,
+                    and it gains the focus ring the hand-rolled one never had.
+                    The height is released because the row carries two lines. */}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => invite(person)}
+                  className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-left"
+                >
+                  <UserAvatar user={person} size="md" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-ui text-foreground">{person.name}</span>
+                    <span className="block truncate text-body text-faint-foreground">
+                      {person.email}
+                    </span>
                   </span>
-                </span>
-                <UserPlus className="size-3.5 shrink-0 text-faint-foreground" />
-              </button>
-            </li>
-          ))}
-        </ul>
+                  <UserPlus className="shrink-0 text-faint-foreground" />
+                </Button>
+              </li>
+            ))}
+          </ul>
 
-        {isUnknownAddress && (
-          <p className="mt-2 rounded-md border border-hairline bg-surface px-2.5 py-2 text-body text-muted-foreground">
-            Nobody in the directory uses <span className="text-foreground">{query.trim()}</span>.
-            Sending an invitation to an address is not part of this build — the backend has no
-            invitation flow yet, so adding them silently would be a lie.
-          </p>
-        )}
+          {isUnknownAddress && (
+            <p className="rounded-md border border-hairline bg-surface px-2.5 py-2 text-body text-muted-foreground">
+              Nobody in the directory uses <span className="text-foreground">{query.trim()}</span>.
+              Sending an invitation to an address is not part of this build — the backend has no
+              invitation flow yet, so adding them silently would be a lie.
+            </p>
+          )}
 
-        {!isUnknownAddress && candidates.length === 0 && (
-          <p className="mt-2 text-body text-muted-foreground">
-            Everybody in the directory is already a member.
-          </p>
-        )}
+          {!isUnknownAddress && candidates.length === 0 && (
+            <p className="text-body text-muted-foreground">
+              Everybody in the directory is already a member.
+            </p>
+          )}
+        </DialogBody>
 
-        <div className="mt-4 flex justify-end">
+        <DialogFooter>
           <Button size="sm" variant="ghost" onClick={onClose}>
             Done
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

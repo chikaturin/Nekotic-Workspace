@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { CellShell, EditorSurface } from "@/components/board/cells/cell-frame";
+import { Textarea } from "@/components/ui/textarea";
 import { Kbd } from "@/components/ui/kbd";
 import type { CellValue } from "@/types";
 
@@ -56,8 +57,13 @@ export function LongTextCellEditor({
 
   return (
     <EditorSurface className="w-[22rem]">
-      <textarea
+      {/* Ghost, because the editor surface around it already draws the border
+          and the focus ring — a second box inside the first reads as two
+          nested fields. The editor is only mounted while a cell is being
+          edited, so nothing here is on the grid's render path. */}
+      <Textarea
         ref={ref}
+        variant="ghost"
         value={draft}
         rows={rows}
         onChange={(event) => setDraft(event.target.value)}
@@ -66,7 +72,7 @@ export function LongTextCellEditor({
           if (!isCancelled.current) onCommit({ kind: "longText", value: draft });
         }}
         aria-label="Edit long text"
-        className="w-full resize-none bg-transparent p-2 text-lead leading-relaxed text-foreground outline-none"
+        className="w-full p-2 text-lead leading-relaxed"
       />
       <div className="flex items-center gap-1.5 border-t border-border px-2 py-1 text-micro text-faint-foreground">
         <Kbd>⌘</Kbd>

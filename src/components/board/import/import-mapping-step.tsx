@@ -1,10 +1,12 @@
 "use client";
 
 import { ArrowRight, Ban } from "lucide-react";
+import { useMemo } from "react";
 import { IMPORT_PREVIEW_ROWS } from "@/config/app";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { SelectField } from "@/components/ui/select-field";
+import type { ListboxOption } from "@/components/ui/listbox";
+import { Select } from "@/components/ui/select";
 import { columnVisual } from "@/lib/board-visuals";
 import { formatCount } from "@/lib/format";
 import type { BoardColumn, ColumnMapping, ImportSource } from "@/types";
@@ -18,6 +20,14 @@ interface ImportMappingStepProps {
   readonly onSetHeaderRow: (hasHeaderRow: boolean) => void;
   readonly onSetMapping: (sourceIndex: number, columnId: string | null) => void;
 }
+
+/**
+ * The value standing in for "no board column". It mirrors the empty
+ * `<option value="">` this select grew out of, and it is unmapped again on the
+ * way out, so `onSetMapping` still receives `null` and the wizard never learns
+ * that the control changed.
+ */
+const NO_IMPORT_VALUE = "";
 
 /**
  * Step 2: point each column in the file at a column on the board.
@@ -37,6 +47,25 @@ export function ImportMappingStep({
 }: ImportMappingStepProps) {
   const mappedCount = mappings.filter((mapping) => mapping.columnId !== null).length;
   const preview = source.rows.slice(0, IMPORT_PREVIEW_ROWS);
+
+  /**
+   * Every source column offers the same list, so it is built once rather than
+   * once per header — a wide file has dozens of these selects side by side.
+   * The type icon rides on the option itself, which is why the select can show
+   * it: a native `<option>` has nowhere to put one, so the icon used to sit
+   * outside the control and describe a choice it was not part of.
+   */
+  const columnOptions = useMemo<readonly ListboxOption[]>(
+    () => [
+      { value: NO_IMPORT_VALUE, label: "Do not import", icon: Ban },
+      ...columns.map((column) => ({
+        value: column.id,
+        label: column.name,
+        icon: columnVisual(column.type).Icon,
+      })),
+    ],
+    [columns],
+  );
 
   return (
     <div className="space-y-3 px-5 py-4">
@@ -70,8 +99,6 @@ export function ImportMappingStep({
             <tr className="border-b border-border bg-surface">
               {source.headers.map((header, index) => {
                 const mapping = mappings[index];
-                const target = columns.find((column) => column.id === mapping?.columnId) ?? null;
-                const Icon = target ? columnVisual(target.type).Icon : Ban;
 
                 return (
                   <th key={`${header}_${index}`} className="min-w-52 p-2 align-top">
@@ -79,27 +106,28 @@ export function ImportMappingStep({
                       {header}
                     </p>
 
-                    <span className="mt-1 flex items-center gap-1.5">
+                    {/* A div rather than the span this used to be: the select
+                        is a composed widget, and phrasing content cannot hold
+                        one. */}
+                    <div className="mt-1 flex items-center gap-1.5">
                       <ArrowRight className="size-3 shrink-0 text-faint-foreground" />
-                      <Icon
-                        className={`size-3.5 shrink-0 ${target ? "text-accent" : "text-faint-foreground"}`}
-                      />
-                      <SelectField
-                        value={mapping?.columnId ?? ""}
+                      <Select
+                        options={columnOptions}
+                        value={mapping?.columnId ?? NO_IMPORT_VALUE}
                         aria-label={`Board column for ${header}`}
-                        onChange={(event) =>
-                          onSetMapping(index, event.target.value === "" ? null : event.target.value)
+                        // The native select this replaces had the platform's
+                        // type-to-jump, and a board with thirty columns is
+                        // where that mattered most. The search field is what
+                        // gives it back; nothing here provides it otherwise.
+                        isSearchable
+                        onValueChange={(value) =>
+                          onSetMapping(
+                            index,
+                            value === null || value === NO_IMPORT_VALUE ? null : value,
+                          )
                         }
-                        className="w-full"
-                      >
-                        <option value="">Do not import</option>
-                        {columns.map((column) => (
-                          <option key={column.id} value={column.id}>
-                            {column.name}
-                          </option>
-                        ))}
-                      </SelectField>
-                    </span>
+                      />
+                    </div>
                   </th>
                 );
               })}

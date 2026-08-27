@@ -1,7 +1,7 @@
 "use client";
 
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NOTIFICATION_TABS } from "@/lib/notifications";
-import { cn } from "@/lib/utils";
 import type { NotificationTab } from "@/types";
 
 interface NotificationTabsProps {
@@ -10,42 +10,41 @@ interface NotificationTabsProps {
   readonly onSelect: (tab: NotificationTab) => void;
 }
 
-/** All · Mentions · Assigned · Following, each carrying its own unread count. */
+/**
+ * All · Mentions · Assigned · Following, each carrying its own unread count.
+ *
+ * The pill variant is the skin this strip already wore; what it gains from
+ * `Tabs` is the keyboard — arrow keys across the filters and one tab stop for
+ * the group, where before every filter was its own stop on the way to the feed.
+ */
 export function NotificationTabs({ tab, unreadPerTab, onSelect }: NotificationTabsProps) {
   return (
-    <div role="tablist" aria-label="Notification filters" className="flex items-center gap-0.5">
-      {NOTIFICATION_TABS.map((definition) => {
-        const isActive = definition.id === tab;
-        const unread = unreadPerTab[definition.id];
-
-        return (
-          <button
+    <Tabs
+      variant="pill"
+      value={tab}
+      onValueChange={(value) => {
+        // The definitions are the only source of tab ids, so matching against
+        // them narrows the string back to a NotificationTab without a cast.
+        const definition = NOTIFICATION_TABS.find((entry) => entry.id === value);
+        if (definition) onSelect(definition.id);
+      }}
+    >
+      <TabsList aria-label="Notification filters">
+        {NOTIFICATION_TABS.map((definition) => (
+          <TabsTrigger
             key={definition.id}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => onSelect(definition.id)}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md px-2 py-1 text-ui transition-colors",
-              isActive
-                ? "bg-accent-soft text-accent"
-                : "text-muted-foreground hover:bg-hover hover:text-foreground",
-            )}
+            value={definition.id}
+            count={unreadPerTab[definition.id]}
+            // Both call sites — the bell popover and the full inbox — render
+            // the feed as a plain sibling rather than as a labelled panel, so
+            // there is no element for the trigger to control. A generated id
+            // pointing at nothing is worse than no id at all.
+            aria-controls={undefined}
           >
             {definition.label}
-            {unread > 0 && (
-              <span
-                className={cn(
-                  "metric rounded-full px-1 text-micro",
-                  isActive ? "bg-accent text-accent-foreground" : "bg-hover text-faint-foreground",
-                )}
-              >
-                {unread}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   );
 }
