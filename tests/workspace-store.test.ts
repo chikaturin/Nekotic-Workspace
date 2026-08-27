@@ -190,6 +190,36 @@ describe("folder and item lifecycle", () => {
     expect(findNodeById(tree(), ID.payment)?.name).toBe("Payment");
   });
 
+  /**
+   * The slug is what the URL addresses, and `resolvePath` takes the first
+   * sibling that matches one. Two siblings sharing a slug therefore does not
+   * look like a clash — it looks like the second item having vanished, with
+   * every link to it silently opening the first.
+   */
+  test("renameNode gives the node a slug no sibling already holds", () => {
+    actions().createFolder(ID.backend, "Reports");
+    actions().createFolder(ID.backend, "Archive");
+
+    const [reports, archive] = childrenOf(findNodeById(tree(), ID.backend)!).filter(
+      (node) => node.name === "Reports" || node.name === "Archive",
+    );
+
+    actions().renameNode(archive!.id, "Reports");
+
+    const renamed = findNodeById(tree(), archive!.id);
+    expect(renamed?.name).toBe("Reports");
+    expect(renamed?.slug).toBe("reports-2");
+    expect(findNodeById(tree(), reports!.id)?.slug).toBe("reports");
+  });
+
+  test("renaming a node to its own name keeps its slug", () => {
+    const before = findNodeById(tree(), ID.payment)?.slug;
+    actions().renameNode(ID.payment, "Payment");
+
+    // Its own slug must not count as taken, or every rename would add a "-2".
+    expect(findNodeById(tree(), ID.payment)?.slug).toBe(before);
+  });
+
   test("applyFileSave records the new size and bumps the version", () => {
     const before = findNodeById(tree(), ID.spec);
     const baseVersion = before && isFile(before) ? before.version : 0;

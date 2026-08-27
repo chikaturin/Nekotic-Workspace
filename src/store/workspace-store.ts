@@ -469,17 +469,33 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       };
     }),
 
+  /**
+   * Rename, and give the node a slug no sibling already holds.
+   *
+   * The slug is what the URL addresses, so two siblings sharing one is not a
+   * cosmetic clash: `resolvePath` walks the chain and takes the first match, so
+   * the loser becomes unreachable and every link to it silently opens the
+   * other. Creating deduped and renaming did not, which left the collision one
+   * rename away — and reachable the moment a document could be renamed from its
+   * own page.
+   */
   renameNode: (nodeId, name) =>
     set((state) => {
       const trimmed = name.trim();
       if (trimmed.length === 0) return state;
 
+      const tree = currentTree(state);
+      const parentId = parentIdOf(tree, nodeId);
+      const taken = siblingsOf(tree, parentId)
+        .filter((sibling) => sibling.id !== nodeId)
+        .map((sibling) => sibling.slug);
+
       return writeTree(
         state,
-        updateNode(currentTree(state), nodeId, (item) => ({
+        updateNode(tree, nodeId, (item) => ({
           ...item,
           name: trimmed,
-          slug: slugify(trimmed),
+          slug: uniqueSlug(slugify(trimmed), taken),
           updatedAt: MOCK_NOW,
         })),
       );
@@ -940,6 +956,12 @@ function writeTrash(state: WorkspaceState, entries: readonly TrashEntry[]) {
   return {
     trashByWorkspace: { ...state.trashByWorkspace, [state.activeWorkspaceId]: entries },
   };
+}
+
+/** The container a node sits in, or null when it sits at the root. */
+function parentIdOf(tree: readonly DriveNode[], nodeId: string): string | null {
+  const path = findPathToId(tree, nodeId);
+  return path[path.length - 2]?.id ?? null;
 }
 
 function siblingsOf(tree: readonly DriveNode[], parentId: string | null): readonly DriveNode[] {

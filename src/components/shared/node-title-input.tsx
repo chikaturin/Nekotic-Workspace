@@ -2,10 +2,13 @@
 
 import { usePathname } from "next/navigation";
 import { useState, type KeyboardEvent } from "react";
+import { DRIVE_ROOT_PATH } from "@/config/app";
 import { useOpenNode } from "@/hooks/use-open-node";
 import { useTitleFocus } from "@/hooks/use-title-focus";
-import { useWorkspaceStore } from "@/store/workspace-store";
-import { cn, slugify } from "@/lib/utils";
+import { chainOf } from "@/lib/exported-routes";
+import { findPathToId } from "@/lib/tree";
+import { getActiveTree, useWorkspaceStore } from "@/store/workspace-store";
+import { cn } from "@/lib/utils";
 import type { DriveNode } from "@/types";
 
 interface NodeTitleInputProps {
@@ -56,7 +59,10 @@ export function NodeTitleInput({ node, canRename, className }: NodeTitleInputPro
 
     renameNode(node.id, trimmed);
 
-    const next = hrefWithSlug(pathname, slugify(trimmed));
+    // Read the slug back rather than deriving it: the store deduplicates
+    // against siblings, so the name typed and the segment written are not
+    // always the same string.
+    const next = hrefAfterRename(pathname, node.id);
     if (next) openNode(next);
   }
 
@@ -95,16 +101,23 @@ export function NodeTitleInput({ node, canRename, className }: NodeTitleInputPro
 }
 
 /**
- * The current path with its last segment replaced.
+ * Where the page has to move to once the node has been renamed.
  *
- * Rebuilding from the tree instead would be more direct and is wrong: it
- * always answers `/drive/…`, so renaming from the Files section would silently
- * move the reader to a different one. Null at a section root, which has no
- * node segment to swap.
+ * Built from the tree, under whichever section root the reader came in through
+ * — `/drive` and `/files` address the same nodes, and rebuilding blindly would
+ * move somebody out of the section they were in.
+ *
+ * Splicing the current URL instead was the obvious version and was wrong. A
+ * node the static export has never heard of — anything created this session —
+ * is addressed as `/drive/?p=a/b/c`, whose *pathname* is just `/drive`: there
+ * is no last segment to replace, so a freshly created document renamed itself
+ * into a path that no longer resolved and the page went to "That path no
+ * longer exists". `useOpenNode` puts the query form back on when it is needed.
  */
-function hrefWithSlug(pathname: string, slug: string): string | null {
-  const segments = pathname.split("/").filter(Boolean);
-  if (segments.length < 2) return null;
+function hrefAfterRename(pathname: string, nodeId: string): string | null {
+  const root = chainOf(pathname)?.root ?? DRIVE_ROOT_PATH;
+  const path = findPathToId(getActiveTree(), nodeId);
+  if (path.length === 0) return null;
 
-  return `/${[...segments.slice(0, -1), slug].join("/")}`;
+  return `${root}/${path.map((node) => node.slug).join("/")}`;
 }
