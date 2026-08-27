@@ -12,7 +12,7 @@ import {
 } from "@/lib/board-dates";
 import { cellOf } from "@/lib/cell-values";
 import type { RowMap } from "@/lib/board-records";
-import type { BoardColumn } from "@/types";
+import type { BoardColumn, GanttZoom } from "@/types";
 
 /**
  * Gantt geometry over the shared records.
@@ -22,24 +22,36 @@ import type { BoardColumn } from "@/types";
  */
 
 /**
- * Two scales, on purpose.
+ * Four scales over the same unit.
  *
- * A roadmap is read at the granularity people plan at — a day or a week. A
- * month scale squeezed a day into five pixels, which made every bar look the
- * same length and every label unreadable, so it is not offered.
+ * Zoom never changes the arithmetic — a day is always one unit — only how many
+ * pixels that day is drawn as. Day reads a sprint, quarter reads a year, and
+ * every offset in between stays a whole number of days.
  */
-export type TimelineZoom = "day" | "week";
+export type TimelineZoom = GanttZoom;
 
-export const TIMELINE_ZOOMS: readonly TimelineZoom[] = ["day", "week"];
+export const TIMELINE_ZOOMS: readonly GanttZoom[] = ["day", "week", "month", "quarter"];
 
-export const DAY_WIDTH: Readonly<Record<TimelineZoom, number>> = {
+export const DAY_WIDTH: Readonly<Record<GanttZoom, number>> = {
   day: 44,
-  week: 16,
+  week: 18,
+  month: 7,
+  quarter: 3,
 };
 
-export const ZOOM_LABELS: Readonly<Record<TimelineZoom, string>> = {
+export const ZOOM_LABELS: Readonly<Record<GanttZoom, string>> = {
   day: "Day",
   week: "Week",
+  month: "Month",
+  quarter: "Quarter",
+};
+
+/** Where a zoom stops labelling every day and starts labelling periods. */
+const TICK_STRIDE: Readonly<Record<GanttZoom, "day" | "week" | "month">> = {
+  day: "day",
+  week: "week",
+  month: "month",
+  quarter: "month",
 };
 
 /** Days of blank space kept on each side of the data. */
@@ -179,24 +191,33 @@ export function timelineScale(
   };
 }
 
-/** Day labels when zoomed in, week starts when zoomed out. */
+/**
+ * Labels at the density the scale can carry: every day up close, every Monday
+ * a step out, every month once a day is only a few pixels wide.
+ */
 function buildTicks(startIso: string, dayCount: number, zoom: TimelineZoom): readonly TimelineTick[] {
   const ticks: TimelineTick[] = [];
+  const stride = TICK_STRIDE[zoom];
 
   for (let offset = 0; offset < dayCount; offset += 1) {
     const iso = addDays(startIso, offset);
 
-    if (zoom === "day") {
+    if (stride === "day") {
       ticks.push({ iso, offset, label: shortDayLabel(iso), isMajor: isFirstOfMonth(iso) });
       continue;
     }
 
-    // Week zoom labels the Monday that starts each week.
-    if (weekdayIndex(iso) !== 0) continue;
-    ticks.push({ iso, offset, label: shortDayLabel(iso), isMajor: isFirstOfMonth(iso) });
+    if (stride === "week") {
+      if (weekdayIndex(iso) !== 0) continue;
+      ticks.push({ iso, offset, label: shortDayLabel(iso), isMajor: isFirstOfMonth(iso) });
+      continue;
+    }
+
+    if (!isFirstOfMonth(iso)) continue;
+    ticks.push({ iso, offset, label: monthLabel(iso), isMajor: true });
   }
 
-  // A window shorter than a week can contain no Monday at all.
+  // A window shorter than the stride can contain no boundary at all.
   if (ticks.length === 0) {
     ticks.push({ iso: startIso, offset: 0, label: monthLabel(startIso), isMajor: true });
   }

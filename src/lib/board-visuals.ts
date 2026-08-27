@@ -38,14 +38,14 @@ export const VIEW_TYPE_LABELS: Readonly<Record<BoardViewType, string>> = {
   table: "Table",
   kanban: "Kanban",
   calendar: "Calendar",
-  timeline: "Timeline",
+  gantt: "Gantt",
 };
 
 const VIEW_ICONS: Readonly<Record<BoardViewType, LucideIcon>> = {
   table: Table2,
   kanban: SquareKanban,
   calendar: CalendarRange,
-  timeline: GanttChartSquare,
+  gantt: GanttChartSquare,
 };
 
 export function viewVisual(type: BoardViewType): ColumnVisual {

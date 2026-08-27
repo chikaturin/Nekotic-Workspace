@@ -93,7 +93,7 @@ describe("view configuration writes to the view, never the records", () => {
     await useBoardStore.getState().setHideEmptyGroups(true);
     await useBoardStore.getState().setDateColumn("col_due");
     await useBoardStore.getState().setEndDateColumn("col_start");
-    await useBoardStore.getState().setViewType("timeline");
+    await useBoardStore.getState().setViewType("gantt");
     await useBoardStore.getState().setRowHeight("tall");
 
     expect(activeView()).toMatchObject({
@@ -101,7 +101,7 @@ describe("view configuration writes to the view, never the records", () => {
       hideEmptyGroups: true,
       dateColumnId: "col_due",
       endDateColumnId: "col_start",
-      type: "timeline",
+      type: "gantt",
       rowHeight: "tall",
     });
     expect(board.columns).toBe(board.columns);

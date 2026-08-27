@@ -11,7 +11,7 @@ import { ArchivedBanner } from "@/components/shared/archived-banner";
 import { TableGrid } from "@/components/board/table/table-grid";
 import { CalendarBoard } from "@/components/board/views/calendar-board";
 import { KanbanBoard } from "@/components/board/views/kanban-board";
-import { TimelineBoard } from "@/components/board/views/timeline-board";
+import { GanttBoard } from "@/components/board/gantt/gantt-board";
 import { ErrorState, ListLoadingState, PermissionDeniedState } from "@/components/shared/state-panels";
 import { Button } from "@/components/ui/button";
 import { useBoard } from "@/hooks/use-board";
@@ -36,8 +36,8 @@ import type { BoardNode, ExportScope } from "@/types";
  * Board surface for a board node.
  *
  * One board, one record set, many views. The toolbar switches saved views and
- * the table renders the current one; Kanban, Calendar and Timeline plug into
- * the same `useBoardView` query when they land.
+ * the table renders the current one; Kanban, Calendar and Gantt all plug into
+ * the same `useBoardView` query.
  */
 export function BoardPage({ node }: { node: BoardNode }) {
   const { status, error, reload } = useBoard(node.id);
@@ -187,7 +187,7 @@ export function BoardPage({ node }: { node: BoardNode }) {
       {model.view?.type === "kanban" && <KanbanBoard model={model} canEdit={canEdit} />}
       {model.view?.type === "calendar" && <CalendarBoard model={model} canEdit={canEdit} />}
       {/* The roadmap is read-only: dates change on the record, not by dragging. */}
-      {model.view?.type === "timeline" && <TimelineBoard model={model} />}
+      {model.view?.type === "gantt" && <GanttBoard model={model} canEdit={canEdit} />}
       {(model.view?.type === "table" || !model.view) && (
         <TableGrid
           model={model}

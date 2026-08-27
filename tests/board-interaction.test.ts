@@ -245,7 +245,7 @@ describe("value helpers", () => {
 
   test("every column type and view type has a visual", () => {
     expect(columnVisual("relation").Icon).toBeTruthy();
-    expect(VIEW_TYPE_LABELS.timeline).toBe("Timeline");
+    expect(VIEW_TYPE_LABELS.gantt).toBe("Gantt");
   });
 });
 

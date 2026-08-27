@@ -28,9 +28,11 @@ import { isBoard } from "@/types";
 import type {
   Board,
   BoardColumn,
+  BoardKind,
   BoardNode,
   BoardRow,
   BoardSnapshot,
+  BoardViewType,
   BulkMoveResult,
   BulkResult,
   CellEdit,
@@ -65,11 +67,22 @@ interface BoardRecord {
 
 const registry = new Map<string, BoardRecord>();
 
+/** A drive node's board kind, as a saved-view type. */
+const VIEW_TYPE_BY_BOARD_KIND: Readonly<Record<BoardKind, BoardViewType>> = {
+  table: "table",
+  kanban: "kanban",
+  timeline: "gantt",
+  doc: "table",
+};
+
 function seedFromNode(nodeId: string): BoardRecord {
   const node = findNodeById(getActiveTree(), nodeId);
   if (!node || !isBoard(node)) throw notFound("That board");
 
-  const kind = node.boardKind === "doc" ? "table" : node.boardKind;
+  // The drive tree still calls a chart board a "timeline"; the board itself
+  // calls that view a Gantt. Translating here is what lets an older stored
+  // node keep opening on the right view.
+  const kind = VIEW_TYPE_BY_BOARD_KIND[node.boardKind];
   const { board, rows } = buildBoard({
     nodeId: node.id,
     workspaceId: node.workspaceId,

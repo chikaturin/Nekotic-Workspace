@@ -14,7 +14,7 @@ export function DateMenu({ model }: { model: BoardViewModel }) {
   const setEndDateColumn = useBoardStore((state) => state.setEndDateColumn);
 
   const dateColumns = columns.filter((column) => column.type === "date");
-  const isTimeline = view?.type === "timeline";
+  const isTimeline = view?.type === "gantt";
 
   return (
     <Popover>

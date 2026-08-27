@@ -40,6 +40,11 @@ export function weekdayIndex(iso: string): number {
   return (new Date(startOfDay(iso)).getUTCDay() + 6) % 7;
 }
 
+/** Saturday or Sunday, in UTC — what the chart shades. */
+export function isWeekend(iso: string): boolean {
+  return weekdayIndex(iso) >= 5;
+}
+
 export function startOfWeek(iso: string): string {
   return addDays(iso, -weekdayIndex(iso));
 }
@@ -85,6 +90,12 @@ export function monthLabel(iso: string): string {
 export function shortDayLabel(iso: string): string {
   const date = new Date(startOfDay(iso));
   return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()] ?? ""}`;
+}
+
+/** `26 Aug 2026` — the unambiguous form a tooltip should carry. */
+export function longDayLabel(iso: string): string {
+  const date = new Date(startOfDay(iso));
+  return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()] ?? ""} ${date.getUTCFullYear()}`;
 }
 
 export function dayOfMonth(iso: string): number {

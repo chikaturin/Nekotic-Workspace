@@ -197,7 +197,7 @@ const TASK: BoardTemplate = {
     { name: "Schedule", type: "calendar", dateColumnId: "col_due" },
     {
       name: "Roadmap",
-      type: "timeline",
+      type: "gantt",
       dateColumnId: "col_start",
       endDateColumnId: "col_due",
     },

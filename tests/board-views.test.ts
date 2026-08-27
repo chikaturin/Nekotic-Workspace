@@ -273,7 +273,7 @@ describe("calendar", () => {
 
 /* --------------------------------------------------------------- timeline */
 
-describe("timeline", () => {
+describe("gantt scale", () => {
   const rows = [
     makeRow("r1", {
       c_start: { kind: "date", iso: "2026-08-10T00:00:00.000Z" },
@@ -335,9 +335,12 @@ describe("timeline", () => {
     expect(weekScale.dayWidth).toBe(DAY_WIDTH.week);
   });
 
-  test("the roadmap offers day and week only", () => {
-    expect(TIMELINE_ZOOMS).toEqual(["day", "week"]);
-    expect(Object.keys(DAY_WIDTH)).toEqual(["day", "week"]);
+  test("the chart offers four scales, widest day to narrowest quarter", () => {
+    expect(TIMELINE_ZOOMS).toEqual(["day", "week", "month", "quarter"]);
+
+    // Each step out draws a day narrower — that is all zoom changes.
+    const widths = TIMELINE_ZOOMS.map((zoom) => DAY_WIDTH[zoom]);
+    expect(widths).toEqual([...widths].sort((a, b) => b - a));
   });
 });
 

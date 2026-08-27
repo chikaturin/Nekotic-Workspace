@@ -42,6 +42,7 @@ import type {
   RowHeight,
   SavedView,
   SelectOption,
+  GanttZoom,
   SubtaskDisplay,
   ViewFilter,
   ViewSort,
@@ -126,6 +127,9 @@ interface BoardActions {
   setRowHeight: (rowHeight: RowHeight) => Promise<void>;
   /** How this view reads the parent/child hierarchy. Presentation, not data. */
   setSubtaskDisplay: (display: SubtaskDisplay) => Promise<void>;
+  /** Gantt's time scale and whether it draws the dependency connectors. */
+  setGanttZoom: (zoom: GanttZoom) => Promise<void>;
+  setShowDependencies: (showDependencies: boolean) => Promise<void>;
 
   /* Saved views. Switching between them never copies a record. */
   createView: (name: string, type: BoardViewType) => Promise<string | null>;
@@ -834,6 +838,16 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
     setSubtaskDisplay: async (subtaskDisplay) => {
       await patchActiveView({ subtaskDisplay }, (view) => ({
         subtaskDisplay: view.subtaskDisplay,
+      }));
+    },
+
+    setGanttZoom: async (ganttZoom) => {
+      await patchActiveView({ ganttZoom }, (view) => ({ ganttZoom: view.ganttZoom }));
+    },
+
+    setShowDependencies: async (showDependencies) => {
+      await patchActiveView({ showDependencies }, (view) => ({
+        showDependencies: view.showDependencies,
       }));
     },
 

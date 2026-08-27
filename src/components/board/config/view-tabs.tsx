@@ -22,7 +22,7 @@ import { useBoardStore } from "@/store/board-store";
 import { cn } from "@/lib/utils";
 import type { BoardViewType, PermissionResolver, SavedView } from "@/types";
 
-const VIEW_TYPES: readonly BoardViewType[] = ["table", "kanban", "calendar", "timeline"];
+const VIEW_TYPES: readonly BoardViewType[] = ["table", "kanban", "calendar", "gantt"];
 
 /**
  * Saved views as tabs.

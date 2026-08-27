@@ -248,7 +248,13 @@ export interface BoardRow {
 
 /* ------------------------------------------------------------------- views */
 
-export type BoardViewType = "table" | "kanban" | "calendar" | "timeline";
+export type BoardViewType = "table" | "kanban" | "calendar" | "gantt";
+
+/**
+ * How wide a day is drawn. Day reads a sprint, quarter reads a year — the
+ * unit is always a whole day, only its pixel width changes.
+ */
+export type GanttZoom = "day" | "week" | "month" | "quarter";
 
 export type FilterOperator =
   | "isNotEmpty"
@@ -314,6 +320,10 @@ export interface SavedView {
    * view can nest subtasks while another lists every record flat.
    */
   readonly subtaskDisplay?: SubtaskDisplay;
+  /** Gantt's time scale. Presentation, so it belongs to the view. */
+  readonly ganttZoom?: GanttZoom;
+  /** Draw the "blocked by" connectors. Off is a legitimate way to read a plan. */
+  readonly showDependencies?: boolean;
 }
 
 /**

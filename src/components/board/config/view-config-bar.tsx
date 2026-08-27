@@ -32,7 +32,7 @@ export function ViewConfigBar({ model }: { model: BoardViewModel }) {
 
   const [isEditingRules, setIsEditingRules] = useState(false);
 
-  const needsDates = view?.type === "calendar" || view?.type === "timeline";
+  const needsDates = view?.type === "calendar" || view?.type === "gantt";
   const filters = view?.filters ?? [];
 
   /**
