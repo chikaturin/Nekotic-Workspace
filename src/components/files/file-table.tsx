@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Download, Ellipsis, Eye, Star, Trash2 } from "lucide-react";
+import { Download, Ellipsis, Eye, Trash2 } from "lucide-react";
+import { FavoriteStar } from "@/components/shared/favorite-star";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -94,7 +95,7 @@ export function FileTable({
               <div role="cell" className="flex min-w-0 items-center gap-2">
                 <Icon className={cn("size-4 shrink-0", colorClass)} />
                 <span className="min-w-0 truncate text-lead text-foreground">{file.name}</span>
-                {file.isFavorite && <Star className="size-3 shrink-0 fill-accent text-accent" />}
+                {file.isFavorite && <FavoriteStar isFavorite className="size-3 shrink-0" />}
               </div>
 
               <span role="cell" className="metric truncate text-body text-faint-foreground">
@@ -143,7 +144,7 @@ export function FileTable({
                     Download
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => onToggleFavorite(file.id)}>
-                    <Star />
+                    <FavoriteStar isFavorite={file.isFavorite} />
                     {file.isFavorite ? "Remove from favorites" : "Add to favorites"}
                   </DropdownMenuItem>
 

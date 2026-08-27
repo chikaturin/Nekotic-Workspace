@@ -10,13 +10,12 @@ import {
   PenLine,
   Share2,
   ShieldCheck,
-  Star,
-  StarOff,
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
 import { FolderAccessDialog } from "@/components/permissions/folder-access-dialog";
 import { PermissionDialog } from "@/components/permissions/permission-dialog";
+import { FavoriteStar } from "@/components/shared/favorite-star";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -92,7 +91,9 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
           {node.type === "file" ? "Preview" : "Open"}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => toggleFavorite(node.id)}>
-          {node.isFavorite ? <StarOff /> : <Star />}
+          {/* The icon is the state you have; the label is what the click
+              does. A slashed star said neither clearly. */}
+          <FavoriteStar isFavorite={node.isFavorite} />
           {node.isFavorite ? "Remove from favorites" : "Add to favorites"}
         </DropdownMenuItem>
         <DropdownMenuItem

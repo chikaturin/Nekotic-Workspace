@@ -1,7 +1,8 @@
 "use client";
 
-import { Download, Info, PanelRightClose, Pencil, Star, StarOff, X } from "lucide-react";
+import { Download, Info, PanelRightClose, Pencil, X } from "lucide-react";
 import { useRef, useState, type KeyboardEvent } from "react";
+import { FavoriteButton } from "@/components/shared/favorite-star";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -32,7 +33,6 @@ export function ViewerHeader({
   onClose,
 }: ViewerHeaderProps) {
   const renameNode = useWorkspaceStore((store) => store.renameNode);
-  const toggleFavorite = useWorkspaceStore((store) => store.toggleFavorite);
   const [draftName, setDraftName] = useState<string | null>(null);
   /** Escape must win over the blur that follows it. */
   const isCancellingRef = useRef(false);
@@ -115,14 +115,7 @@ export function ViewerHeader({
           </Button>
         )}
 
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          aria-label={node.isFavorite ? "Remove from favorites" : "Add to favorites"}
-          onClick={() => toggleFavorite(node.id)}
-        >
-          {node.isFavorite ? <StarOff className="text-warning" /> : <Star />}
-        </Button>
+        <FavoriteButton node={node} />
 
         <Button
           size="icon-sm"

@@ -1,10 +1,10 @@
 "use client";
 
-import { Star, StarOff } from "lucide-react";
+import { Star } from "lucide-react";
 import { useMemo } from "react";
 import { EntityRow } from "@/components/collections/entity-row";
 import { EmptyState } from "@/components/drive/empty-state";
-import { Button } from "@/components/ui/button";
+import { FavoriteButton } from "@/components/shared/favorite-star";
 import { useOpenEntity } from "@/hooks/use-entity-navigation";
 import { nodeRef } from "@/lib/entity-ref";
 import { formatCount } from "@/lib/format";
@@ -37,7 +37,6 @@ const isVisible = (node: DriveNode): boolean =>
 
 export function FavoritesPage() {
   const tree = useWorkspaceStore(selectTree);
-  const toggleFavorite = useWorkspaceStore((state) => state.toggleFavorite);
   const openEntity = useOpenEntity();
 
   const groups = useMemo(() => {
@@ -97,16 +96,9 @@ export function FavoritesPage() {
                       title={node.name}
                       subtitle={pathLabel(tree, node.id)}
                       onOpen={() => openEntity(nodeRef(node))}
-                      actions={
-                        <Button
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label={`Remove ${node.name} from favorites`}
-                          onClick={() => toggleFavorite(node.id)}
-                        >
-                          <StarOff />
-                        </Button>
-                      }
+                      // Every row here is starred, so the star is full. It
+                      // empties on hover, which is what the click does.
+                      actions={<FavoriteButton node={node} />}
                     />
                   );
                 })}
