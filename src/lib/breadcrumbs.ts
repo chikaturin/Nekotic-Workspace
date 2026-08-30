@@ -2,11 +2,6 @@ import { DRIVE_ROOT_PATH } from "@/config/app";
 import { buildHref } from "@/lib/tree";
 import { childrenOf, isContainer, type BreadcrumbTrail, type DriveNode, type Workspace } from "@/types";
 
-/**
- * Build the header trail: workspace root first, then every ancestor, then the
- * current node. Each crumb carries its sibling containers so the dropdown can
- * jump laterally without a round trip.
- */
 export function buildBreadcrumbs(
   workspace: Workspace,
   tree: readonly DriveNode[],

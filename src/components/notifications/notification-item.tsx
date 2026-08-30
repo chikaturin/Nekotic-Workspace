@@ -4,6 +4,7 @@ import { AtSign, Bell, MessageSquare, UserPlus, Eye, type LucideIcon } from "luc
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { formatRelativeTime } from "@/lib/format";
+import { plainBody } from "@/lib/mentions";
 import { cn } from "@/lib/utils";
 import type { AppNotification, NotificationReason } from "@/types";
 
@@ -21,10 +22,6 @@ interface NotificationItemProps {
   readonly isCompact?: boolean;
 }
 
-/**
- * One inbox row. Clicking it both marks it read and routes to its target, so
- * the two never diverge — an opened notification is a read notification.
- */
 export function NotificationItem({
   notification,
   onOpen,
@@ -48,7 +45,12 @@ export function NotificationItem({
       <span className="min-w-0 flex-1">
         <span className="block text-lead font-medium text-foreground">{notification.title}</span>
         <span className="mt-0.5 line-clamp-2 block text-ui text-muted-foreground">
-          {notification.body}
+          {/*
+            Server mới đã bỏ id trước khi lưu, nhưng những thông báo CŨ trong
+            máy người dùng vẫn mang `@[Tên](uuid)`. Bỏ ở đây nữa để chúng cũng
+            đọc được, không phải đợi thông báo mới.
+          */}
+          {plainBody(notification.body)}
         </span>
 
         <span className="metric mt-1 flex items-center gap-1.5 text-micro text-faint-foreground">

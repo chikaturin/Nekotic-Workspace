@@ -9,7 +9,6 @@ import { peekCommentDraft, useCommentDraft } from "@/hooks/use-comment-draft";
 import type { CommentAttachment, DirectoryUser } from "@/types";
 
 interface CommentComposerProps {
-  /** Storage key for the unsent draft — target key, plus the root for a reply. */
   readonly draftKey: string;
   readonly people: readonly DirectoryUser[];
   readonly placeholder: string;
@@ -21,17 +20,9 @@ interface CommentComposerProps {
     attachments: readonly CommentAttachment[],
   ) => Promise<boolean>;
   readonly onAttach: (file: File) => Promise<CommentAttachment | null>;
-  /** Present on reply composers, which can be dismissed. */
   readonly onCancel?: () => void;
 }
 
-/**
- * The comment composer.
- *
- * The unsent body is written to local storage on every keystroke, so closing
- * the drawer and coming back finds it intact. Attachments live in component
- * state — they are session object URLs and are not worth persisting.
- */
 export function CommentComposer({
   draftKey,
   people,
@@ -59,8 +50,6 @@ export function CommentComposer({
     const posted = await onSubmit(submitted, sent);
     if (!posted) return;
 
-    // The textarea stays editable while the post is in flight, so clear only
-    // what was actually sent — anything typed since is still the user's.
     const current = peekCommentDraft(draftKey);
     setDraft(current.startsWith(submitted) ? current.slice(submitted.length) : current);
     setAttachments((all) => all.filter((file) => !sent.includes(file)));
@@ -114,7 +103,7 @@ export function CommentComposer({
           {isAttaching
             ? "Attaching…"
             : draft.trim().length > 0
-              ? "Draft saved · @ to mention · ⌘↵ to send"
+              ? "Draft saved · @ to mention · ↵ to send · ⇧↵ for a new line"
               : "@ to mention a teammate"}
         </span>
 

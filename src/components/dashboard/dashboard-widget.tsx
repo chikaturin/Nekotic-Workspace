@@ -13,13 +13,6 @@ interface DashboardWidgetProps {
   readonly onOpenSource: (nodeId: string) => void;
 }
 
-/**
- * One widget (SY-DSH-44): a proportion, the numbers behind it, and where the
- * numbers came from.
- *
- * A count you cannot trace is not much use, so every card names the boards it
- * read and says plainly how many records it could not place.
- */
 export function DashboardWidget({ widget, icon: Icon, onOpenSource }: DashboardWidgetProps) {
   const isEmpty = widget.total === 0;
 
@@ -103,7 +96,6 @@ export function DashboardWidget({ widget, icon: Icon, onOpenSource }: DashboardW
           <span className="text-faint-foreground">No board contributes to this yet</span>
         )}
 
-        {/* Reported rather than folded into the nearest bucket. */}
         {widget.unmapped > 0 && (
           <span className="ml-auto text-faint-foreground">
             {formatCount(widget.unmapped, "record")} in another state

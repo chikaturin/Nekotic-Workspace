@@ -5,13 +5,6 @@ import type { RowMap } from "@/lib/board-records";
 import type { RangeBox } from "@/lib/grid-selection";
 import type { BoardColumn, CellEdit } from "@/types";
 
-/**
- * Excel-style copy and paste over a cell range.
- *
- * The wire format is TSV, which is what spreadsheets put on the clipboard, so
- * a range copied here pastes straight into Excel, Sheets or Numbers and back.
- */
-
 export interface GridSlice {
   readonly rowIds: readonly string[];
   readonly columns: readonly BoardColumn[];
@@ -41,17 +34,10 @@ export function copyRange(slice: GridSlice, box: RangeBox): string {
 
 export interface PasteResult {
   readonly edits: readonly CellEdit[];
-  /** Cells the clipboard held that fell outside the grid. */
   readonly skipped: number;
-  /** Values that could not be parsed and were kept as text with a warning. */
   readonly preserved: number;
 }
 
-/**
- * Write a clipboard payload into the grid starting at `anchor`. Values are
- * parsed into each target column's own type, so pasting a date column into a
- * select column behaves exactly like a column conversion would.
- */
 export function pasteRange(slice: GridSlice, anchor: RangeBox, text: string): PasteResult {
   const matrix = parseDelimited(text, TAB);
   const edits: CellEdit[] = [];
@@ -80,7 +66,6 @@ export function pasteRange(slice: GridSlice, anchor: RangeBox, text: string): Pa
   return { edits, skipped, preserved };
 }
 
-/** Clearing a range writes the empty value for each column's type. */
 export function clearRange(slice: GridSlice, box: RangeBox): readonly CellEdit[] {
   const edits: CellEdit[] = [];
 

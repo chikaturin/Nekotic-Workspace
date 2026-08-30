@@ -10,13 +10,6 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { useNotificationStore } from "@/store/notification-store";
 import { formatCount } from "@/lib/format";
 
-/**
- * The bell (CO-NOT-29).
- *
- * The unread count is derived from the inbox rather than tracked separately,
- * so a realtime frame, a click on a row and "mark all read" can never leave
- * the badge disagreeing with the list behind it.
- */
 export function NotificationBell() {
   const controller = useNotifications();
   const isOpen = useNotificationStore((state) => state.isPanelOpen);

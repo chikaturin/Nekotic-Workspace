@@ -3,7 +3,6 @@ import { documentExcerpt } from "@/lib/blocks";
 import { contentForSlug } from "@/mock/document-content";
 import type { DriveNode } from "@/types";
 
-/** Documents declare their summary from the seeded blocks — never by hand. */
 function docSpecFrom(
   name: string,
   slug: string,
@@ -33,8 +32,6 @@ function docSpecFrom(
     ownerIndex: options.ownerIndex,
   });
 }
-
-/* ------------------------------------------------------------------ NexDrop */
 
 const paymentFolder = folder({
   name: "Payment",
@@ -184,7 +181,6 @@ const developmentProject = project({
       ownerIndex: 1,
     }),
     board({ name: "Release Checklist", boardKind: "table", itemCount: 22, openCount: 4, updatedHoursAgo: 10 }),
-    // The virtualisation target from the PRD: 5.000 records in one table view.
     board({
       name: "QA Regression Log",
       boardKind: "table",
@@ -326,7 +322,7 @@ const legalVaultFolder = folder({
   ],
 });
 
-const NEXDROP_SPEC: readonly NodeSpec[] = [
+const NEKOTIC_SPEC: readonly NodeSpec[] = [
   developmentProject,
   designProject,
   marketingProject,
@@ -335,8 +331,6 @@ const NEXDROP_SPEC: readonly NodeSpec[] = [
   file({ name: "quarterly-okrs.xlsx", sizeBytes: 233_118, updatedHoursAgo: 46 }),
   file({ name: "deprecated-pitch.pdf", sizeBytes: 900_118, updatedHoursAgo: 400, trashed: true }),
 ];
-
-/* -------------------------------------------------------------- Aurora Labs */
 
 const AURORA_SPEC: readonly NodeSpec[] = [
   project({
@@ -363,10 +357,8 @@ const AURORA_SPEC: readonly NodeSpec[] = [
   }),
 ];
 
-/* ----------------------------------------------------------------- exports */
-
-export const NEXDROP_TREE: readonly DriveNode[] = hydrate(NEXDROP_SPEC, {
-  workspaceId: "ws_nexdrop",
+export const NEKOTIC_TREE: readonly DriveNode[] = hydrate(NEKOTIC_SPEC, {
+  workspaceId: "ws_nekotic",
   parentId: null,
   idPrefix: "nd",
 });
@@ -377,11 +369,10 @@ export const AURORA_TREE: readonly DriveNode[] = hydrate(AURORA_SPEC, {
   idPrefix: "al",
 });
 
-/** A workspace nobody has put anything in yet. */
 export const ATLAS_TREE: readonly DriveNode[] = [];
 
 export const TREES_BY_WORKSPACE: Readonly<Record<string, readonly DriveNode[]>> = {
-  ws_nexdrop: NEXDROP_TREE,
+  ws_nekotic: NEKOTIC_TREE,
   ws_aurora: AURORA_TREE,
   ws_atlas: ATLAS_TREE,
 };

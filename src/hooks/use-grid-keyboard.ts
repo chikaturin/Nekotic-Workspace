@@ -12,22 +12,11 @@ interface GridKeyboardInput {
   readonly columns: readonly BoardColumn[];
   readonly onClearSelection: () => void;
   readonly onScrollToRow: (index: number) => void;
-  /** Navigation stays live on a frozen board; only the write keys go quiet. */
   readonly isReadOnly?: boolean;
 }
 
-/** Types whose editor opens on a keystroke rather than needing a click. */
 const TYPEAHEAD_TYPES = new Set<BoardColumn["type"]>(["text", "longText"]);
 
-/**
- * Spreadsheet keyboard model: arrows move, Shift extends, Tab walks, Enter
- * edits, typing replaces, Delete clears, Space opens the record drawer.
- *
- * It is bound to the grid container, which also contains the column headers, so
- * the first thing it does is check the key was actually meant for it. A field
- * inside the grid — the header's rename input above all — keeps its own
- * keystrokes; see `dom/typing-target`.
- */
 export function useGridKeyboard({
   bounds,
   rowIds,
@@ -38,8 +27,6 @@ export function useGridKeyboard({
 }: GridKeyboardInput) {
   return useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      // A keystroke aimed at a field inside the grid is that field's, not the
-      // cursor's — even one the grid itself rendered.
       if (!isGridKeyTarget(event.target)) return;
 
       const grid = useGridStore.getState();
@@ -91,9 +78,6 @@ export function useGridKeyboard({
 
         case "Enter": {
           event.preventDefault();
-          // Asked unconditionally: the cell itself knows whether it can be
-          // edited — the board may be writable while *this record* is archived
-          // — and it answers a request it cannot honour by opening the reader.
           if (rowId && column) grid.beginEdit(rowId, column.id);
           return;
         }
@@ -126,7 +110,6 @@ export function useGridKeyboard({
         return;
       }
 
-      // Typing over a cell replaces it, the way a spreadsheet does.
       if (!isReadOnly && !isMod && !event.altKey && event.key.length === 1 && rowId && column) {
         if (!TYPEAHEAD_TYPES.has(column.type)) return;
         event.preventDefault();

@@ -2,14 +2,12 @@
 
 import { Search } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
-import { useMounted } from "@/hooks/use-mounted";
+import { useModKeyLabel } from "@/hooks/use-mod-key";
 import { useWorkspaceStore } from "@/store/workspace-store";
 
-/** Header affordance that opens the ⌘K palette. */
 export function GlobalSearch() {
   const setSearchOpen = useWorkspaceStore((state) => state.setSearchOpen);
-  const isMounted = useMounted();
-  const isMac = isMounted && navigator.platform.toLowerCase().includes("mac");
+  const modKey = useModKeyLabel();
 
   return (
     <button
@@ -20,7 +18,7 @@ export function GlobalSearch() {
       <Search className="size-4 shrink-0" />
       <span className="min-w-0 flex-1 truncate">Search workspace…</span>
       <span className="flex shrink-0 items-center gap-1">
-        <Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
+        <Kbd>{modKey}</Kbd>
         <Kbd>K</Kbd>
       </span>
     </button>

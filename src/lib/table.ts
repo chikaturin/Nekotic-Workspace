@@ -11,7 +11,6 @@ export function rowCount(block: TableBlock): number {
   return block.rows.length;
 }
 
-/** Pad every row to the widest one so the grid is always rectangular. */
 export function normalizeTable(block: TableBlock): TableBlock {
   const width = Math.max(MIN_COLUMNS, ...block.rows.map((row) => row.length));
   const rows = block.rows.map((row) =>

@@ -3,23 +3,10 @@
 import { TriangleAlert } from "lucide-react";
 import { useCallback, useRef, type ReactNode } from "react";
 import { useDismissOnOutside } from "@/hooks/use-dismiss-on-outside";
+import { GRID_SCROLLER_ATTR } from "@/lib/dom/grid-scroll";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-/**
- * Shared shell for a read-only cell: one line, ellipsis, no layout surprises.
- *
- * `overflow-hidden` is the load-bearing part. A cell's width is a CSS variable
- * the user set by dragging a column edge, and without a clip the content simply
- * ignored it — a Blocked by cell holding four links drew all four, straight
- * across whatever column came next. Clipping here rather than in each view is
- * what makes that true of every cell type at once, and it is why the chip lists
- * inside are free to be laid out in the obvious way.
- *
- * It also pins the row's height: the flex row does not wrap, so a cell with
- * twenty values is exactly as tall as one with none — which is the contract the
- * virtualiser is measuring rows against.
- */
 export function CellShell({
   children,
   className,
@@ -27,14 +14,6 @@ export function CellShell({
 }: {
   children: ReactNode;
   className?: string;
-  /**
-   * The cell wraps rather than sitting on one line. Its text starts at the top
-   * instead of being centred, because a five-line paragraph centred against a
-   * one-line neighbour reads as misaligned. The row has already been made tall
-   * enough by the grid, so nothing here has to grow — it only has to clip to
-   * the height it was given, which is what keeps the estimate and the render
-   * agreeing.
-   */
   isFlowed?: boolean;
 }) {
   return (
@@ -50,14 +29,6 @@ export function CellShell({
   );
 }
 
-/**
- * The "+4" that stands for the values a cell had no room for.
- *
- * It carries the full list as its title, so the whole set is one hover away
- * even where the grid is read-only and no editor will open. Where the cell *is*
- * editable, `GridCell` treats a click on it as "open this cell" — the marked
- * attribute is what it looks for.
- */
 export function CellOverflowCount({ count, title }: { count: number; title: string }) {
   return (
     <span
@@ -70,10 +41,6 @@ export function CellOverflowCount({ count, title }: { count: number; title: stri
   );
 }
 
-/**
- * Marker for a value the column could not parse — a converted column keeps the
- * original text and flags it here instead of dropping the data.
- */
 export function UnparsedBadge({ text }: { text: string }) {
   return (
     <Tooltip>
@@ -88,18 +55,6 @@ export function UnparsedBadge({ text }: { text: string }) {
   );
 }
 
-/**
- * Popover surface used by the editors that need more room than the cell.
- *
- * It sits at `z-raised`: above every other cell, and *below* the frozen row
- * gutter and primary column at `z-sticky`. That ordering is the whole fix for
- * the panel that used to bleed across the sticky ID column — it outranked the
- * frozen pane, so an editor opened on a cell scrolled part-way underneath was
- * painted straight over the top of it. A frozen column is the one thing in a
- * table that must never be drawn on; the panel goes behind it instead, and
- * `revealBeyondFrozen` scrolls the cell clear first so there is nothing left
- * hidden. Bumping the z-index the other way would have made the bleed worse.
- */
 export function EditorSurface({
   children,
   className,
@@ -107,22 +62,21 @@ export function EditorSurface({
 }: {
   children: ReactNode;
   className?: string;
-  /**
-   * Close on a click outside or on Escape. For the editors that hold no
-   * focused field of their own — an attachment panel is a grid of thumbnails,
-   * not an input — where blur would otherwise never fire and the only way out
-   * is a button the user has to find.
-   */
   onDismiss?: () => void;
 }) {
   const surface = useRef<HTMLDivElement>(null);
   const dismiss = useCallback(() => onDismiss?.(), [onDismiss]);
 
-  useDismissOnOutside(surface, onDismiss ? dismiss : NO_DISMISS);
+  const attach = useCallback((panel: HTMLDivElement | null) => {
+    surface.current = panel;
+    keepPanelInView(panel);
+  }, []);
+
+  useDismissOnOutside(surface, onDismiss ? dismiss : null);
 
   return (
     <div
-      ref={surface}
+      ref={attach}
       className={cn(
         "absolute left-0 top-0 z-raised min-w-full rounded-md border border-accent bg-elevated shadow-float",
         className,
@@ -133,5 +87,19 @@ export function EditorSurface({
   );
 }
 
-/** Stable no-op, so a surface without `onDismiss` never re-subscribes. */
-const NO_DISMISS = () => undefined;
+const PANEL_EDGE_GAP = 8;
+
+function keepPanelInView(panel: HTMLDivElement | null): void {
+  if (!panel) return;
+
+  const scroller = panel.closest<HTMLElement>(`[${GRID_SCROLLER_ATTR}]`);
+  const limit = scroller
+    ? scroller.getBoundingClientRect().right
+    : document.documentElement.clientWidth;
+
+  if (panel.getBoundingClientRect().right + PANEL_EDGE_GAP <= limit) return;
+
+  panel.style.left = "auto";
+  panel.style.right = "0";
+}
+

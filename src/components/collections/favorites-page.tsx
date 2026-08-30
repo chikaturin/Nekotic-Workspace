@@ -13,14 +13,6 @@ import { collectNodes, pathLabel } from "@/lib/tree";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
 import { isDocument, type DriveNode, type DriveNodeType } from "@/types";
 
-/**
- * Favorites (CO-FAV-32).
- *
- * Starring already lives on the drive node, so this view adds no second list —
- * it groups what the tree already knows, which is why un-starring here updates
- * the sidebar and the drive grid in the same frame.
- */
-
 const GROUP_ORDER: readonly DriveNodeType[] = ["project", "folder", "board", "document", "file"];
 
 const GROUP_LABELS: Readonly<Record<DriveNodeType, string>> = {
@@ -31,7 +23,6 @@ const GROUP_LABELS: Readonly<Record<DriveNodeType, string>> = {
   file: "Files",
 };
 
-/** Archived pages are hidden here, exactly as they are in the drive. */
 const isVisible = (node: DriveNode): boolean =>
   node.isFavorite && !node.isTrashed && !(isDocument(node) && node.isArchived);
 
@@ -96,8 +87,6 @@ export function FavoritesPage() {
                       title={node.name}
                       subtitle={pathLabel(tree, node.id)}
                       onOpen={() => openEntity(nodeRef(node))}
-                      // Every row here is starred, so the star is full. It
-                      // empties on hover, which is what the click does.
                       actions={<FavoriteButton node={node} />}
                     />
                   );

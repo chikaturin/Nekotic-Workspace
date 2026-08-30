@@ -12,13 +12,8 @@ import { columnVisual } from "@/lib/board-visuals";
 import { useBoardStore } from "@/store/board-store";
 import { useGridStore } from "@/store/grid-store";
 
-/** Columns that produce meaningful buckets. */
 const GROUPABLE = new Set(["select", "user", "date", "text"]);
 
-/**
- * Grouping for the table and Kanban. Kanban always groups — its columns are
- * the groups — so the same setting drives both.
- */
 export function GroupMenu({ model }: { model: BoardViewModel }) {
   const { view, columns, groups } = model;
   const setGroupBy = useBoardStore((state) => state.setGroupBy);
@@ -29,9 +24,6 @@ export function GroupMenu({ model }: { model: BoardViewModel }) {
   const isGrouped = Boolean(view?.groupByColumnId);
   const isKanban = view?.type === "kanban";
 
-  // The picker's trigger is a div rather than a control the browser will
-  // associate with a wrapping <label>, so the visible caption is pointed at
-  // explicitly instead.
   const groupByLabelId = useId();
 
   return (
@@ -49,10 +41,6 @@ export function GroupMenu({ model }: { model: BoardViewModel }) {
           <span id={groupByLabelId} className="w-16 shrink-0 text-body text-muted-foreground">
             Group by
           </span>
-          {/* The type icon is what distinguishes the four groupable kinds:
-              grouping by a date column buckets by day and grouping by a text
-              one buckets by exact string, and the names alone never said so.
-              Clearing the picker is the old "None" option — same null. */}
           <Select
             aria-labelledby={groupByLabelId}
             size="sm"

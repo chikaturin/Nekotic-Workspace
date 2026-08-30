@@ -29,13 +29,11 @@ import type { CapabilitySet, WorkspaceDocument } from "@/types";
 interface DocumentActionsMenuProps {
   readonly document: WorkspaceDocument;
   readonly actions: DocumentActions;
-  /** Capabilities before the lock is applied, so unlocking stays possible. */
   readonly capabilities: CapabilitySet;
   readonly onMoveRequested: () => void;
   readonly onHistoryRequested: () => void;
 }
 
-/** Pin · Lock · History · Duplicate · Move · Archive · Delete, each gated. */
 export function DocumentActionsMenu({
   document,
   actions,

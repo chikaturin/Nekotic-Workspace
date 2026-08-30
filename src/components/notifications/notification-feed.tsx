@@ -10,17 +10,9 @@ import type { AppNotification } from "@/types";
 interface NotificationFeedProps {
   readonly controller: ReturnType<typeof useNotifications>;
   readonly isCompact?: boolean;
-  /** Lets the bell close its popover once a notification has been opened. */
   readonly onOpened?: () => void;
 }
 
-/**
- * The inbox list.
- *
- * Opening a notification marks it read and routes to its target: a record
- * lands on its board with the drawer open, a page opens the page, and a
- * system notice with no target simply marks itself read.
- */
 export function NotificationFeed({
   controller,
   isCompact = false,

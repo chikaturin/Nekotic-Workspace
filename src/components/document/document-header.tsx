@@ -41,13 +41,10 @@ interface DocumentHeaderProps {
   readonly onRetrySave: () => void;
   readonly onMoveRequested: () => void;
   readonly onHistoryRequested: () => void;
-  /** Enter in the title jumps into the body. */
   readonly onTitleSubmit: () => void;
   readonly isFullScreen: boolean;
   readonly onToggleFullScreen: () => void;
-  /** The page itself, for the follow button. */
   readonly watchTarget: EntityRef;
-  /** Drive node id, so a freshly created page can claim its own title focus. */
   readonly nodeId: string;
 }
 

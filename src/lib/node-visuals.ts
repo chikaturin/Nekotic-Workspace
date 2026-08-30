@@ -20,9 +20,7 @@ import type { BoardKind, DriveNode, FileKind } from "@/types";
 
 export interface NodeVisual {
   readonly Icon: LucideIcon;
-  /** Tailwind text color bound to a `--color-kind-*` token. */
   readonly colorClass: string;
-  /** Matching translucent surface for icon tiles. */
   readonly tintClass: string;
   readonly label: string;
 }
@@ -65,10 +63,6 @@ const BOARD_LABELS: Record<BoardKind, string> = {
   doc: "Doc",
 };
 
-/**
- * Tailwind can only see class names it finds as literals, so every kind class
- * is written out in full rather than composed from a template string.
- */
 const FILE_COLOR_CLASSES: Record<FileKind, string> = {
   image: "text-kind-image",
   document: "text-kind-document",
@@ -93,7 +87,6 @@ const FILE_TINT_CLASSES: Record<FileKind, string> = {
   other: "bg-kind-other/10",
 };
 
-/** Visual treatment for a file kind on its own — used by attachment chips. */
 export function fileKindVisual(kind: FileKind): NodeVisual {
   return {
     Icon: FILE_ICONS[kind],
@@ -103,7 +96,6 @@ export function fileKindVisual(kind: FileKind): NodeVisual {
   };
 }
 
-/** Icon, color and type label for any node. `isOpen` swaps the folder glyph. */
 export function nodeVisual(node: DriveNode, isOpen = false): NodeVisual {
   switch (node.type) {
     case "project":
@@ -202,7 +194,6 @@ const EXTENSION_KINDS: Record<string, FileKind> = {
   css: "code",
 };
 
-/** Classify an uploaded file from its extension. Defaults to `other`. */
 export function kindFromFileName(fileName: string): FileKind {
   const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
   return EXTENSION_KINDS[extension] ?? "other";
@@ -213,7 +204,6 @@ export function extensionOf(fileName: string): string {
   return parts.length > 1 ? (parts.pop()?.toLowerCase() ?? "") : "";
 }
 
-/** Kinds the quick-preview modal can render inline. */
 export function isPreviewable(node: DriveNode): boolean {
   return node.type === "file" && ["image", "document", "code", "pdf"].includes(node.kind);
 }

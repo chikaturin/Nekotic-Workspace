@@ -10,22 +10,15 @@ import type { Block } from "@/types";
 
 interface BlockEditorProps {
   readonly blocks: readonly Block[];
-  /** Owned by the page so the toolbar and title can drive it too. */
   readonly api: BlockEditorApi;
   readonly isEditable: boolean;
-  /** Folder that image and attachment uploads are filed into. */
   readonly folderId: string | null;
 }
 
-/**
- * The editor surface: a list of blocks with slash commands, drag reordering and
- * keyboard-first editing. All structural rules come from `useBlockEditor`.
- */
 export function BlockEditor({ blocks, api, isEditable, folderId }: BlockEditorProps) {
   const slashMenu = useSlashMenu();
   const dnd = useBlockDnd(api.moveToInsertionIndex, isEditable);
 
-  /** Numbered lists restart after any non-numbered block. */
   const ordinals = useMemo(() => {
     const result: number[] = [];
 

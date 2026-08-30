@@ -14,18 +14,10 @@ import { splitForCell } from "@/lib/cell-overflow";
 import { DELETED_LABEL } from "@/lib/cell-values";
 import { cn } from "@/lib/utils";
 import { boardService } from "@/services/board-service";
-import type { BoardColumnOf, BoardRow, CellValue } from "@/types";
+import type { BoardColumn, BoardColumnOf, BoardRow, CellValue } from "@/types";
 
 type RelationValue = Extract<CellValue, { kind: "relation" }>;
 
-/**
- * Relation is wired end to end for one board today and shaped for the module
- * that lands later: the column names a target board, the value stores row ids,
- * and lookup goes through `boardService.searchRows`, which a real API replaces
- * one-for-one. Bidirectional mirroring and referential cleanup are the parts
- * still owned by the backend — see the API report.
- */
-/** What a linked id reads as: its record's own display id, or the raw id. */
 function relationLabel(
   rowId: string,
   labels: ReadonlyMap<string, string>,
@@ -36,14 +28,6 @@ function relationLabel(
   return isResolved ? DELETED_LABEL : rowId;
 }
 
-/**
- * Links, in a cell one line tall.
- *
- * A "Blocked by" field routinely holds more records than a column is wide, so
- * only the first few are drawn and the rest are counted. The count carries the
- * whole list as its title and opens the cell when clicked, which is what keeps
- * the truncation a summary rather than a loss.
- */
 export function RelationCellView({
   value,
   labels,
@@ -51,7 +35,6 @@ export function RelationCellView({
 }: {
   value: RelationValue;
   labels: ReadonlyMap<string, string>;
-  /** Until every target board has answered, an unknown id is not a deletion. */
   isResolved?: boolean;
 }) {
   const { shown, overflow } = splitForCell(value.rowIds);
@@ -68,9 +51,6 @@ export function RelationCellView({
                 key={rowId}
                 title={relationLabel(rowId, labels, isResolved)}
                 className={cn(
-                  // `min-w-0` and the truncate inside are what stop one long
-                  // display id doing on its own what four short ones do
-                  // together: pushing the cell past the column it lives in.
                   "metric inline-flex min-w-0 shrink items-center gap-1 rounded border px-1.5 py-0.5 text-micro",
                   isDeleted
                     ? "border-danger/40 bg-danger/10 text-danger"
@@ -102,17 +82,20 @@ export function RelationCellView({
 interface RelationEditorProps {
   readonly value: RelationValue;
   readonly column: BoardColumnOf<"relation">;
-  /** Board the relation points at; falls back to the current board. */
   readonly targetBoardId: string;
+  readonly boardId: string;
   readonly primaryColumnId: string;
   readonly onCommit: (value: CellValue) => void;
   readonly onCancel: () => void;
 }
 
+const NO_COLUMNS: readonly BoardColumn[] = [];
+
 export function RelationCellEditor({
   value,
   column,
   targetBoardId,
+  boardId,
   primaryColumnId,
   onCommit,
   onCancel,
@@ -132,6 +115,26 @@ export function RelationCellEditor({
   const results = state.status === "success" ? state.data : [];
   const isLoading = state.status === "loading" || state.status === "idle";
   const error = state.status === "error" ? state.error.message : null;
+
+  const isCrossBoard = targetBoardId !== boardId;
+  const needsLookup = isCrossBoard && column.config.displayColumnId === null;
+
+  const schemaLoader = useCallback(
+    (signal: AbortSignal) =>
+      needsLookup
+        ? boardService.listColumns(targetBoardId, signal)
+        : Promise.resolve(NO_COLUMNS),
+    [needsLookup, targetBoardId],
+  );
+
+  const { state: schema } = useAsyncResource<readonly BoardColumn[]>(schemaLoader, {
+    keepPreviousData: true,
+  });
+
+  const titleColumnId =
+    schema.status === "success"
+      ? (schema.data.find((candidate) => candidate.isPrimary)?.id ?? primaryColumnId)
+      : primaryColumnId;
 
   const chosen = useMemo(() => new Set(selected), [selected]);
 
@@ -198,7 +201,7 @@ export function RelationCellEditor({
         {!isLoading &&
           !error &&
           results.map((row) => {
-            const title = row.cells[primaryColumnId];
+            const title = row.cells[titleColumnId];
 
             return (
               <button

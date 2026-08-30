@@ -13,11 +13,9 @@ interface PreviewSurfaceProps {
   readonly onDownload: () => void;
   readonly canDownload: boolean;
   readonly canEdit: boolean;
-  /** Re-read the file after its bytes changed. */
   readonly onSaved: () => void;
 }
 
-/** Maps a resolved preview to its renderer. The service decides the strategy. */
 export function PreviewSurface({
   preview,
   node,

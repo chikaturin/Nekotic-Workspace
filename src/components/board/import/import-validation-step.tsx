@@ -18,10 +18,6 @@ const POLICY_LABELS: Readonly<Record<ImportInvalidPolicy, string>> = {
   blank: "Import them with the flagged cells empty",
 };
 
-/**
- * Step 3: what the board would refuse, listed per row before anything is
- * written — and the two answers the user can give it.
- */
 export function ImportValidationStep({ plan, policy, onSetPolicy }: ImportValidationStepProps) {
   const shown = plan.issues.slice(0, IMPORT_ISSUE_LIMIT);
   const isClean = plan.invalidCount === 0;
@@ -60,8 +56,6 @@ export function ImportValidationStep({ plan, policy, onSetPolicy }: ImportValida
           <RadioGroup
             label="Rows with a value the column cannot read"
             value={policy}
-            // The group speaks in plain strings; the only ones it can hand back
-            // are the keys of `POLICY_LABELS` rendered just below.
             onValueChange={(value) => onSetPolicy(value as ImportInvalidPolicy)}
           >
             {(Object.keys(POLICY_LABELS) as ImportInvalidPolicy[]).map((candidate) => (

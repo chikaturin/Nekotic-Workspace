@@ -17,7 +17,6 @@ async function loadBoard() {
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-  boardService.reset();
 
   useWorkspaceStore.setState({
     workspaces: [TEST_WORKSPACE],
@@ -116,6 +115,18 @@ describe("board service", () => {
     expect(await boardService.searchRows(board.id, "nothing-matches-this")).toHaveLength(0);
   });
 
+  test("an empty query lists records instead of finding none", async () => {
+    // Picker relation mở ra với ô tìm kiếm còn trống. `rows/search` trả `[]`
+    // cho chuỗi rỗng — đúng với nghĩa của nó — nên hỏi thẳng vào đó sẽ cho một
+    // picker trống trơn mà không ai đoán ra là phải gõ mới thấy gì.
+    const { board } = await boardService.getBoard(ID.roadmap);
+
+    const browsing = await boardService.searchRows(board.id, "");
+
+    expect(browsing.length).toBeGreaterThan(0);
+    expect(await boardService.searchRows(board.id, "   ")).toHaveLength(browsing.length);
+  });
+
   test("creating a select option appends it to the column schema", async () => {
     const { board } = await boardService.getBoard(ID.roadmap);
     const select = board.columns.find((column) => column.type === "select");
@@ -125,7 +136,7 @@ describe("board service", () => {
     const refreshed = await boardService.getBoard(ID.roadmap);
     const updated = refreshed.board.columns.find((column) => column.id === select.id);
 
-    expect(option.label).toBe("Deferred");
+    expect(option?.label).toBe("Deferred");
     expect(updated?.type === "select" && updated.config.options.at(-1)?.label).toBe("Deferred");
   });
 });

@@ -28,8 +28,6 @@ export interface ColumnVisual {
   readonly Icon: LucideIcon;
 }
 
-/** Returns the icon as a property, not as a bare return value — a component
- * handed straight back from a call reads as "created during render". */
 export function columnVisual(type: ColumnType): ColumnVisual {
   return { Icon: COLUMN_ICONS[type] };
 }

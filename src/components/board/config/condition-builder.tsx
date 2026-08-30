@@ -37,28 +37,15 @@ interface ConditionBuilderProps {
   readonly columns: readonly BoardColumn[];
   readonly people: readonly DirectoryUser[];
   readonly onChange: (group: ConditionGroup) => void;
-  /** Nested groups indent; the root does not. */
   readonly depth?: number;
   readonly onRemove?: () => void;
 }
 
-/**
- * One step for every control in a condition row. The builder is nested inside
- * a dialog that is already dense, and a row mixing 32px pickers with a 28px
- * value field reads as two rows sharing a line.
- */
 const CONTROL_SIZE = "sm" as const;
 
 let seed = 0;
 const nextId = (prefix: string): string => `${prefix}_${(seed += 1).toString(36)}`;
 
-/**
- * AND/OR condition builder, one level of nesting per group.
- *
- * It edits a `ConditionGroup` and nothing else — the same shape the evaluator
- * in `lib/conditions` reads — so the same builder can drive conditional select
- * options today and any other rule that needs "when is this true?" later.
- */
 export function ConditionBuilder({
   group,
   columns,
@@ -69,11 +56,6 @@ export function ConditionBuilder({
 }: ConditionBuilderProps) {
   const isEmpty = group.conditions.length === 0 && group.groups.length === 0;
 
-  /**
-   * The type icon is the reason the field picker is not native: the operator
-   * list beside it changes with the column's type, and a list of bare names
-   * gives no warning that picking one will rewrite the operator.
-   */
   const columnOptions = useMemo<readonly ListboxOption[]>(
     () =>
       columns.map((column) => ({
@@ -141,9 +123,6 @@ export function ConditionBuilder({
               <Select
                 aria-label="Field"
                 size={CONTROL_SIZE}
-                // A board carries dozens of columns and the native select this
-                // replaces had the platform's typeahead; the search field is
-                // what hands that back rather than dropping it.
                 isSearchable
                 options={columnOptions}
                 value={condition.columnId}
@@ -160,9 +139,6 @@ export function ConditionBuilder({
                 className="w-32 shrink-0"
               />
 
-              {/* The operators are a plain list of words, so this one stays
-                  native: it keeps the platform's keyboard and adds no second
-                  portal inside a dialog that is already one. */}
               <SelectField
                 aria-label="Condition"
                 size={CONTROL_SIZE}
@@ -216,8 +192,6 @@ export function ConditionBuilder({
           <Plus />
           Add condition
         </Button>
-        {/* One level of nesting is enough for `A and (B or C)`; more is a
-            workflow engine, which this deliberately is not. */}
         {depth === 0 && (
           <Button size="xs" variant="ghost" className="gap-1" onClick={addGroup}>
             <Plus />
@@ -271,7 +245,6 @@ interface ConditionValueProps {
   readonly onChange: (changes: Partial<Condition>) => void;
 }
 
-/** The value control follows the column's type and the operator's arity. */
 function ConditionValue({ condition, column, people, onChange }: ConditionValueProps) {
   if (!column) return <span className="min-w-0 flex-1" />;
 
@@ -281,23 +254,12 @@ function ConditionValue({ condition, column, people, onChange }: ConditionValueP
   }
 
   if (column.type === "select") {
-    // `isDisabled` is deliberately not carried onto these rows. It means "no
-    // longer offered for data entry", and a rule about a retired status is
-    // precisely how the records still holding one get caught.
     const options: readonly ListboxOption[] = column.config.options.map((option) => ({
       value: option.id,
       label: option.label,
       color: option.color,
     }));
 
-    /**
-     * "Is any of" used to be a `<select multiple>` reading `selectedOptions`.
-     * That list had no affordance saying it took more than one — the gesture
-     * was ctrl-click — and on touch there is no ctrl to hold, which made this
-     * the one control in the app a phone could not operate. The stored shape
-     * is untouched: a `string[]` in `values`, with `value` still mirroring the
-     * first entry for the evaluator that reads single-value operators.
-     */
     if (arity === "list") {
       return (
         <MultiSelect
@@ -317,8 +279,6 @@ function ConditionValue({ condition, column, people, onChange }: ConditionValueP
         aria-label="Value"
         size={CONTROL_SIZE}
         isSearchable
-        // "Choose…" used to be a real <option>, and picking it wrote "" back.
-        // The placeholder plus the clear button are those same two states.
         isClearable
         placeholder="Choose…"
         options={options}
@@ -339,13 +299,7 @@ function ConditionValue({ condition, column, people, onChange }: ConditionValueP
         placeholder="Choose…"
         options={people.map((person) => ({
           value: person.id,
-          // The inactive marker stays in the label rather than moving to a
-          // description, because the trigger only ever shows the label and a
-          // rule pointed at a departed teammate should say so on its face.
           label: person.isActive ? person.name : `${person.name} (inactive)`,
-          // Empty rather than undefined: the visual branches on
-        // presence, and an absent url would drop the row to no
-        // glyph at all instead of falling back to initials.
         avatarUrl: person.avatarUrl ?? "",
         }))}
         value={condition.value === "" ? null : condition.value}
@@ -356,8 +310,6 @@ function ConditionValue({ condition, column, people, onChange }: ConditionValueP
   }
 
   if (column.type === "date") {
-    // A rule stores the bound as `YYYY-MM-DD` and `matchesDate` compares whole
-    // days, so the picker's day key goes in untouched.
     return (
       <DatePicker
         aria-label="Value"

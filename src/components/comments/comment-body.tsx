@@ -3,16 +3,11 @@
 import { useMemo } from "react";
 import { parseBody } from "@/lib/mentions";
 import { cn } from "@/lib/utils";
-import { CURRENT_USER } from "@/mock/users";
+import { useCurrentUserId } from "@/store/session-store";
 
-/**
- * A comment body, rendered from parsed segments.
- *
- * Mentions and record references become tokens; a mention of the signed-in
- * user is emphasised, which is what makes "somebody is talking to me" readable
- * without opening the notification.
- */
 export function CommentBody({ body, className }: { body: string; className?: string }) {
+  const meId = useCurrentUserId();
+
   const segments = useMemo(() => parseBody(body), [body]);
 
   return (
@@ -31,7 +26,7 @@ export function CommentBody({ body, className }: { body: string; className?: str
           );
         }
 
-        const isMe = segment.userId === CURRENT_USER.id;
+        const isMe = segment.userId === meId;
         return (
           <span
             key={index}

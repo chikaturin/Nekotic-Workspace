@@ -3,6 +3,7 @@
 import { Filter, Plus, X } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { CountBadge } from "@/components/ui/badge";
+import { useBoardPeople } from "@/hooks/use-board-people";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
@@ -22,31 +23,16 @@ import { columnVisual } from "@/lib/board-visuals";
 import { useBoardStore } from "@/store/board-store";
 import type { BoardColumn, DirectoryUser, FilterOperator, ViewFilter } from "@/types";
 
-/**
- * One step for every control in a condition row. A row mixing a 32px picker
- * with a 28px input reads as two rows that happen to be on the same line, and
- * the four controls here were previously split across both heights.
- */
 const CONTROL_SIZE = "sm" as const;
 
-/**
- * Filter engine UI. Conditions are stored on the saved view, so the same set
- * applies to the table, Kanban, calendar and timeline without being re-entered.
- */
 export function FilterMenu({ model }: { model: BoardViewModel }) {
   const { view, columns } = model;
   const setFilters = useBoardStore((state) => state.setFilters);
   const setConjunction = useBoardStore((state) => state.setFilterConjunction);
-  const people = useBoardStore((state) => state.people);
+  const people = useBoardPeople();
 
   const filters = useMemo<readonly ViewFilter[]>(() => view?.filters ?? [], [view?.filters]);
 
-  /**
-   * The type icon is the reason this one picker is not native: a column list of
-   * bare names says nothing about which entries will offer "is before" and
-   * which will offer "contains", and the operator list below only makes sense
-   * once you can see what kind of column it belongs to.
-   */
   const columnOptions = useMemo<readonly ListboxOption[]>(
     () =>
       columns.map((column) => ({
@@ -119,9 +105,6 @@ export function FilterMenu({ model }: { model: BoardViewModel }) {
                   <Select
                     aria-label="Column"
                     size={CONTROL_SIZE}
-                    // A board carries dozens of columns and the native select
-                    // this replaces had the platform's typeahead; the search
-                    // field is what hands that back rather than dropping it.
                     isSearchable
                     options={columnOptions}
                     value={filter.columnId}
@@ -137,9 +120,6 @@ export function FilterMenu({ model }: { model: BoardViewModel }) {
                     className="w-32 shrink-0"
                   />
 
-                  {/* The operators are a plain list of words, so this one stays
-                      native: it keeps the platform's keyboard and adds no
-                      second portal inside an already-open popover. */}
                   <SelectField
                     aria-label="Condition"
                     size={CONTROL_SIZE}
@@ -208,7 +188,6 @@ interface FilterValueProps {
   readonly onChange: (value: string) => void;
 }
 
-/** The value control follows the column's type, not the operator alone. */
 function FilterValue({ filter, column, people, onChange }: FilterValueProps) {
   if (!column) return <span className="flex-1" />;
 
@@ -224,18 +203,12 @@ function FilterValue({ filter, column, people, onChange }: FilterValueProps) {
         aria-label="Value"
         size={CONTROL_SIZE}
         isSearchable
-        // "Choose…" used to be a real <option>, and picking it wrote "" back.
-        // The placeholder plus the clear button are the same two states — an
-        // empty filter is still expressible, just not as a fake option.
         isClearable
         placeholder="Choose…"
         options={column.config.options.map((option) => ({
           value: option.id,
           label: option.label,
           color: option.color,
-          // `isDisabled` is deliberately not carried over. It means "no longer
-          // offered for data entry", and filtering for a retired status is
-          // exactly how you find the records still holding one.
         }))}
         value={filter.value === "" ? null : filter.value}
         onValueChange={(value) => onChange(value ?? "")}
@@ -254,13 +227,7 @@ function FilterValue({ filter, column, people, onChange }: FilterValueProps) {
         placeholder="Choose…"
         options={people.map((person) => ({
           value: person.id,
-          // The inactive marker stays in the label rather than moving to a
-          // description, because the trigger only ever shows the label and
-          // "who is this filtered to" should not need the list reopened.
           label: person.isActive ? person.name : `${person.name} (inactive)`,
-          // Empty rather than undefined: the visual branches on
-        // presence, and an absent url would drop the row to no
-        // glyph at all instead of falling back to initials.
         avatarUrl: person.avatarUrl ?? "",
         }))}
         value={filter.value === "" ? null : filter.value}
@@ -271,9 +238,6 @@ function FilterValue({ filter, column, people, onChange }: FilterValueProps) {
   }
 
   if (kind === "date") {
-    // The filter already stores `YYYY-MM-DD`, which is exactly what the picker
-    // speaks, so nothing is converted on the way in or out — and the day the
-    // rule compares against is the day that was clicked, in every timezone.
     return (
       <DatePicker
         aria-label="Value"

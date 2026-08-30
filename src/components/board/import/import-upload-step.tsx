@@ -17,7 +17,6 @@ interface ImportUploadStepProps {
 
 const ACCEPT = ".xlsx,.csv,.tsv";
 
-/** Step 1: hand over one spreadsheet. Nothing is written by picking a file. */
 export function ImportUploadStep({ error, isBusy, onFile }: ImportUploadStepProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isOver, setIsOver] = useState(false);
@@ -53,9 +52,6 @@ export function ImportUploadStep({ error, isBusy, onFile }: ImportUploadStepProp
             isOver ? "bg-accent text-accent-foreground" : "bg-hover text-muted-foreground",
           )}
         >
-          {/* No `label` on the spinner: the line underneath already changes to
-              "Reading the file…", and announcing the same fact twice is noise
-              rather than access. */}
           {isBusy ? (
             <Spinner size="lg" />
           ) : (

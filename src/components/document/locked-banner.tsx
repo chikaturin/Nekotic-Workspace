@@ -11,7 +11,6 @@ interface LockedBannerProps {
   readonly onRestore: () => void;
 }
 
-/** Explains why the editor is read-only and offers the way out. */
 export function LockedBanner({
   document,
   canToggleLock,

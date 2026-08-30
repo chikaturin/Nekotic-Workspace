@@ -16,10 +16,6 @@ export const TEAM: readonly UserSummary[] = [
   { id: "usr_hai", name: "Hai Vo", email: "hai@nexdrop.io", initials: "HV", accentColor: "var(--kind-video)" },
 ] as const;
 
-/**
- * One person per role (SY-RBC-42), so every column of the matrix is held by
- * someone real and none of them is only a table row.
- */
 const ROLES: readonly WorkspaceRole[] = ["admin", "manager", "member", "member", "viewer"];
 
 export const MEMBERS: readonly WorkspaceMember[] = TEAM.map((user, index) => ({
@@ -28,16 +24,10 @@ export const MEMBERS: readonly WorkspaceMember[] = TEAM.map((user, index) => ({
   joinedAt: `2025-0${index + 2}-14T08:00:00.000Z`,
 }));
 
-/** Deterministic owner pick so mock data never depends on randomness. */
 export function memberAt(index: number): UserSummary {
   return TEAM[index % TEAM.length] ?? CURRENT_USER;
 }
 
-/**
- * People a board can reference, including two who have left the workspace.
- * Removed members stay resolvable so their name still renders — flagged
- * inactive rather than dropped, which is what the PRD asks for.
- */
 export const DIRECTORY: readonly DirectoryUser[] = [
   ...TEAM.map((user) => ({ ...user, isActive: true })),
   {

@@ -9,29 +9,13 @@ import { scaleLabel } from "@/lib/pan-zoom";
 import { cn } from "@/lib/utils";
 
 interface ImageCanvasProps {
-  /** Full-resolution asset. Thumbnails belong in cells and lists, not here. */
   readonly url: string;
   readonly alt: string;
-  /** Optional low-resolution stand-in, shown blurred while the original loads. */
   readonly placeholderUrl?: string | null;
   readonly className?: string;
-  /** Bind =/-/0 to zoom and fit. Off where another surface owns those keys. */
   readonly hasShortcuts?: boolean;
 }
 
-/**
- * A picture on a canvas, rather than a picture in a box.
- *
- * The image sits at its own size on an open surface: wheel or pinch to zoom
- * around the cursor, drag anywhere to pan, Fit and 100% to get back. It is the
- * interaction a map or a design tool uses, and it is the right one here for the
- * same reason — looking at a screenshot means moving around inside it, not
- * squinting at a version squeezed to fit the window.
- *
- * The transform is written straight to the DOM by `usePanZoom`, so dragging
- * never re-renders React. Nothing here is persisted: zoom and position are
- * where this reader happens to be looking, not a property of the file.
- */
 export function ImageCanvas({
   url,
   alt,
@@ -45,7 +29,6 @@ export function ImageCanvas({
   const canvas = usePanZoom({ viewportRef, stageRef });
 
   const isReady = status === "ready";
-  // "=" rather than "+": the matcher compares the unshifted key.
   useHotkey("=", canvas.zoomIn, { enabled: hasShortcuts && isReady });
   useHotkey("-", canvas.zoomOut, { enabled: hasShortcuts && isReady });
   useHotkey("0", canvas.fit, { enabled: hasShortcuts && isReady });
@@ -56,8 +39,6 @@ export function ImageCanvas({
         ref={viewportRef}
         {...canvas.handlers}
         onPointerCancel={canvas.handlers.onPointerUp}
-        // `touch-none` hands touch gestures to the pointer handlers instead of
-        // letting the browser scroll the dialog underneath.
         className={cn(
           "canvas-grid absolute inset-0 touch-none select-none",
           "cursor-grab [&.is-grabbing]:cursor-grabbing",
@@ -71,8 +52,6 @@ export function ImageCanvas({
           <img
             src={url}
             alt={alt}
-            // Without this the browser starts its own file drag and paints a
-            // ghost image; a drag here means panning the canvas.
             draggable={false}
             onLoad={(event) => {
               const image = event.currentTarget;
@@ -94,8 +73,6 @@ export function ImageCanvas({
       {status === "loading" && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-10">
           {placeholderUrl ? (
-            // The thumbnail is already in memory, so it stands in until the
-            // original arrives — blurred, so nobody mistakes it for the file.
             // eslint-disable-next-line @next/next/no-img-element -- same asset pipeline as above
             <img
               src={placeholderUrl}
@@ -121,11 +98,6 @@ export function ImageCanvas({
   );
 }
 
-/**
- * Floating, small, and out of the way — the picture is the subject. Zoom out,
- * the current percentage, zoom in, then the two ways back: fit the frame, or
- * return to the pixels the file actually has.
- */
 function CanvasToolbar({ canvas }: { canvas: ReturnType<typeof usePanZoom> }) {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">

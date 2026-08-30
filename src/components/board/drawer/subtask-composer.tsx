@@ -21,22 +21,6 @@ interface SubtaskComposerProps {
   readonly onCancel: () => void;
 }
 
-/**
- * Quick add: title, owner, status and a deadline in one row.
- *
- * The four fields are found by *type* rather than by name — the first select,
- * the first user column, the first date column — so the same composer works on
- * a task board, a bug board and anything a user builds themselves.
- *
- * A new subtask is a full record, so the status list is offered from the
- * column's own options with the availability rules already applied; a status a
- * rule forbids is never on the menu here either.
- *
- * The four controls all sit on the 28px step of the control ladder. They used
- * to be three heights — the inputs were pinned to h-7 by hand and the two
- * selects were left at the 32px default — which is what a row of controls
- * looks like when each one picks its own size.
- */
 export function SubtaskComposer({
   columns,
   primaryColumnId,
@@ -57,11 +41,6 @@ export function SubtaskComposer({
   const userColumn = columns.find((column) => column.type === "user") ?? null;
   const dateColumn = columns.find((column) => column.type === "date") ?? null;
 
-  /**
-   * No record exists yet, so there is nothing to evaluate conditions against.
-   * Options switched off in column settings are still filtered out — that gate
-   * needs no record.
-   */
   const statusOptions = statusColumn
     ? resolveOptionAvailability({
         column: statusColumn,
@@ -72,21 +51,9 @@ export function SubtaskComposer({
       }).filter((entry) => entry.isAvailable)
     : [];
 
-  /**
-   * People, with their faces. A `<option>` can hold a name and nothing else,
-   * which is why picking an owner here used to look nothing like picking one
-   * in the grid.
-   */
   const assigneeOptions: readonly ListboxOption[] = people.map((person) => ({
     value: person.id,
-    // The marker stays inside the label rather than moving to the description
-    // slot, because the trigger renders the label alone: someone who has left
-    // the workspace has to still say so after the popover has closed.
     label: person.isActive ? person.name : `${person.name} (inactive)`,
-    // Nobody in the directory carries a photo, and an absent `avatarUrl` skips
-    // the avatar branch entirely — the row would draw no visual at all. An
-    // empty src is reported as a load error, which is what puts the initials
-    // in the circle.
     avatarUrl: person.avatarUrl ?? "",
   }));
 
@@ -100,14 +67,11 @@ export function SubtaskComposer({
 
     if (statusColumn && optionId) values[statusColumn.id] = { kind: "select", optionIds: [optionId] };
     if (userColumn && assigneeId) values[userColumn.id] = { kind: "user", userIds: [assigneeId] };
-    // `due` is a day key, so the stored instant is midnight UTC on exactly the
-    // day that was clicked — never the day before it in a western timezone.
     if (dateColumn && due) values[dateColumn.id] = { kind: "date", iso: isoOfDayKey(due) };
 
     setIsSaving(true);
     try {
       await onCreate(values);
-      // Cleared rather than closed: adding five subtasks in a row is the flow.
       setTitle("");
       setDue("");
       inputRef.current?.focus();
@@ -167,13 +131,9 @@ export function SubtaskComposer({
             size="sm"
             aria-label={userColumn.name}
             options={assigneeOptions}
-            // The state stays a string so `submit` is untouched; the empty
-            // string and null are the same "nobody yet" on either side of it.
             value={assigneeId === "" ? null : assigneeId}
             onValueChange={(next) => setAssigneeId(next ?? "")}
             placeholder={`${userColumn.name}…`}
-            // What the native select's blank first option used to do: take an
-            // owner back off a subtask that has not been created yet.
             isClearable
             className="min-w-0 flex-1"
           />

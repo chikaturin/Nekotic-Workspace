@@ -5,6 +5,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { EditorSurface } from "@/components/board/cells/cell-frame";
 import { FlowedText } from "@/components/board/cells/flowed-text";
 import { StepHints, StepTextarea } from "@/components/board/cells/step-textarea";
+import { useCellCommit } from "@/hooks/use-cell-commit";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type { CellExit, CellMove } from "@/lib/cell-arrow-exit";
 import { canFormatSteps, formatSteps, openingText } from "@/lib/step-numbering";
 import type { CellDisplayMode, CellValue, StepNumbering } from "@/types";
 
@@ -43,31 +45,14 @@ interface LongTextEditorProps {
   readonly value: Extract<CellValue, { kind: "longText" }>;
   readonly rows: number;
   readonly initialText?: string;
-  /** Step numbering from the column, when the column has it switched on. */
   readonly steps?: StepNumbering;
-  /** The column's name — what the expanded editor is titled with. */
   readonly label?: string;
-  readonly onCommit: (value: CellValue) => void;
+  readonly onCommit: (value: CellValue, move?: CellMove) => void;
   readonly onCancel: () => void;
+  /** Xem `canExitByArrow` của `CellEditor`. */
+  readonly canExitByArrow?: boolean;
 }
 
-/**
- * Expands over the grid so long notes are editable without leaving the row.
- *
- * With step numbering on, the keys divide like this:
- *
- *   - **Enter** opens the next numbered step. It is the common case in a test
- *     case — one step, then the next — so it gets the unmodified key.
- *   - **Shift+Enter** is a plain newline, for a step that runs to two lines.
- *   - **⌘/Ctrl+Enter** saves, as everywhere else in the app.
- *   - **Tab** indents, and Shift+Tab takes it back. See `StepTextarea`.
- *
- * With numbering off nothing changes: Enter is a newline, as it always was.
- *
- * The draft lives here rather than in the field, so opening the full-screen
- * editor is a change of size and nothing else — the same text, the same keys,
- * mid-sentence and uncommitted.
- */
 export function LongTextCellEditor({
   value,
   rows,
@@ -76,35 +61,35 @@ export function LongTextCellEditor({
   label = "Edit long text",
   onCommit,
   onCancel,
+  canExitByArrow = false,
 }: LongTextEditorProps) {
   const isNumbering = steps?.enabled === true;
   const base = initialText ?? value.value;
 
-  // A blank cell opens on its first step, already numbered — see `openingText`.
   const opening = steps ? openingText(value.value, initialText, steps) : base;
   const seed = opening.slice(0, opening.length - base.length);
 
   const [draft, setDraft] = useState(opening);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  /**
-   * True while the blur is somebody opening the big editor.
-   *
-   * The inline field commits when it loses focus, and moving focus into a
-   * dialog is losing focus — so without this, pressing Expand saved the cell
-   * and closed the editor, and the dialog opened over a cell that was no
-   * longer being edited.
-   */
-  const isHandingOver = useRef(false);
-
-  /**
-   * What a commit writes. A cell nobody typed into stays empty — the seed is an
-   * invitation, not a value, and saving it would turn "no steps" into "step one
-   * with nothing in it" every time somebody clicked through a cell.
-   */
   const committed = (): string => (seed.length > 0 && draft === seed ? "" : draft);
 
-  const save = () => onCommit({ kind: "longText", value: committed() });
+  const surfaceRef = useRef<HTMLDivElement>(null);
+
+  const { finish, discard } = useCellCommit(
+    () => onCommit({ kind: "longText", value: committed() }),
+    surfaceRef,
+  );
+
+  const save = () => {
+    discard();
+    onCommit({ kind: "longText", value: committed() });
+  };
+
+  const leave = (direction: CellExit) => {
+    discard();
+    onCommit({ kind: "longText", value: committed() }, direction);
+  };
   const canFormat = isNumbering && steps ? canFormatSteps(draft, steps) : false;
 
   const format = (
@@ -132,6 +117,7 @@ export function LongTextCellEditor({
 
   return (
     <EditorSurface className="w-[26rem]">
+      <div ref={surfaceRef}>
       <StepTextarea
         value={draft}
         onChange={setDraft}
@@ -141,9 +127,8 @@ export function LongTextCellEditor({
         label={label}
         onSubmit={save}
         onCancel={onCancel}
-        onBlur={() => {
-          if (!isHandingOver.current) save();
-        }}
+        onBlur={finish}
+        {...(canExitByArrow ? { onExit: leave } : {})}
       />
 
       <div className="flex items-center gap-1.5 border-t border-border px-2 py-1 text-micro text-faint-foreground">
@@ -156,15 +141,11 @@ export function LongTextCellEditor({
             variant="ghost"
             aria-label="Open the full editor"
             title="Write this in a full-size editor"
-            // The pointer must not commit on its way to the button: a blur
-            // here saves, and saving closes the editor the dialog opens from.
             onMouseDown={(event) => event.preventDefault()}
-            // The flag is set on the click, not on the press. Arming it on
-            // mousedown meant a press that slid off the button and never
-            // became a click left the field unable to commit at all — the
-            // next click anywhere would have thrown the edit away in silence.
             onClick={() => {
-              isHandingOver.current = true;
+              // Bàn giao cho editor toàn màn hình: ô inline bị gỡ đi nhưng
+              // người dùng CHƯA viết xong, nên không được ghi ở đây.
+              discard();
               setIsExpanded(true);
             }}
           >
@@ -172,14 +153,11 @@ export function LongTextCellEditor({
           </Button>
         </span>
       </div>
+    </div>
     </EditorSurface>
   );
 }
 
-/**
- * Renumbering prose would destroy it, so the action is offered only for a block
- * that already reads as steps and would actually change.
- */
 function FormatStepsButton({
   isOffered,
   canFormat,
@@ -202,7 +180,6 @@ function FormatStepsButton({
           ? "Renumber these steps in sequence"
           : "These lines are already numbered in sequence, or are not steps"
       }
-      // The pointer must not leave the textarea: blurring it commits.
       onMouseDown={(event) => event.preventDefault()}
       onClick={onFormat}
     >
@@ -223,18 +200,6 @@ interface ExpandedEditorProps {
   readonly onCancel: () => void;
 }
 
-/**
- * The same editor, given the screen.
- *
- * A test case is a dozen numbered steps with wrapped sub-points hanging under
- * them, and the panel over the cell shows four lines of it — you write the
- * thing through a letterbox and scroll to check what you already said. This is
- * the same field at a size you can see the whole procedure in.
- *
- * Deliberately not committing on blur, unlike the inline field: a dialog has
- * its own buttons, and a click on Format steps or a drag of the scrollbar is
- * not a decision to stop editing.
- */
 function LongTextExpandedEditor({
   draft,
   onDraftChange,
@@ -250,9 +215,6 @@ function LongTextExpandedEditor({
       <DialogContent
         size="2xl"
         className="flex max-h-[85dvh] flex-col"
-        // Radix would otherwise put focus on the close button. The field is
-        // the only thing anybody opened this for, and `StepTextarea` puts the
-        // caret at the end of what is already written.
         onOpenAutoFocus={(event) => event.preventDefault()}
       >
         <DialogHeader>
@@ -264,10 +226,6 @@ function LongTextExpandedEditor({
           </DialogDescription>
         </DialogHeader>
 
-        {/* The field is the dialog's body rather than sitting inside one: it
-            has to take the height the card gives it, and a scrolling body
-            wrapped around a scrolling textarea is two scrollbars for one
-            piece of text. */}
         <div className="min-h-0 flex-1 px-5 pb-2">
           <StepTextarea
             value={draft}

@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { hasExternalFiles, readDroppedFiles } from "@/lib/dnd";
 import { IMAGE_ACCEPT_ATTRIBUTE } from "@/lib/file-validation";
 import { cn } from "@/lib/utils";
-import { fileService } from "@/services/file-service";
 import { useUploadStore } from "@/store/upload-store";
 import type { DocumentImage, ImageBlock as ImageBlockModel } from "@/types";
 
@@ -16,15 +15,9 @@ interface ImageBlockProps {
   readonly block: ImageBlockModel;
   readonly onChange: (block: ImageBlockModel) => void;
   readonly isEditable: boolean;
-  /** Folder uploads are filed into — the page's own folder. */
   readonly folderId: string | null;
 }
 
-/**
- * A gallery block: add as many images as you like, click any of them to open
- * the full-page viewer. Uploads go through the shared upload store, so they
- * obey the same permission and validation rules as every other upload.
- */
 export function ImageBlock({ block, onChange, isEditable, folderId }: ImageBlockProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const startUploads = useUploadStore((state) => state.startUploads);
@@ -40,11 +33,16 @@ export function ImageBlock({ block, onChange, isEditable, folderId }: ImageBlock
 
     setIsUploading(true);
     try {
-      const assets = await startUploads(files, folderId);
-      const added = assets.reduce<readonly DocumentImage[]>((list, asset) => {
-        const url = fileService.getAssetUrl(asset.id);
-        return url ? [...list, { assetId: asset.id, url, alt: asset.name }] : list;
-      }, []);
+      // Ảnh nằm trong khối của trang này, không phải một mục trong Drive.
+      const assets = await startUploads(files, folderId, {
+        reference: { kind: "block" },
+      });
+
+      const added: readonly DocumentImage[] = assets.flatMap((asset) =>
+        asset.previewUrl == null
+          ? []
+          : [{ assetId: asset.id, url: asset.previewUrl, alt: asset.name }],
+      );
 
       if (added.length > 0) onChange({ ...block, images: [...block.images, ...added] });
     } finally {
@@ -199,8 +197,6 @@ export function ImageBlock({ block, onChange, isEditable, folderId }: ImageBlock
         }}
       />
 
-      {/* One picture at a time: clicking a thumbnail opens that thumbnail, and
-          closing returns to the gallery, which is where choosing happens. */}
       <ImageLightbox
         image={openIndex === null ? null : (images[openIndex] ?? null)}
         caption={block.caption}

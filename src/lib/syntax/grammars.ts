@@ -1,31 +1,12 @@
 import type { ConfigFormat } from "@/types";
 
-/**
- * What each language is made of, as data.
- *
- * Every C-family dialect here differs from its neighbours in about six facts —
- * which prefix starts a comment, which quotes open a string, which words are
- * reserved — and in nothing else a colouring pass can see. Writing a lexer per
- * language would be a dozen copies of the same loop with a different word
- * list; the loop lives in `tokenize` and the differences live here.
- *
- * The word lists are not exhaustive and are not meant to be. A missing keyword
- * renders as an identifier, which is what a real editor does with a word it
- * does not know — the failure mode is "less colour", never "wrong text". JSON,
- * ENV, YAML and the markup languages are line-shaped rather than token-shaped
- * and keep their own passes.
- */
-
 export interface Grammar {
-  /** Everything after one of these is a comment to the end of the line. */
   readonly lineComment: readonly string[];
-  /** Open and close of a comment that may run across lines. */
   readonly blockComment: readonly [string, string] | null;
   readonly quotes: readonly string[];
   readonly keywords: ReadonlySet<string>;
   readonly types: ReadonlySet<string>;
   readonly constants: ReadonlySet<string>;
-  /** SQL is written in either case and means the same thing. */
   readonly ignoreCase: boolean;
 }
 
@@ -101,10 +82,6 @@ const C_LINE = ["//"] as const;
 const C_BLOCK = ["/*", "*/"] as const;
 const JS_QUOTES = ['"', "'", "`"] as const;
 
-/**
- * Which languages the generic lexer handles. The rest are line-shaped and have
- * their own pass in `tokenize`; `null` is what says so.
- */
 export const GRAMMARS: Readonly<Record<ConfigFormat, Grammar | null>> = {
   json: null,
   env: null,
@@ -163,7 +140,6 @@ export const GRAMMARS: Readonly<Record<ConfigFormat, Grammar | null>> = {
   nginx: grammar({ lineComment: ["#"], keywords: NGINX_KEYWORDS }),
 };
 
-/** What the language picker shows, in the order it shows them. */
 export const CONFIG_FORMAT_LABELS: Readonly<Record<ConfigFormat, string>> = {
   json: "JSON",
   env: "ENV",
@@ -184,7 +160,6 @@ export const CONFIG_FORMAT_LABELS: Readonly<Record<ConfigFormat, string>> = {
 
 export const CONFIG_FORMATS = Object.keys(CONFIG_FORMAT_LABELS) as readonly ConfigFormat[];
 
-/** A stored or pasted value, made safe to switch on. */
 export function isConfigFormat(value: unknown): value is ConfigFormat {
   return typeof value === "string" && Object.hasOwn(CONFIG_FORMAT_LABELS, value);
 }

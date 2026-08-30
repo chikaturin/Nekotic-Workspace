@@ -10,23 +10,21 @@ import type { BoardColumnOf, CellValue } from "@/types";
 type AttachmentValue = Extract<CellValue, { kind: "attachment" }>;
 
 /**
- * An attachment cell, read-only.
+ * Ô đính kèm KHÔNG cho bôi đen chữ.
  *
- * Empty, it offers the only thing it can do. The hint stays invisible until
- * the pointer is over the cell, so a column of empty cells reads as empty
- * rather than as a column of buttons — but the click target is the whole cell,
- * not the hint, so nobody has to aim at it. `GridCell` is what turns that click
- * into the uploader; the marker here is what tells it to.
+ * Ô này mở bằng cú bấm đúp, mà bấm đúp cũng chính là lệnh bôi đen của trình
+ * duyệt. Hai việc xảy ra cùng lúc: bảng đính kèm hiện ra, và cả nội dung của nó
+ * — tên tệp, dung lượng, "Add files", "Close" — bị bôi xanh phía dưới.
  *
- * With files in it the cell shows them, and a click on one opens *that* file —
- * the editor is handed its id and opens on its preview. Reaching for a file
- * and being given an upload dialog is the wrong answer to the question the
- * click asked.
+ * Ô chữ không dính vì nó thay ngay bằng một `<input>`. Ô này thì không, nên
+ * phải nói thẳng với trình duyệt là ở đây không có gì để bôi.
  */
+const NO_TEXT_SELECT = "select-none";
+
 export function AttachmentCellView({ value }: { value: AttachmentValue }) {
   if (value.attachments.length === 0) {
     return (
-      <CellShell>
+      <CellShell className={NO_TEXT_SELECT}>
         <span
           data-cell-expand=""
           title="Add attachment"
@@ -40,7 +38,7 @@ export function AttachmentCellView({ value }: { value: AttachmentValue }) {
   }
 
   return (
-    <CellShell>
+    <CellShell className={NO_TEXT_SELECT}>
       <AttachmentStrip files={value.attachments} isInteractive />
     </CellShell>
   );
@@ -50,24 +48,10 @@ interface AttachmentEditorProps {
   readonly column: BoardColumnOf<"attachment">;
   readonly rowId: string;
   readonly folderId: string | null;
-  /** Attachment the cell was opened on, if a particular file was clicked. */
   readonly focusId?: string | undefined;
   readonly onCancel: () => void;
 }
 
-/**
- * Attachment editing in the grid.
- *
- * There is no local draft here: the editor writes straight to the record's
- * attachment cell through `useAttachmentField`, which is the same field the
- * drawer's Attachments section reads. Dropping a screenshot in the cell is
- * therefore visible in the drawer immediately, and vice versa, because both
- * are looking at one value rather than two copies of it.
- *
- * That is also why the popover has a Close and not a Save: every upload and
- * every removal has already been committed to the board record — and why
- * clicking away closes it rather than asking. There is nothing to lose.
- */
 export function AttachmentCellEditor({
   column,
   rowId,

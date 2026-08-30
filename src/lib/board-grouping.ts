@@ -3,14 +3,6 @@ import { cellOf, cellText, isCellEmpty, type CellContext } from "@/lib/cell-valu
 import type { RowMap } from "@/lib/board-records";
 import type { BoardColumn, CellValue, SelectColor } from "@/types";
 
-/**
- * Grouping over the shared record set.
- *
- * The same function feeds the table's collapsible blocks and Kanban's columns —
- * a Kanban column *is* a group. Neither owns records; both name row ids.
- */
-
-/** Bucket for records whose group value is empty. */
 export const UNGROUPED_KEY = "__ungrouped__";
 
 export interface GroupBucket {
@@ -23,7 +15,6 @@ export interface RowGroup extends GroupBucket {
   readonly rowIds: readonly string[];
 }
 
-/** Which value puts a row in a group. Multi-value cells group by their first. */
 export function groupKeyOf(
   rowId: string,
   rows: RowMap,
@@ -47,11 +38,6 @@ export function groupKeyOf(
   }
 }
 
-/**
- * Every bucket a column can produce, in a meaningful order — option order for
- * a select, directory order for a user. Kanban needs the empty ones too, which
- * is why the catalog is derived from the schema and not from the records.
- */
 export function bucketsFor(column: BoardColumn, context: CellContext): readonly GroupBucket[] {
   if (column.type === "select") {
     return column.config.options.map((option) => ({
@@ -74,14 +60,9 @@ export function bucketsFor(column: BoardColumn, context: CellContext): readonly 
 export const UNGROUPED_BUCKET: GroupBucket = { key: UNGROUPED_KEY, label: "No value" };
 
 export interface GroupOptions {
-  /** Drop buckets that hold no records. The ungrouped bucket follows the same rule. */
   readonly hideEmpty?: boolean;
 }
 
-/**
- * Split ordered row ids into groups. Row order inside a group is the order it
- * arrived in, so filters and sorts stay in charge of sequencing.
- */
 export function buildGroups(
   rowIds: readonly string[],
   rows: RowMap,
@@ -101,7 +82,6 @@ export function buildGroups(
   const catalog = bucketsFor(column, context);
   const known = new Set(catalog.map((bucket) => bucket.key));
 
-  // Values outside the catalog (free text, a stale option id) still get a group.
   const extra: GroupBucket[] = [...byKey.keys()]
     .filter((key) => key !== UNGROUPED_KEY && !known.has(key))
     .map((key) => ({ key, label: labelForKey(key, column, context) }));
@@ -119,10 +99,6 @@ function labelForKey(key: string, column: BoardColumn, context: CellContext): st
   return key;
 }
 
-/**
- * The cell value that puts a record into `groupKey` — what a Kanban drop
- * writes. Returns null for columns that cannot be set by grouping alone.
- */
 export function groupValueFor(column: BoardColumn, groupKey: string): CellValue | null {
   const isEmptyBucket = groupKey === UNGROUPED_KEY;
 
@@ -135,8 +111,6 @@ export function groupValueFor(column: BoardColumn, groupKey: string): CellValue 
 
   return null;
 }
-
-/* ------------------------------------------------------ table flattening */
 
 export type FlatRow =
   | {
@@ -151,19 +125,12 @@ export type FlatRow =
       readonly kind: "record";
       readonly rowId: string;
       readonly recordIndex: number;
-      /** Hierarchy depth; 0 for a top-level record. */
       readonly depth: number;
       readonly hasChildren: boolean;
       readonly childCount: number;
-      /** True when this parent's subtasks are folded away. */
       readonly isCollapsed: boolean;
     };
 
-/**
- * Turns a group's ordered row ids into the entries to render. The table passes
- * the hierarchy layout; anything that does not care about nesting passes
- * nothing and gets one flat entry per id.
- */
 export type RowExpander = (rowIds: readonly string[]) => readonly HierarchyEntry[];
 
 const FLAT_EXPANDER: RowExpander = (rowIds) =>
@@ -176,18 +143,11 @@ const FLAT_EXPANDER: RowExpander = (rowIds) =>
   }));
 
 export interface FlattenedGroups {
-  /** Group headers and records interleaved — what the virtualiser renders. */
   readonly flat: readonly FlatRow[];
-  /** Records in display order — what selection and the keyboard address. */
   readonly rowIds: readonly string[];
-  /** Position of each record inside `flat`, for scroll-into-view. */
   readonly flatIndexByRecord: readonly number[];
 }
 
-/**
- * Turn groups into one uniform-height list. Collapsed groups contribute their
- * header and nothing else, so collapsing is instant at any record count.
- */
 export function flattenGroups(
   groups: readonly RowGroup[],
   collapsed: ReadonlySet<string>,
@@ -221,7 +181,6 @@ export function flattenGroups(
   return { flat, rowIds, flatIndexByRecord };
 }
 
-/** The ungrouped shape, so the grid can take one code path either way. */
 export function flattenUngrouped(
   rowIds: readonly string[],
   expand: RowExpander = FLAT_EXPANDER,

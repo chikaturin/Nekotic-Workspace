@@ -10,11 +10,9 @@ interface EntityRowProps {
   readonly title: string;
   readonly subtitle: string;
   readonly onOpen: () => void;
-  /** Trailing controls — a star, a dismiss button. */
   readonly actions?: ReactNode;
 }
 
-/** One line in Favorites and Recent; both lists read identically by design. */
 export function EntityRow({
   icon: Icon,
   iconClassName,

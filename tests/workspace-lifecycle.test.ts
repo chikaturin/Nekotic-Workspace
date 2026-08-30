@@ -1,7 +1,11 @@
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, test } from "vitest";
+import { API_BASE_URL } from "@/config/api";
+import { driveApi } from "@/services/api/drive.api";
+import { server } from "./msw/server";
 import { CURRENT_USER, MEMBERS } from "@/mock/users";
 import { boardService } from "@/services/board-service";
-import { searchService } from "@/services/search-service";
+import { searchFake } from "./msw/fake/search.fake";
 import { resetSimulation } from "@/services/simulation";
 import { usePermissionStore } from "@/store/permission-store";
 import {
@@ -13,6 +17,7 @@ import {
   useWorkspaceStore,
 } from "@/store/workspace-store";
 import { flattenTree, findNodeById, updateNode } from "@/lib/tree";
+import { seedWorkspace } from "./msw/db";
 import { buildTestTree, ID, TEST_WORKSPACE, testWorkspace } from "./helpers";
 import type { AccessRule, DriveNode } from "@/types";
 
@@ -28,6 +33,10 @@ import type { AccessRule, DriveNode } from "@/types";
 const state = () => useWorkspaceStore.getState();
 
 function mount(tree: readonly DriveNode[] = buildTestTree()) {
+  // Backend giả phải biết workspace này: gỡ thành viên giờ là một lần GHI thật,
+  // và một store dựng sẵn mà server chưa từng nghe tới sẽ nhận 404.
+  seedWorkspace({ workspace: TEST_WORKSPACE, nodes: tree });
+
   useWorkspaceStore.setState({
     workspaces: [TEST_WORKSPACE],
     activeWorkspaceId: TEST_WORKSPACE.id,
@@ -49,7 +58,7 @@ function mount(tree: readonly DriveNode[] = buildTestTree()) {
  * reach — and half the fixture is owned by the signed-in user, so leaving it
  * alone would test the escape hatch rather than the restriction.
  */
-function restrict(nodeId: string, grantedTo: readonly string[] = []) {
+async function restrict(nodeId: string, grantedTo: readonly string[] = []) {
   useWorkspaceStore.setState((current) => ({
     treeByWorkspace: {
       ...current.treeByWorkspace,
@@ -61,7 +70,7 @@ function restrict(nodeId: string, grantedTo: readonly string[] = []) {
     },
   }));
 
-  state().setNodeAccessMode(nodeId, "restricted");
+  await state().setNodeAccessMode(nodeId, "restricted");
 
   const rules: AccessRule[] = grantedTo.map((userId, index) => ({
     id: `acl_${index}`,
@@ -81,19 +90,20 @@ const visibleNames = () => flattenTree(selectTree(state())).map((node) => node.n
 
 beforeEach(() => {
   resetSimulation();
-  boardService.reset();
   mount();
 });
 
 describe("creating a workspace", () => {
-  test("makes the creator its admin and switches to it", () => {
-    const created = state().createWorkspace(
-      { name: "NexDrop Development", description: "Dev." },
-      CURRENT_USER,
-    );
+  test("makes the creator its admin and switches to it", async () => {
+    const created = await state().createWorkspace({
+      name: "NexDrop Development",
+      description: "Dev.",
+    });
 
     const workspace = state().workspaces.find((item) => item.id === created);
 
+    // Vai admin do SERVER gán, không phải client gửi lên — nên đây là khẳng
+    // định về câu trả lời của server, không phải về đối số truyền vào.
     expect(workspace?.members).toEqual([
       expect.objectContaining({ id: CURRENT_USER.id, role: "admin" }),
     ]);
@@ -101,15 +111,15 @@ describe("creating a workspace", () => {
     expect(selectWorkspaceAccess(state()).isAllowed).toBe(true);
   });
 
-  test("appears in the switcher straight away, and starts empty", () => {
-    const created = state().createWorkspace({ name: "Workspace C" }, CURRENT_USER);
+  test("appears in the switcher straight away, and starts empty", async () => {
+    const created = await state().createWorkspace({ name: "Workspace C" });
 
     expect(selectMyWorkspaces(state()).map((item) => item.id)).toContain(created);
     expect(selectTree(state())).toHaveLength(0);
   });
 
-  test("carries no other workspace's tree into it", () => {
-    state().createWorkspace({ name: "Fresh" }, CURRENT_USER);
+  test("carries no other workspace's tree into it", async () => {
+    await state().createWorkspace({ name: "Fresh" });
 
     expect(getFullTree()).toHaveLength(0);
     expect(state().selectedIds).toHaveLength(0);
@@ -148,23 +158,23 @@ describe("the switcher lists only what you are in", () => {
 });
 
 describe("membership changes", () => {
-  test("removing yourself takes the workspace and its tree away at once", () => {
-    state().removeMember(TEST_WORKSPACE.id, CURRENT_USER.id);
+  test("removing yourself takes the workspace and its tree away at once", async () => {
+    await state().removeMember(TEST_WORKSPACE.id, CURRENT_USER.id);
 
     expect(selectMyWorkspaces(state())).toHaveLength(0);
     expect(selectTree(state())).toHaveLength(0);
   });
 
-  test("removing somebody else leaves your own view alone", () => {
+  test("removing somebody else leaves your own view alone", async () => {
     const other = MEMBERS.find((member) => member.id !== CURRENT_USER.id);
-    state().removeMember(TEST_WORKSPACE.id, other?.id ?? "");
+    await state().removeMember(TEST_WORKSPACE.id, other?.id ?? "");
 
     expect(selectMyWorkspaces(state())).toHaveLength(1);
     expect(visibleNames()).toContain("Development");
   });
 
-  test("leaving is removing yourself, and lands the same way", () => {
-    state().leaveWorkspace(TEST_WORKSPACE.id, CURRENT_USER.id);
+  test("leaving is removing yourself, and lands the same way", async () => {
+    await state().leaveWorkspace(TEST_WORKSPACE.id, CURRENT_USER.id);
 
     expect(selectWorkspaceAccess(state()).isAllowed).toBe(false);
   });
@@ -185,12 +195,12 @@ describe("membership changes", () => {
 });
 
 describe("a restricted folder, through the store", () => {
-  test("disappears from the tree every surface reads", () => {
+  test("disappears from the tree every surface reads", async () => {
     expect(visibleNames()).toContain("Payment");
 
     // Restricted, and granted to somebody who is not the signed-in user. The
     // fixture's owner is a member, so the owner escape hatch is not in play.
-    restrict(ID.payment, ["usr_nobody"]);
+    await restrict(ID.payment, ["usr_nobody"]);
 
     expect(visibleNames()).not.toContain("Payment");
     // Its children go with it, not just the folder.
@@ -199,37 +209,62 @@ describe("a restricted folder, through the store", () => {
     expect(visibleNames()).toContain("Backend");
   });
 
-  test("is still in the stored tree, so an admin can reopen it", () => {
-    restrict(ID.payment, ["usr_nobody"]);
+  /**
+   * Câu hỏi thật của "Restricted": nó có SỐNG QUA một lần F5 không.
+   *
+   * Bản cũ ghi cờ vào cây trong bộ nhớ và không gọi server. Mọi test đọc lại
+   * store đều xanh — store nói đúng thứ vừa ghi vào nó — trong khi trang vẫn
+   * mở toang cho mọi người khác. Nên chỗ này hỏi BACKEND, không hỏi store.
+   */
+  test("is written to the server, not just to the tab that set it", async () => {
+    await restrict(ID.payment, ["usr_nobody"]);
+
+    const fromServer = await driveApi.tree(TEST_WORKSPACE.id);
+
+    expect(findNodeById(fromServer, ID.payment)?.accessMode).toBe("restricted");
+  });
+
+  test("và một lần ghi hỏng thì KHÔNG vẽ ra là đã hạn chế", async () => {
+    server.use(
+      http.put(`${API_BASE_URL}/nodes/:nodeId/access-mode`, () => HttpResponse.error()),
+    );
+
+    // Không ném ra ngoài: hộp thoại nhận một câu báo lỗi, không nhận một trang
+    // trắng. Nhưng nó cũng KHÔNG được vẽ ra là đã hạn chế.
+    await state().setNodeAccessMode(ID.payment, "restricted");
+
+    expect(findNodeById(getFullTree(), ID.payment)?.accessMode).not.toBe("restricted");
+    expect(visibleNames()).toContain("Payment");
+    expect(state().feedback?.tone).toBe("error");
+  });
+
+  test("is still in the stored tree, so an admin can reopen it", async () => {
+    await restrict(ID.payment, ["usr_nobody"]);
 
     expect(findNodeById(getFullTree(), ID.payment)).not.toBeNull();
     expect(findNodeById(selectTree(state()), ID.payment)).toBeNull();
   });
 
-  test("granting it back puts it and its subtree straight back", () => {
-    restrict(ID.payment, ["usr_nobody"]);
+  test("granting it back puts it and its subtree straight back", async () => {
+    await restrict(ID.payment, ["usr_nobody"]);
     expect(visibleNames()).not.toContain("Payment");
 
-    restrict(ID.payment, ["usr_nobody", CURRENT_USER.id]);
+    await restrict(ID.payment, ["usr_nobody", CURRENT_USER.id]);
     expect(visibleNames()).toContain("Payment");
     expect(visibleNames()).toContain("spec.pdf");
   });
 
   test("global search returns nothing from inside it", async () => {
-    restrict(ID.payment, ["usr_nobody"]);
+    await restrict(ID.payment, ["usr_nobody"]);
 
-    const groups = await searchService.search({
-      query: "spec",
-      role: "admin",
-      user: CURRENT_USER,
-    });
+    const groups = await searchFake.search({ query: "spec" , role: "admin", user: CURRENT_USER });
 
     const titles = groups.flatMap((group) => group.results.map((result) => result.title));
     expect(titles).not.toContain("spec.pdf");
   });
 
   test("a board inside it cannot be opened by its own id", async () => {
-    restrict(ID.backend, ["usr_nobody"]);
+    await restrict(ID.backend, ["usr_nobody"]);
 
     // The board is a descendant of Backend; the service resolves through the
     // filtered tree, so there is nothing to load rather than something to hide.
@@ -238,8 +273,8 @@ describe("a restricted folder, through the store", () => {
 });
 
 describe("moving something into a restricted folder", () => {
-  test("says how many people it was just taken away from", () => {
-    restrict(ID.payment, [CURRENT_USER.id]);
+  test("says how many people it was just taken away from", async () => {
+    await restrict(ID.payment, [CURRENT_USER.id]);
     state().moveNode(ID.frontend, ID.payment);
 
     expect(state().feedback?.message).toContain("can no longer see it");

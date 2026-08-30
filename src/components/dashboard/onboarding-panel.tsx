@@ -8,13 +8,6 @@ import { useCreateBoard } from "@/hooks/use-create-board";
 import { requirementFor } from "@/lib/permissions";
 import { BOARD_TEMPLATES } from "@/lib/board-templates";
 
-/**
- * A workspace with nothing in it yet (SY-DSH-44).
- *
- * Three empty widgets tell a new team nothing. The first thing they need is a
- * board with a task on it, so that is the only thing this offers — and it is
- * still permission-gated, because a viewer cannot create one.
- */
 export function OnboardingPanel() {
   const { createBoard, isCreating } = useCreateBoard();
   const can = usePermissions();
@@ -48,7 +41,7 @@ export function OnboardingPanel() {
         className="gap-1.5"
         disabled={!canCreate || isCreating || taskTemplate === null}
         title={canCreate ? undefined : requirementFor("board.create")}
-        onClick={() => taskTemplate && createBoard(null, taskTemplate)}
+        onClick={() => void (taskTemplate && createBoard(null, taskTemplate))}
       >
         <ListChecks />
         Create your first task board

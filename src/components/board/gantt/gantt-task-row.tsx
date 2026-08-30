@@ -7,7 +7,6 @@ import { selectRow, useBoardStore } from "@/store/board-store";
 import { useGridStore } from "@/store/grid-store";
 import { cn } from "@/lib/utils";
 
-/** Indent per hierarchy level — the same step the table nests subtasks with. */
 export const INDENT_PER_LEVEL = 14;
 
 interface GanttTaskRowProps {
@@ -17,14 +16,6 @@ interface GanttTaskRowProps {
   readonly onToggle: (rowId: string) => void;
 }
 
-/**
- * One line of the task panel.
- *
- * It subscribes to its own record, so renaming a task repaints one row rather
- * than the chart. Parents carry a disclosure triangle and their derived
- * progress; everything else is the record's id and title, because a task list
- * beside a chart earns its width by staying narrow.
- */
 export const GanttTaskRow = memo(function GanttTaskRow({
   row,
   primaryColumnId,

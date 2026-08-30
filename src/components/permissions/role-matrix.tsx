@@ -6,11 +6,6 @@ import { ROLE_LABELS, ROLE_SUMMARIES, permissionsByModule, roleHas } from "@/lib
 import { cn } from "@/lib/utils";
 import { WORKSPACE_ROLES, type WorkspaceRole } from "@/types";
 
-/**
- * The role matrix (SY-RBC-42), rendered from the same catalogue the app runs
- * on. It is not a picture of the rules — it *is* the rules, read out. A key
- * that never reaches this table is a key no component could be gating on.
- */
 export function RoleMatrix({ highlight }: { highlight?: WorkspaceRole | null }) {
   return (
     <div className="overflow-x-auto">
@@ -29,17 +24,8 @@ export function RoleMatrix({ highlight }: { highlight?: WorkspaceRole | null }) 
                   role === highlight ? "text-accent" : "text-muted-foreground",
                 )}
               >
-                {/* The summary used to ride on the native `title`, which never
-                    appears for a keyboard or a touch user and cannot be styled
-                    to match the hint on every other explanation in this dialog.
-                    The trigger is a span rather than the cell itself so the
-                    hover target is the word, not the whole column head. */}
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    {/* Focusable, or the tooltip is mouse-only — Radix merges
-                        its handlers onto the child but never makes one
-                        focusable, and `onFocus` on a bare span never fires.
-                        The `title` this replaced was at least read out. */}
                     <span
                       tabIndex={0}
                       className="inline-flex rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"

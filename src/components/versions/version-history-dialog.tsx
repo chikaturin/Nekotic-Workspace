@@ -14,18 +14,10 @@ interface VersionHistoryDialogProps {
   readonly isOpen: boolean;
   readonly title: string;
   readonly history: VersionHistory;
-  /** Shown when the subject records events without snapshots — secrets. */
   readonly notice?: string;
   readonly onClose: () => void;
 }
 
-/**
- * Version history (SY-VER-39) for pages, config files and secret documents.
- *
- * One surface for all three: the difference lives in the entries, not in the
- * UI. Restoring writes a new version rather than rewinding, so the list always
- * reloads afterwards instead of assuming what it now contains.
- */
 export function VersionHistoryDialog({
   isOpen,
   title,

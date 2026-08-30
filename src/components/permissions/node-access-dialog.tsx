@@ -29,7 +29,6 @@ import {
   accessModeOf,
 } from "@/lib/permissions/visibility";
 import { nodeVisual } from "@/lib/node-visuals";
-import { CURRENT_USER } from "@/mock/users";
 import { isContainer, NODE_ACCESS_MODES, WORKSPACE_ROLES } from "@/types";
 import type { DriveNode, NodeAccessMode, WorkspaceRole } from "@/types";
 
@@ -39,39 +38,18 @@ interface NodeAccessDialogProps {
   readonly onClose: () => void;
 }
 
-/**
- * The four roles, each carrying the sentence that says what it actually means.
- * A native <option> has nowhere to put that sentence, which is the whole reason
- * the per-person picker is no longer a native select: "Viewer" beside a name is
- * not an answer until you know a viewer changes nothing.
- */
 const ROLE_OPTIONS: readonly ListboxOption[] = WORKSPACE_ROLES.map((role) => ({
   value: role,
   label: ROLE_LABELS[role],
   description: ROLE_SUMMARIES[role],
 }));
 
-/**
- * What picking one mode would do, said in full on the card itself.
- *
- * The inheriting card names the ancestor it currently follows, because "inherit
- * from parent" on its own does not tell you who that lets in — and who it lets
- * in is the question the dialog exists to answer.
- */
 function describeMode(mode: NodeAccessMode, inheritedFrom: string | null): string {
   const summary = ACCESS_MODE_SUMMARIES[mode];
   if (mode !== "inherit" || inheritedFrom === null) return summary;
   return `${summary} Right now that is ${inheritedFrom}.`;
 }
 
-/**
- * How to talk about the thing being restricted.
- *
- * A folder gates its whole subtree and a file gates itself, and saying "and
- * everything inside it" over a CSV would describe a rule that does not exist.
- * The noun comes from the same visual table the icons do, so a Config document
- * is called a Config here too.
- */
 function accessScope(node: DriveNode): {
   readonly noun: string;
   readonly subject: string;
@@ -87,21 +65,9 @@ function accessScope(node: DriveNode): {
   };
 }
 
-/**
- * The empty state of the add box, which has to name what was searched for.
- *
- * `Combobox` owns its query and does not hand it back, so the query is read off
- * the command store the popover already runs on. Worth the reach: this sentence
- * is a product rule, not a "no results" shrug. Folder access is downstream of
- * workspace membership and never a way around it — somebody outside the
- * workspace has to be invited to it first, and silently pulling them in here
- * would make a folder dialog a membership control.
- */
 function NoCandidateNotice() {
   const query = useCommandState((state) => state.search).trim();
 
-  // Reached when everyone is already listed rather than when a search missed,
-  // so the membership rule would be answering a question nobody asked.
   if (query.length === 0) {
     return <>Everyone in this workspace already has access to this item.</>;
   }
@@ -114,25 +80,6 @@ function NoCandidateNotice() {
   );
 }
 
-/**
- * Who can see this item (SY-FAC).
- *
- * One choice and one list, in that order, because that is the order the
- * question is actually asked: *is this shut*, and if so, *who is in*. Anything
- * more — condition builders, effective-permission simulators, deny rules —
- * turns it into an IAM console, and access control that needs a manual is
- * access control nobody sets.
- *
- * The two layers stay visible and separate: the mode decides who gets *in*, the
- * role beside each name decides what they can do once they are. A viewer who is
- * listed sees the item and edits nothing; a manager who is not listed does not
- * see it at all.
- *
- * It opens on any node, a single file included. Restricting one file is the
- * case people actually reach for first — a credentials dump or an `.env` beside
- * a dozen harmless ones — and demanding a whole folder around it was making the
- * feature answer a question nobody asked.
- */
 export function NodeAccessDialog({ node, isOpen, onClose }: NodeAccessDialogProps) {
   const access = useNodeAccess(node);
   const [pendingMode, setPendingMode] = useState<NodeAccessMode | null>(null);
@@ -144,15 +91,7 @@ export function NodeAccessDialog({ node, isOpen, onClose }: NodeAccessDialogProp
       access.candidates.map((person) => ({
         value: person.id,
         label: person.name,
-        // The email is both the second line of the row and the second thing the
-        // search scores against, which is exactly what the hand-rolled filter
-        // this replaced did.
         description: person.email,
-        // An empty string is Radix's own "there is no image" signal, and it is
-        // what makes the circle fall through to initials. Without it a
-        // directory where nobody has uploaded a photo — which is every row
-        // today — draws no avatar at all, because a `ListboxOption` can only
-        // express an avatar as a URL.
         avatarUrl: person.avatarUrl ?? "",
       })),
     [access.candidates],
@@ -163,22 +102,18 @@ export function NodeAccessDialog({ node, isOpen, onClose }: NodeAccessDialogProp
   const scope = accessScope(node);
 
   function changeMode(next: NodeAccessMode) {
-    // Widening access is the change worth stopping to confirm: it is the one
-    // that shows a folder to people who could not see it a moment ago.
     if (next === "workspace" && mode === "restricted") {
       setPendingMode(next);
       return;
     }
-    access.setMode(next);
+    void access.setMode(next);
   }
 
   function addPerson(userId: string | null) {
     if (userId === null) return;
 
-    // Somebody is added at the role they already hold in the workspace; the
-    // select on their row is where it gets narrowed afterwards.
     const person = access.candidates.find((candidate) => candidate.id === userId);
-    if (person) access.grant(person.id, person.role);
+    if (person) void access.grant(person.id, person.role);
   }
 
   return (
@@ -194,9 +129,6 @@ export function NodeAccessDialog({ node, isOpen, onClose }: NodeAccessDialogProp
           </DialogHeader>
 
           <DialogBody size="sm" className="space-y-4">
-            {/* Three cards rather than a dropdown, because each option carries a
-                consequence that has to be read *before* it is chosen — and a
-                native <option> cannot hold a second line. */}
             <RadioGroup
               label="Access"
               value={mode}
@@ -246,7 +178,7 @@ export function NodeAccessDialog({ node, isOpen, onClose }: NodeAccessDialogProp
                           options={ROLE_OPTIONS}
                           aria-label={`What ${entry.user.name} can do here`}
                           onValueChange={(next) => {
-                            if (next !== null) access.grant(entry.user.id, next as WorkspaceRole);
+                            if (next !== null) void access.grant(entry.user.id, next as WorkspaceRole);
                           }}
                           className="w-32 shrink-0"
                         />
@@ -259,7 +191,7 @@ export function NodeAccessDialog({ node, isOpen, onClose }: NodeAccessDialogProp
                           variant="ghost"
                           aria-label={`Remove ${entry.user.name}`}
                           tooltip={`Remove from ${scope.noun}`}
-                          onClick={() => access.revoke(entry.user.id)}
+                          onClick={() => void access.revoke(entry.user.id)}
                           className="shrink-0 text-faint-foreground hover:text-danger"
                         >
                           <X />
@@ -274,9 +206,6 @@ export function NodeAccessDialog({ node, isOpen, onClose }: NodeAccessDialogProp
                     <p className="mb-1.5 text-body font-medium text-muted-foreground">
                       Add people
                     </p>
-                    {/* Nothing is selected here and nothing stays selected: the
-                        pick is an action, so the control reports the id, grants
-                        it, and goes straight back to its placeholder. */}
                     <Combobox
                       size="sm"
                       value={null}
@@ -321,13 +250,10 @@ export function NodeAccessDialog({ node, isOpen, onClose }: NodeAccessDialogProp
         confirmLabel="Make accessible"
         onClose={() => setPendingMode(null)}
         onConfirm={() => {
-          if (pendingMode) access.setMode(pendingMode);
+          if (pendingMode) void access.setMode(pendingMode);
           setPendingMode(null);
         }}
       />
     </>
   );
 }
-
-/** Re-exported so surfaces can name the actor without importing the mock. */
-export const ACCESS_ACTOR_ID = CURRENT_USER.id;

@@ -6,13 +6,6 @@ import { Button } from "@/components/ui/button";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { selectPreviewRole, usePermissionStore } from "@/store/permission-store";
 
-/**
- * Standing reminder while the app is being previewed as another role.
- *
- * Without it a manager wonders why the column menu vanished. It never appears
- * unprompted: the preview is opt-in, and previewing can only ever *remove*
- * affordances, never add one.
- */
 export function RolePreviewBanner() {
   const previewRole = usePermissionStore(selectPreviewRole);
   const setPreviewRole = usePermissionStore((state) => state.setPreviewRole);

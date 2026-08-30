@@ -39,17 +39,11 @@ interface TableBlockProps {
   readonly isEditable: boolean;
 }
 
-/**
- * Grid with the controls where the work is: a menu on every row and column,
- * one-click add bars along the right and bottom edges, and Tab/Enter that grow
- * the table as you type.
- */
 export function TableBlock({ block, onChange, isEditable }: TableBlockProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = columnCount(block);
   const rows = block.rows.length;
 
-  /** Cells are addressed by coordinate so growth can hand focus straight on. */
   function focusCell(rowIndex: number, columnIndex: number) {
     requestAnimationFrame(() => {
       containerRef.current
@@ -194,9 +188,6 @@ export function TableBlock({ block, onChange, isEditable }: TableBlockProps) {
   );
 }
 
-/* ------------------------------------------------------------------ pieces */
-
-/** Thin bar along an edge — one click appends a row or a column. */
 function EdgeAdd({
   orientation,
   label,

@@ -12,7 +12,6 @@ export interface UploadsView {
   readonly isPanelOpen: boolean;
 }
 
-/** Read-only view of the upload queue, optionally scoped to one tag. */
 export function useUploads(tag?: string): UploadsView {
   const allTasks = useUploadStore((state) => state.tasks);
   const isPanelOpen = useUploadStore((state) => state.isPanelOpen);

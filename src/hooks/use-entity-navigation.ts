@@ -8,14 +8,6 @@ import { useRecentStore } from "@/store/recent-store";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
 import type { EntityRef } from "@/types";
 
-/**
- * Open anything a notification, search hit or My Work card points at.
- *
- * One function so every entry point behaves identically: files open the
- * preview, records route to their board and then ask it to open the drawer,
- * everything else is a plain navigation. A target whose node has since been
- * deleted reports that instead of dropping the user at the drive root.
- */
 export function useOpenEntity(): (ref: EntityRef) => void {
   const openNode = useOpenNode();
   const tree = useWorkspaceStore(selectTree);
@@ -38,7 +30,6 @@ export function useOpenEntity(): (ref: EntityRef) => void {
         return;
       }
 
-      // The board reads this after it loads; the grid store resets per board.
       if (opensDrawer(ref)) requestRow(ref.nodeId, ref.rowId);
 
       openNode(hrefForRef(tree, ref));

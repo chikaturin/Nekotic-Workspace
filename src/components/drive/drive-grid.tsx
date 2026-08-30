@@ -14,11 +14,9 @@ const CONTAINER_MOTION = {
 
 interface DriveGridProps {
   readonly nodes: readonly DriveNode[];
-  /** Route for an item — folder views append a slug, smart views resolve paths. */
   readonly resolveHref: (node: DriveNode) => string;
   readonly selectedIds: readonly string[];
   readonly onSelect: (nodeId: string, additive: boolean) => void;
-  /** Changes when the folder changes, restaging the reveal animation. */
   readonly revealKey: string;
 }
 

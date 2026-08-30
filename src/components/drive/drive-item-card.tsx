@@ -23,11 +23,6 @@ interface DriveItemCardProps {
   readonly onSelect: (nodeId: string, additive: boolean) => void;
 }
 
-/**
- * Grid tile: thumbnail for images, icon plate otherwise, drop target for folders.
- * The motion wrapper stays separate from the interactive element — framer-motion
- * owns `onDragStart` for its gesture system, which would shadow native HTML5 DnD.
- */
 export function DriveItemCard({ node, href, isSelected, onSelect }: DriveItemCardProps) {
   const openNode = useOpenNode();
   const openPreview = useWorkspaceStore((state) => state.openPreview);

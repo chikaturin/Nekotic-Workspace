@@ -33,22 +33,10 @@ const STEPS: readonly { readonly id: ImportStep; readonly label: string }[] = [
   { id: "result", label: "Result" },
 ];
 
-/**
- * The import wizard (SY-IMP-35).
- *
- * Four steps, and the board is untouched until the fourth. Everything the user
- * decides — which column feeds which, what to do with values that will not
- * parse — is decided against a preview computed from the file itself.
- */
 export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
   const wizard = useImportWizard(model);
   const stepIndex = STEPS.findIndex((step) => step.id === wizard.step);
 
-  /**
-   * The import writes records in the file's order; the view decides the order
-   * they are *read* in. Saying so on the way out is what stops a sorted view
-   * from looking like an import that shuffled the file.
-   */
   const isSorted = (model.view?.sorts.length ?? 0) > 0;
 
   function close() {
@@ -96,8 +84,6 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
           </ol>
         </DialogHeader>
 
-        {/* `inline` because every step pads itself — the body only has to be
-            the part of the card that scrolls. */}
         <DialogBody variant="inline">
           {wizard.step === "upload" && (
             <ImportUploadStep
@@ -162,9 +148,6 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
               <Button
                 size="sm"
                 variant="default"
-                // `isLoading` blocks the click and swaps the leading check for
-                // the spinner, which is the pair of things the hand-rolled
-                // version did with a ternary and a separate `disabled`.
                 isLoading={wizard.isBusy}
                 onClick={() => void wizard.confirm()}
               >
@@ -183,14 +166,6 @@ export function ImportDialog({ isOpen, model, onClose }: ImportDialogProps) {
   );
 }
 
-/**
- * Validate is offered only for a mapping that can actually run.
- *
- * A conflict is a decision the user has to make — two source columns aimed at
- * one board column, or a new column whose name is taken. Letting the step
- * advance and failing later would put the error a page away from the control
- * that causes it.
- */
 function ValidateButton({ wizard }: { readonly wizard: ImportWizard }) {
   const plan = wizard.plan;
   const targets = (plan?.mappedColumnCount ?? 0) + (plan?.newColumnCount ?? 0);

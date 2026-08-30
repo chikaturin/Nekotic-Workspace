@@ -40,14 +40,6 @@ export interface EmbeddedBoard {
 
 const EMPTY_ROWS: RowMap = {};
 
-/**
- * DV-EMB-25 — a saved view of another board, rendered inside a document.
- *
- * Nothing is copied into the document: the block stores a board node id and a
- * view id, and the records come from the board service on demand. Reads run
- * through the same query the board itself uses, and writes go straight back to
- * the source board, so the embed cannot drift from it.
- */
 export function useEmbeddedBoard(
   nodeId: string | null,
   viewId: string | null,
@@ -96,10 +88,6 @@ export function useEmbeddedBoard(
     [index, view, columns, context],
   );
 
-  /**
-   * Writes take the same three beats as the board's own store — optimistic,
-   * request, reconcile or roll back — reusing the very same pure operations.
-   */
   const editCell = useCallback(
     async (rowId: string, columnId: string, value: CellValue) => {
       if (!snapshot || !index) return;

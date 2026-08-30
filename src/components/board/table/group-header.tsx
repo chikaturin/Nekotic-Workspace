@@ -19,10 +19,6 @@ interface GroupHeaderProps {
   readonly onToggle: () => void;
 }
 
-/**
- * A group divider inside the virtualised list. It is the same height as a
- * record row, which keeps the fixed-height window maths exact.
- */
 export const GroupHeader = memo(function GroupHeader({
   label,
   groupKey,

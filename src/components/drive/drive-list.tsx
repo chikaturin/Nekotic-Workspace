@@ -15,7 +15,6 @@ const CONTAINER_MOTION = {
 interface Column {
   readonly key: SortKey | null;
   readonly label: string;
-  /** Matches the responsive visibility of the matching row cell. */
   readonly className?: string;
 }
 

@@ -11,13 +11,10 @@ interface SlashMenuProps {
   readonly activeIndex: number;
   readonly onSelect: (type: BlockType) => void;
   readonly onHover: (index: number) => void;
-  /** Referenced by the editor's `aria-controls`. */
   readonly listboxId: string;
-  /** Builds the option ids the editor points `aria-activedescendant` at. */
   readonly optionId: (index: number) => string;
 }
 
-/** Command palette for block insertion, anchored under the active block. */
 export function SlashMenu({
   results,
   activeIndex,
@@ -64,7 +61,6 @@ export function SlashMenu({
                 aria-selected={index === activeIndex}
                 onMouseEnter={() => onHover(index)}
                 onMouseDown={(event) => {
-                  // Keep the caret in the block the menu was opened from.
                   event.preventDefault();
                   onSelect(command.type);
                 }}

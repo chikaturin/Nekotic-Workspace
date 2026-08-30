@@ -4,11 +4,15 @@ import { memo, useCallback, useLayoutEffect, useRef, type MouseEvent, type React
 import { CellEditor } from "@/components/board/cells/cell-editor";
 import { CellRenderer } from "@/components/board/cells/cell-renderer";
 import { widthStyle, type GridShared } from "@/components/board/table/grid-shared";
+import type { CellMove } from "@/lib/cell-arrow-exit";
 import { cellOf } from "@/lib/cell-values";
 import { GRID_FROZEN_ATTR, revealBeyondFrozen } from "@/lib/dom/grid-scroll";
+import { moveAddress } from "@/lib/grid-selection";
 import { cn } from "@/lib/utils";
 import {
   selectIsEditing,
+  selectIsFillOrigin,
+  selectIsFillTarget,
   selectIsFocused,
   selectIsSelected,
   useGridStore,
@@ -21,38 +25,15 @@ interface GridCellProps {
   readonly rowIndex: number;
   readonly columnIndex: number;
   readonly shared: GridShared;
-  /** Frozen: an archived record, an archived board, or a viewer who may read. */
   readonly isReadOnly: boolean;
-  /**
-   * Hierarchy indent in pixels, applied to the primary cell only so a nested
-   * row still lines up with every other column.
-   */
   readonly indent?: number;
-  /** Expand/collapse control for a record that owns subtasks. */
   readonly disclosure?: ReactNode;
 }
 
-/** The reader marker owns its own click; the cell's gestures must let it past. */
 function isReaderMarker(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest("[data-cell-detail]") != null;
 }
 
-/**
- * The cell types a *single* click opens.
- *
- * Most of the grid opens on double-click, and that is right: a single click is
- * how you select, and a cell full of text has something to select.
- *
- * Two types have nothing to select. An empty Attachment cell holds no value to
- * pick and no text to range over — the only thing anyone wants from it is the
- * uploader. A Date cell holds one atomic value that cannot be part-selected,
- * typed into or extended; every interaction with it is "open the calendar", so
- * making people find the second click is a step that exists for the grid's
- * convenience rather than theirs.
- *
- * A cell that already holds files is *not* included: there, a click has to
- * reach the file, not the uploader.
- */
 function opensOnSingleClick(column: BoardColumn, value: CellValue): boolean {
   if (column.type === "date") return true;
 
@@ -61,13 +42,6 @@ function opensOnSingleClick(column: BoardColumn, value: CellValue): boolean {
   );
 }
 
-/**
- * One cell.
- *
- * It subscribes to three booleans out of the grid store rather than to the
- * selection object, so moving the cursor re-renders the two cells involved and
- * nothing else.
- */
 export const GridCell = memo(function GridCell({
   row,
   column,
@@ -81,6 +55,8 @@ export const GridCell = memo(function GridCell({
   const isFocused = useGridStore(selectIsFocused(rowIndex, columnIndex));
   const isSelected = useGridStore(selectIsSelected(rowIndex, columnIndex));
   const isEditing = useGridStore(selectIsEditing(row.id, column.id));
+  const isFillOrigin = useGridStore(selectIsFillOrigin(rowIndex, columnIndex));
+  const isFillTarget = useGridStore(selectIsFillTarget(rowIndex, columnIndex));
   const initialText = useGridStore((state) =>
     state.editing?.rowId === row.id && state.editing.columnId === column.id
       ? state.editing.initialText
@@ -95,19 +71,6 @@ export const GridCell = memo(function GridCell({
   const value = cellOf(row, column);
   const element = useRef<HTMLDivElement>(null);
 
-  /**
-   * What happens the moment a cell is asked to edit.
-   *
-   * A cell that cannot be edited — a viewer's board, or an archived record on
-   * a board anybody else can write — answers with the reader instead of
-   * nothing at all. That is the one place the substitution belongs: the
-   * keyboard handler knows the board is frozen but not that this row is, and a
-   * request that silently does nothing is how a clipped value becomes
-   * unreadable to somebody working without a mouse.
-   *
-   * Otherwise the editor must not open behind the frozen columns. Both only
-   * ever run for the one cell being edited, and only when edit mode starts.
-   */
   useLayoutEffect(() => {
     if (!isEditing) return;
 
@@ -123,8 +86,6 @@ export const GridCell = memo(function GridCell({
 
   const handleMouseDown = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
-      // Pressing the reader marker must not begin a range: a few pixels of
-      // travel would turn it into a drag and swallow the click entirely.
       if (isEditing || isReaderMarker(event.target)) return;
       const grid = useGridStore.getState();
       const address = { rowIndex, columnIndex };
@@ -145,29 +106,12 @@ export const GridCell = memo(function GridCell({
     if (grid.isDragSelecting) grid.dragSelectTo({ rowIndex, columnIndex });
   }, [rowIndex, columnIndex]);
 
-  /**
-   * Single click, for the two things that are not selection.
-   *
-   * A `+4` marker means "there is more here than fits" — clicking it has to
-   * show the rest, which is what the cell's own editor does. The other is the
-   * empty Attachment cell above. Both are read off the DOM rather than passed
-   * down as callbacks, because `CellRenderer` is memoised on the value and
-   * handing it a fresh function per cell would undo that for five thousand
-   * rows to serve two of them.
-   */
   const handleClick = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
-      // A click *inside* an open editor is the editor's. Without this, an
-      // empty attachment cell — the one type that opens on a single click —
-      // re-opened itself from every click in its own panel, so pressing Close
-      // shut it and re-opened it in the same gesture.
       if (isEditing) return;
 
       const target = event.target as Element | null;
 
-      // Reading comes first, and is not gated on permission: showing somebody
-      // the whole of a value they can already see part of is not a write, and
-      // a read-only board is exactly where a clipped step is hardest to read.
       if (target?.closest?.("[data-cell-detail]") != null) {
         useGridStore.getState().openDetail(row.id, column.id);
         return;
@@ -175,9 +119,6 @@ export const GridCell = memo(function GridCell({
 
       if (isReadOnly) return;
 
-      // A modified click is a selection gesture — Shift extends the range,
-      // Cmd/Ctrl is the platform's add-to-selection. Opening an editor on one
-      // would take a cell type out of range selection altogether.
       if (event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return;
 
       const isExpand = target?.closest?.("[data-cell-expand]") != null;
@@ -189,17 +130,32 @@ export const GridCell = memo(function GridCell({
     [isReadOnly, isEditing, column, value, row.id],
   );
 
+  /**
+   * Trả con trỏ bàn phím về bảng sau khi thoát khỏi một ô.
+   *
+   * Ô đang sửa là một `<input>` thật; đóng nó lại là React gỡ luôn phần tử đang
+   * giữ focus, và focus rơi về `<body>`. Bảng nghe phím trên chính div
+   * `role="grid"` của nó, nên từ lúc đó mũi tên, Tab, Enter đều không còn tác
+   * dụng — người dùng phải bấm chuột vào một ô mới gõ tiếp được.
+   */
+  const returnFocusToGrid = useCallback(() => {
+    element.current?.closest<HTMLElement>('[role="grid"]')?.focus();
+  }, []);
+
   const commit = useCallback(
-    (next: CellValue, move: "down" | "none" = "none") => {
+    (next: CellValue, move: CellMove = "none") => {
       shared.onCommitCell(row.id, column.id, next);
       const grid = useGridStore.getState();
       grid.endEdit();
 
-      if (move === "down") {
-        grid.focusCell({ rowIndex: rowIndex + 1, columnIndex });
-      }
+      // `move === "none"` nghĩa là ô đóng vì người dùng bấm sang chỗ khác. Kéo
+      // focus về bảng lúc này là giật mất thứ họ vừa bấm vào.
+      if (move === "none") return;
+
+      grid.focusCell(moveAddress({ rowIndex, columnIndex }, move, shared.bounds));
+      returnFocusToGrid();
     },
-    [shared, row.id, column.id, rowIndex, columnIndex],
+    [shared, row.id, column.id, rowIndex, columnIndex, returnFocusToGrid],
   );
 
   return (
@@ -208,16 +164,11 @@ export const GridCell = memo(function GridCell({
       role="gridcell"
       aria-colindex={columnIndex + 1}
       aria-selected={isSelected}
-      // The frozen pane the rest of the row scrolls beneath. Marked in the DOM
-      // because the only thing that needs it — keeping an editor out from
-      // under it — measures the pane rather than recomputing its width.
       {...(column.isPrimary ? { [GRID_FROZEN_ATTR]: "" } : {})}
       onMouseDown={handleMouseDown}
       onMouseEnter={handleMouseEnter}
       onClick={handleClick}
       onDoubleClick={(event) => {
-        // Two presses on the marker are two attempts to read, not a request to
-        // edit — without this the pair opened the reader *and* an editor.
         if (isReadOnly || isEditing || isReaderMarker(event.target)) return;
         useGridStore.getState().beginEdit(row.id, column.id);
       }}
@@ -226,6 +177,8 @@ export const GridCell = memo(function GridCell({
         "group/cell relative h-full shrink-0 border-b border-r border-hairline",
         column.isPrimary && "sticky z-sticky bg-surface",
         !column.isPrimary && isSelected && "bg-selection",
+        isFillTarget &&
+          "bg-accent-soft/50 outline-1 outline-dashed outline-accent/60 -outline-offset-1",
         isFocused && "z-raised ring-2 ring-inset ring-accent",
       )}
     >
@@ -236,6 +189,17 @@ export const GridCell = memo(function GridCell({
         >
           <span className="pointer-events-auto">{disclosure}</span>
         </div>
+      )}
+
+      {isFillOrigin && shared.onFillPointerDown && !isEditing && (
+        <span
+          className="absolute -bottom-[7px] -right-[7px] z-raised flex size-[14px] cursor-crosshair items-center justify-center"
+          onPointerDown={shared.onFillPointerDown}
+          data-fill-handle
+          aria-hidden="true"
+        >
+          <span className="size-[7px] rounded-[1px] border border-surface bg-accent" />
+        </span>
       )}
 
       {isEditing && !isReadOnly ? (
@@ -251,8 +215,12 @@ export const GridCell = memo(function GridCell({
           context={shared.context}
           initialText={initialText}
           focusId={focusId}
+          canExitByArrow
           onCommit={commit}
-          onCancel={() => useGridStore.getState().endEdit()}
+          onCancel={() => {
+            useGridStore.getState().endEdit();
+            returnFocusToGrid();
+          }}
           onCreateOption={(label) => shared.onCreateOption(column.id, label)}
         />
       ) : (

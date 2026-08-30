@@ -18,12 +18,11 @@ import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/ui/select-field";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { isWorkspaceMember } from "@/lib/workspace-access";
-import { DIRECTORY } from "@/mock/users";
+import { useDirectory } from "@/hooks/use-directory";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspace-store";
 import {
   WORKSPACE_ROLES,
   type DirectoryUser,
-  type UserSummary,
   type WorkspaceRole,
 } from "@/types";
 
@@ -32,35 +31,22 @@ interface InviteMemberDialogProps {
   readonly onClose: () => void;
 }
 
-/**
- * Adding somebody to the workspace.
- *
- * The directory is searched by name or address, and a match is added straight
- * away — this build has no invitation mailbox, and inventing one would mean
- * shipping a flow whose second half does not exist. An address that matches
- * nobody says so rather than silently creating an account.
- *
- * The search and the result list stay hand-built rather than becoming a
- * `Combobox`, and the reason is the paragraph at the bottom of this file. That
- * message is a function of what was typed — it only appears for something that
- * looks like an address, and it quotes the address back — whereas a Combobox
- * owns its query internally and offers the caller one static `emptyMessage`.
- * A picked row here also *performs* the invitation rather than setting a
- * value, which is not the shape `value`/`onValueChange` describes. Everything
- * that could move without losing that has: the field, the role select and the
- * rows are all primitives now.
- */
 export function InviteMemberDialog({ isOpen, onClose }: InviteMemberDialogProps) {
   const workspace = useWorkspaceStore(selectActiveWorkspace);
-  const addMember = useWorkspaceStore((state) => state.addMember);
+  const inviteMember = useWorkspaceStore((state) => state.inviteMember);
+  const createMemberAccount = useWorkspaceStore((state) => state.createMemberAccount);
   const pushFeedback = useWorkspaceStore((state) => state.pushFeedback);
 
   const [query, setQuery] = useState("");
   const [role, setRole] = useState<WorkspaceRole>("member");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [isBusy, setIsBusy] = useState(false);
 
   const needle = query.trim().toLowerCase();
+  const directory = useDirectory();
 
-  const candidates = DIRECTORY.filter(
+  const candidates = directory.filter(
     (person) =>
       person.isActive &&
       !isWorkspaceMember(workspace, person.id) &&
@@ -72,32 +58,51 @@ export function InviteMemberDialog({ isOpen, onClose }: InviteMemberDialogProps)
   const looksLikeAddress = needle.includes("@");
   const isUnknownAddress = looksLikeAddress && candidates.length === 0;
 
-  function invite(person: DirectoryUser) {
-    // A member is a summary plus a role — `isActive` belongs to the directory
-    // entry, not to the membership, so it is not carried across.
-    const user: UserSummary = {
-      id: person.id,
-      name: person.name,
-      email: person.email,
-      initials: person.initials,
-      ...(person.avatarUrl ? { avatarUrl: person.avatarUrl } : {}),
-      ...(person.accentColor ? { accentColor: person.accentColor } : {}),
-    };
-
-    addMember(workspace.id, user, role);
-    pushFeedback(`${person.name} joined as ${ROLE_LABELS[role]}`, "success");
+  function close() {
     setQuery("");
+    setName("");
+    setPassword("");
     onClose();
   }
 
+  async function invite(person: DirectoryUser) {
+    setIsBusy(true);
+    const sent = await inviteMember(person.email, role);
+    setIsBusy(false);
+
+    if (!sent) return;
+
+    pushFeedback(
+      `Invitation sent to ${person.name} — they join once they accept`,
+      "success",
+    );
+    close();
+  }
+
+  async function createAccount() {
+    const email = query.trim();
+    const fullName = name.trim();
+
+    setIsBusy(true);
+    const created = await createMemberAccount({ email, name: fullName, password, role });
+    setIsBusy(false);
+
+    if (!created) return;
+
+    pushFeedback(`${fullName} joined as ${ROLE_LABELS[role]}`, "success");
+    close();
+  }
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
       <DialogContent size="md" className="flex max-h-[85vh] flex-col">
         <DialogHeader>
           <DialogTitle>Invite members</DialogTitle>
           <DialogDescription>
-            People are added to {workspace.name} straight away. Their role decides what
-            they can do; folder access is decided separately, on the folder.
+            Somebody with an account is invited to {workspace.name} and joins when they
+            accept. A new address gets an account created here and joins right away.
+            Their role decides what they can do; folder access is decided separately,
+            on the folder.
           </DialogDescription>
         </DialogHeader>
 
@@ -115,11 +120,6 @@ export function InviteMemberDialog({ isOpen, onClose }: InviteMemberDialogProps)
               )}
             </FormField>
 
-            {/* Stays the native select: four plain words, no icon, no second
-                line, and it sits inside a dialog where a second portal buys
-                nothing. The role picker in Members is the popover one because
-                a table row has space for the descriptions and this row does
-                not. */}
             <FormField label="Role" className="shrink-0">
               {(field) => (
                 <SelectField
@@ -140,15 +140,12 @@ export function InviteMemberDialog({ isOpen, onClose }: InviteMemberDialogProps)
           <ul className="max-h-56 space-y-0.5 overflow-y-auto">
             {candidates.map((person) => (
               <li key={person.id}>
-                {/* A row is an action, not a selection — clicking it invites
-                    the person — so it is a Button rather than a listbox row,
-                    and it gains the focus ring the hand-rolled one never had.
-                    The height is released because the row carries two lines. */}
                 <Button
                   type="button"
                   size="sm"
                   variant="ghost"
-                  onClick={() => invite(person)}
+                  disabled={isBusy}
+                  onClick={() => void invite(person)}
                   className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-left"
                 >
                   <UserAvatar user={person} size="md" />
@@ -165,11 +162,51 @@ export function InviteMemberDialog({ isOpen, onClose }: InviteMemberDialogProps)
           </ul>
 
           {isUnknownAddress && (
-            <p className="rounded-md border border-hairline bg-surface px-2.5 py-2 text-body text-muted-foreground">
-              Nobody in the directory uses <span className="text-foreground">{query.trim()}</span>.
-              Sending an invitation to an address is not part of this build — the backend has no
-              invitation flow yet, so adding them silently would be a lie.
-            </p>
+            <div className="space-y-2.5 rounded-md border border-hairline bg-surface p-2.5">
+              <p className="text-body text-muted-foreground">
+                Nobody uses <span className="text-foreground">{query.trim()}</span> yet.
+                Create the account here and hand the password over — there is no
+                invitation mailbox in this build, so a link sent to that address would
+                reach nobody.
+              </p>
+
+              <div className="flex gap-2">
+                <FormField label="Full name" className="flex-1">
+                  {(field) => (
+                    <Input
+                      {...field}
+                      value={name}
+                      placeholder="Nguyễn Văn A"
+                      onChange={(event) => setName(event.target.value)}
+                    />
+                  )}
+                </FormField>
+
+                <FormField label="Starting password" className="flex-1">
+                  {(field) => (
+                    <Input
+                      {...field}
+                      type="password"
+                      value={password}
+                      autoComplete="new-password"
+                      placeholder="Ít nhất 8 ký tự"
+                      onChange={(event) => setPassword(event.target.value)}
+                    />
+                  )}
+                </FormField>
+              </div>
+
+              <Button
+                type="button"
+                size="sm"
+                variant="default"
+                disabled={isBusy || name.trim() === "" || password.length < 8}
+                onClick={() => void createAccount()}
+              >
+                <UserPlus />
+                Create account and add
+              </Button>
+            </div>
           )}
 
           {!isUnknownAddress && candidates.length === 0 && (
@@ -180,7 +217,7 @@ export function InviteMemberDialog({ isOpen, onClose }: InviteMemberDialogProps)
         </DialogBody>
 
         <DialogFooter>
-          <Button size="sm" variant="ghost" onClick={onClose}>
+          <Button size="sm" variant="ghost" onClick={close}>
             Done
           </Button>
         </DialogFooter>

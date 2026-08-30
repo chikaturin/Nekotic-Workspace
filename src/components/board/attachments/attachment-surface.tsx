@@ -16,18 +16,6 @@ interface AttachmentSurfaceProps {
   readonly onDownload: () => void;
 }
 
-/**
- * One attachment, rendered by what it is.
- *
- * A dispatcher and nothing else: each strategy gets its own small renderer, so
- * adding a type never means growing a switch inside a viewer that also owns a
- * dialog, a header and a keyboard map. Images do not appear here — they open on
- * the canvas viewer instead.
- *
- * Nothing uploaded is ever rendered as markup: SVG and HTML are classed
- * unpreviewable in `lib/attachments`, so an uploaded file cannot execute in the
- * app's origin.
- */
 export function AttachmentSurface({ file, strategy, onDownload }: AttachmentSurfaceProps) {
   if (!isReachable(file)) {
     return (
@@ -71,10 +59,6 @@ export function AttachmentSurface({ file, strategy, onDownload }: AttachmentSurf
   );
 }
 
-/**
- * Text-like attachments are read as text and rendered as text — never as
- * markup. A `.json`, `.log` or `.csv` shows its own bytes, escaped by React.
- */
 function AttachmentText({
   file,
   onDownload,
@@ -82,11 +66,6 @@ function AttachmentText({
   readonly file: CellAttachment;
   readonly onDownload: () => void;
 }) {
-  /**
-   * The result is stored with the URL it came from, so switching attachments
-   * shows "Reading…" by derivation rather than by clearing state in an effect.
-   * A late response for the previous file can never paint over the new one.
-   */
   const [result, setResult] = useState<{
     url: string;
     content: string | null;
@@ -126,7 +105,6 @@ function AttachmentText({
   );
 }
 
-/** Metadata plus a download — what an unpreviewable file honestly offers. */
 export function AttachmentFallback({
   file,
   reason,

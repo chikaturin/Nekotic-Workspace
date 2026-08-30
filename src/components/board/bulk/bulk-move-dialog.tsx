@@ -14,19 +14,12 @@ import { cn } from "@/lib/utils";
 interface BulkMoveDialogProps {
   readonly isOpen: boolean;
   readonly count: number;
-  /** The board the records are on now — never a destination. */
   readonly currentBoardId: string;
   readonly isBusy: boolean;
   readonly onMove: (targetNodeId: string, targetName: string) => void;
   readonly onClose: () => void;
 }
 
-/**
- * Choosing a destination board.
- *
- * The list comes from the drive tree, so naming a board never seeds its
- * records — a 5.000-record board costs nothing to *offer* as a destination.
- */
 export function BulkMoveDialog({
   isOpen,
   count,

@@ -14,31 +14,10 @@ import { cellOf } from "@/lib/cell-values";
 import type { RowMap } from "@/lib/board-records";
 import type { BoardColumn, GanttZoom } from "@/types";
 
-/**
- * Gantt geometry over the shared records.
- *
- * One unit is always a day; zoom only changes how many pixels a day is worth,
- * which keeps every offset in whole days and the maths exact.
- */
-
-/**
- * Three scales over the same unit.
- *
- * Zoom never changes the arithmetic — a day is always one unit — only how many
- * pixels that day is drawn as. Week reads a sprint, quarter reads a year, and
- * every offset in between stays a whole number of days.
- *
- * There is no per-day scale. At 44px a day the viewport held a fortnight, so
- * the scale that was meant to show detail was the one you had to scroll to
- * read anything at all — and every other surface that answers "what is
- * happening this week" (the calendar, My Work, the table sorted by date) does
- * it better. Week is the floor.
- */
 export type TimelineZoom = GanttZoom;
 
 export const TIMELINE_ZOOMS: readonly GanttZoom[] = ["week", "month", "quarter"];
 
-/** What a view opens at, and what an unreadable stored value falls back to. */
 export const DEFAULT_GANTT_ZOOM: GanttZoom = "week";
 
 export const DAY_WIDTH: Readonly<Record<GanttZoom, number>> = {
@@ -53,50 +32,22 @@ export const ZOOM_LABELS: Readonly<Record<GanttZoom, string>> = {
   quarter: "Quarter",
 };
 
-/**
- * A saved view's stored zoom, made safe to use.
- *
- * Views written before the per-day scale was removed still carry `"day"`, and
- * a stored string is untrusted data either way. Rather than let an unknown
- * value reach `DAY_WIDTH` and render a chart whose days are `undefined` pixels
- * wide, anything the timeline does not recognise is read as Week — the nearest
- * surviving scale, and the one a Day view was closest to.
- */
 export function normalizeGanttZoom(value: unknown): GanttZoom {
   return TIMELINE_ZOOMS.find((zoom) => zoom === value) ?? DEFAULT_GANTT_ZOOM;
 }
 
-/** Where a zoom stops labelling every day and starts labelling periods. */
 const TICK_STRIDE: Readonly<Record<GanttZoom, "week" | "month">> = {
   week: "week",
   month: "month",
   quarter: "month",
 };
 
-/** Days of blank space kept on each side of the data. */
 const PADDING_DAYS = 3;
 const FALLBACK_SPAN_DAYS = 30;
 const MIN_BAR_DAYS = 1;
 
-/**
- * The widest window the chart will build.
- *
- * One record dated years out would otherwise stretch the timeline across a
- * decade of empty columns, which costs DOM and tells the reader nothing. The
- * window is clamped around today instead, and the outlier is simply off-screen.
- */
 const MAX_RANGE_DAYS = 1100;
 
-/**
- * The narrowest window each zoom will draw, in days.
- *
- * Zooming out is a request to see more time, not to see the same fortnight
- * drawn smaller. Without a floor, Quarter renders a board that happens to span
- * two months as a 180px stub against an empty canvas — accurate about the data
- * and useless to look at, because the scale is chosen for the horizon it
- * shows. Each figure is set so its column width fills a wide viewport:
- * 98 days at 18px, 380 at 7px, 760 at 3px.
- */
 const MIN_SPAN_DAYS: Readonly<Record<TimelineZoom, number>> = {
   week: 98,
   month: 380,
@@ -110,13 +61,6 @@ export interface TimelineTick {
   readonly isMajor: boolean;
 }
 
-/**
- * The upper row of the header: the month (or year) a run of ticks belongs to.
- *
- * A scale that only labels "17 Aug, 24 Aug, 31 Aug" makes the reader carry the
- * month in their head. Naming the span above the columns is what turns a row of
- * dates into a calendar.
- */
 export interface TimelineBand {
   readonly key: string;
   readonly offset: number;
@@ -128,12 +72,9 @@ export interface TimelineBar {
   readonly rowId: string;
   readonly startIso: string;
   readonly endIso: string;
-  /** Whole days from the range start. */
   readonly offset: number;
   readonly span: number;
-  /** True when the record's own start is after its end. */
   readonly isInverted: boolean;
-  /** True when either end is missing and had to be inferred. */
   readonly isPartial: boolean;
 }
 
@@ -143,14 +84,9 @@ export interface TimelineScale {
   readonly dayWidth: number;
   readonly ticks: readonly TimelineTick[];
   readonly bands: readonly TimelineBand[];
-  /** Whole days from the range start; never null — today is always in range. */
   readonly todayOffset: number;
 }
 
-/**
- * PRD rule: a start after its end is not an error state, it is swapped — the
- * caller warns, and `wasSwapped` is what it warns about.
- */
 export function orderRange(
   startIso: string | null,
   endIso: string | null,
@@ -172,11 +108,6 @@ function readDate(rowId: string, rows: RowMap, column: BoardColumn | null): stri
   return value.kind === "date" ? value.iso : null;
 }
 
-/**
- * Bars for every row that has at least one of the two dates. A record with only
- * one end renders as a single day so it stays visible rather than collapsing to
- * nothing.
- */
 export function buildBars(
   rowIds: readonly string[],
   rows: RowMap,
@@ -210,14 +141,6 @@ export function buildBars(
   return bars;
 }
 
-/**
- * The window the chart spans.
- *
- * Today is always inside it. A chart that opens on a range the reader is not
- * living in — because every record happens to sit last quarter — makes them
- * hunt for the present before they can read anything, so the present is part
- * of the range by construction rather than by luck.
- */
 export function timelineScale(
   rowIds: readonly string[],
   rows: RowMap,
@@ -242,14 +165,9 @@ export function timelineScale(
 
   if (min === max) max = today + FALLBACK_SPAN_DAYS;
 
-  // Clamp around today rather than around the data, so an outlier trims the
-  // far end instead of pushing the present off the chart.
   min = Math.max(min, today - MAX_RANGE_DAYS);
   max = Math.min(max, today + MAX_RANGE_DAYS);
 
-  // Then widen to the zoom's own horizon, evenly on both sides so the data
-  // stays centred. Every floor is well inside the clamp above, so this can
-  // never reintroduce the outlier problem it sits below.
   const shortfall = MIN_SPAN_DAYS[zoom] - (max - min + 1);
   if (shortfall > 0) {
     min -= Math.floor(shortfall / 2);
@@ -270,10 +188,6 @@ export function timelineScale(
   };
 }
 
-/**
- * The header's upper row: one entry per month, or per year once a month is too
- * narrow to hold its own name.
- */
 function buildBands(
   startIso: string,
   dayCount: number,
@@ -303,10 +217,6 @@ function buildBands(
   return bands;
 }
 
-/**
- * Labels at the density the scale can carry: every Monday up close, every
- * month once a day is only a few pixels wide.
- */
 function buildTicks(startIso: string, dayCount: number, zoom: TimelineZoom): readonly TimelineTick[] {
   const ticks: TimelineTick[] = [];
   const stride = TICK_STRIDE[zoom];
@@ -324,7 +234,6 @@ function buildTicks(startIso: string, dayCount: number, zoom: TimelineZoom): rea
     ticks.push({ iso, offset, label: monthLabel(iso), isMajor: true });
   }
 
-  // A window shorter than the stride can contain no boundary at all.
   if (ticks.length === 0) {
     ticks.push({ iso: startIso, offset: 0, label: monthLabel(startIso), isMajor: true });
   }

@@ -19,24 +19,6 @@ import { useUnsavedWarning } from "@/hooks/use-unsaved-warning";
 import { ROLE_LABELS } from "@/lib/permissions";
 import type { DocumentNode } from "@/types";
 
-/**
- * DV-SEC-23 — secrets shown as masks by default, with an editor.
- *
- * The page never receives plaintext with the document: values arrive one at a
- * time from a permission-checked call, live in component state, and are dropped
- * on a timer. Nothing is persisted and nothing is logged.
- *
- * Two modes, and the split is deliberate. Reading is the common case and stays
- * masked; writing is rarer, more consequential, and needs a different shape of
- * control — so Edit is a mode rather than every row being a live input. It also
- * means the read view can offer selection and bulk copy without any of it being
- * one mis-click away from a rotation.
- *
- * This is not a code editor and must not become one. A raw text area holding a
- * production credential file is exactly the screenshot nobody wants: every
- * value visible at once, no per-key audit, and a save that reads as rotating
- * everything. Config documents are the surface for text; this one is a list.
- */
 export function SecretDocumentPage({ node }: { node: DocumentNode }) {
   const can = usePermissions(node);
   const role = useEffectiveRole(node);
@@ -54,7 +36,6 @@ export function SecretDocumentPage({ node }: { node: DocumentNode }) {
 
   useUnsavedWarning(isEditing && editor.isDirty);
 
-  /** Leaving edit mode never throws work away without asking. */
   function leaveEditing() {
     if (editor.isDirty) {
       setIsDiscarding(true);

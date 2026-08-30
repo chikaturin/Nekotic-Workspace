@@ -38,7 +38,6 @@ export function blockIcon(type: BlockType): LucideIcon {
   return BLOCK_ICONS[type];
 }
 
-/** Typography per text block type — one place, so headings never drift. */
 export const TEXT_BLOCK_CLASS: Readonly<Record<string, string>> = {
   heading1: "text-[26px] font-semibold leading-9 tracking-tight text-foreground",
   heading2: "text-[20px] font-semibold leading-8 tracking-tight text-foreground",

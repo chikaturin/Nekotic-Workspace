@@ -10,13 +10,10 @@ import { selectActiveWorkspace, selectTree, useWorkspaceStore } from "@/store/wo
 import { isContainer } from "@/types";
 
 interface FilesViewProps {
-  /** URL segments below `/files`, mirroring the drive path. */
   readonly segments: readonly string[];
 }
 
-/** File manager for the folder addressed by the URL. */
 export function FilesView({ segments: prerendered }: FilesViewProps) {
-  // Same reason as Drive: the live URL, not the build-time params.
   const segments = useRouteSegments(prerendered);
   const location = useDriveLocation(segments);
   const workspace = useWorkspaceStore(selectActiveWorkspace);

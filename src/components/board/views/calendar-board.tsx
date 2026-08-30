@@ -24,10 +24,6 @@ interface CalendarBoardProps {
 
 const MAX_CARDS_PER_DAY = 2;
 
-/**
- * Month view over the shared records. Days hold row ids; dropping a card writes
- * the view's date column on the record, so the table updates with it.
- */
 export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
   const { dateColumn, rowIds, columnsShown, context, board } = model;
   const rowsById = useBoardStore((state) => state.rowsById);
@@ -36,7 +32,6 @@ export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
 
   const [monthIso, setMonthIso] = useState(MOCK_NOW);
   const [overKey, setOverKey] = useState<string | null>(null);
-  /** The day whose full record list is open — a cell only fits a couple. */
   const [openDayKey, setOpenDayKey] = useState<string | null>(null);
 
   const month = useMemo(
@@ -48,7 +43,6 @@ export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
     (column) => !column.isPrimary && column.id !== dateColumn?.id,
   );
 
-  /** The day the reader asked to see in full, resolved against this month. */
   const openDay = useMemo(() => {
     if (!month || !openDayKey) return null;
     return month.weeks.flat().find((day) => day.key === openDayKey) ?? null;
@@ -159,8 +153,6 @@ export function CalendarBoard({ model, canEdit }: CalendarBoardProps) {
               )}
             >
               <div className="flex shrink-0 items-center gap-1">
-                {/* The date is the way into the day: it opens every record on
-                    it, not just the two the cell had room for. */}
                 <button
                   type="button"
                   aria-label={`Open ${day.iso.slice(0, 10)} — ${day.rowIds.length} records`}

@@ -7,13 +7,10 @@ export interface BlockCommand {
   readonly label: string;
   readonly description: string;
   readonly group: BlockCommandGroup;
-  /** Extra search terms, e.g. `h1` for Heading 1. */
   readonly keywords: readonly string[];
-  /** Markdown-style shortcut typed at the start of an empty block. */
   readonly markdownPrefix?: string;
 }
 
-/** Catalog behind the slash menu, the turn-into menu and markdown shortcuts. */
 export const BLOCK_COMMANDS: readonly BlockCommand[] = [
   {
     type: "paragraph",
@@ -130,10 +127,6 @@ export const GROUP_LABELS: Readonly<Record<BlockCommandGroup, string>> = {
   advanced: "Advanced",
 };
 
-/**
- * Rank commands for a slash query: exact label prefix first, then label
- * substring, then keyword hits. An empty query returns the whole catalog.
- */
 export function matchBlockCommands(query: string): readonly BlockCommand[] {
   const needle = query.trim().toLowerCase();
   if (needle.length === 0) return BLOCK_COMMANDS;
@@ -157,21 +150,15 @@ export function findBlockCommand(type: BlockType): BlockCommand | null {
   return BLOCK_COMMANDS.find((command) => command.type === type) ?? null;
 }
 
-/** Resolve a markdown shortcut typed at the start of a block, e.g. `## `. */
 export function blockTypeForMarkdown(prefix: string): BlockType | null {
   return BLOCK_COMMANDS.find((command) => command.markdownPrefix === prefix)?.type ?? null;
 }
 
 export interface MarkdownShortcut {
   readonly type: BlockType;
-  /** Text left over once the prefix is consumed. */
   readonly rest: string;
 }
 
-/**
- * Detect a markdown shortcut typed at the start of a block, such as a hash
- * followed by a space. Returns null when no known prefix matches.
- */
 export function detectMarkdownShortcut(text: string): MarkdownShortcut | null {
   const match = /^(\S{1,3})\s/.exec(text);
   if (!match) return null;

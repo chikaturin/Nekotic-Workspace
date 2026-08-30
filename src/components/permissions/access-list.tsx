@@ -8,16 +8,8 @@ import type { ListboxOption } from "@/components/ui/listbox";
 import { Select } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ACCESS_SOURCE_LABELS, ROLE_LABELS, ROLE_SUMMARIES, subjectKey } from "@/lib/permissions";
-import { DIRECTORY } from "@/mock/users";
-import { WORKSPACE_ROLES, type AccessSource, type AccessSubject, type ResolvedAccess, type WorkspaceRole } from "@/types";
-
-/**
- * Who has access to one node, and why (SY-INH-43).
- *
- * Every row says where its access came from, because "Member" alone is not an
- * answer a person can act on: whether it arrived from the project above or was
- * written here decides what changing it will do.
- */
+import { useDirectory } from "@/hooks/use-directory";
+import { WORKSPACE_ROLES, type AccessSource, type AccessSubject, type DirectoryUser, type ResolvedAccess, type WorkspaceRole } from "@/types";
 
 interface AccessListProps {
   readonly entries: readonly ResolvedAccess[];
@@ -26,15 +18,6 @@ interface AccessListProps {
   readonly onReset: (subject: AccessSubject) => void;
 }
 
-/**
- * One tone ramp, read as a sentence: access that merely arrived is chrome,
- * access written here is a fact about this item, and access written here that
- * *replaced* something is the one worth spotting from across the row.
- *
- * `neutral` and `info` are the ramp's own names for the tones these badges
- * have always worn, so the row looks exactly as it did — only now the names
- * mean something next to the other five.
- */
 const SOURCE_VARIANT: Readonly<Record<AccessSource, BadgeVariant>> = {
   workspace: "neutral",
   inherited: "neutral",
@@ -42,23 +25,20 @@ const SOURCE_VARIANT: Readonly<Record<AccessSource, BadgeVariant>> = {
   override: "info",
 };
 
-/**
- * The roles, each carrying what it actually permits. That sentence is the
- * reason this is a popover list rather than a native select: "Manager" on its
- * own does not tell you that granting it also hands over the structure.
- */
 const ROLE_OPTIONS: readonly ListboxOption[] = WORKSPACE_ROLES.map((role) => ({
   value: role,
   label: ROLE_LABELS[role],
   description: ROLE_SUMMARIES[role],
 }));
 
-function subjectName(subject: AccessSubject): string {
+function subjectName(
+  subject: AccessSubject,
+  directory: readonly DirectoryUser[],
+): string {
   if (subject.kind === "role") return `Everyone · ${ROLE_LABELS[subject.role]}`;
-  return DIRECTORY.find((person) => person.id === subject.userId)?.name ?? "Unknown member";
+  return directory.find((person) => person.id === subject.userId)?.name ?? "Unknown member";
 }
 
-/** What the badge means, spelled out where the badge is too short to say it. */
 function sourceHint(entry: ResolvedAccess): string {
   switch (entry.source) {
     case "workspace":
@@ -75,6 +55,8 @@ function sourceHint(entry: ResolvedAccess): string {
 }
 
 export function AccessList({ entries, canManage, onGrant, onReset }: AccessListProps) {
+  const directory = useDirectory();
+
   return (
     <ul className="flex flex-col">
       {entries.map((entry) => {
@@ -82,10 +64,10 @@ export function AccessList({ entries, canManage, onGrant, onReset }: AccessListP
         const subject = entry.subject;
         const person =
           subject.kind === "user"
-            ? DIRECTORY.find((candidate) => candidate.id === subject.userId)
+            ? directory.find((candidate) => candidate.id === subject.userId)
             : undefined;
         const isWritten = entry.source === "explicit" || entry.source === "override";
-        const name = subjectName(entry.subject);
+        const name = subjectName(entry.subject, directory);
 
         return (
           <li
@@ -128,14 +110,6 @@ export function AccessList({ entries, canManage, onGrant, onReset }: AccessListP
               className="w-32 shrink-0"
             />
 
-            {/* Only a rule written here can be taken away; there is nothing to
-                reset on access that is merely flowing through.
-
-                The tooltip stays wrapped by hand rather than moving to
-                `IconButton`'s own `tooltip` prop, because the moment it is most
-                needed is the moment the button is disabled — and a disabled
-                button fires no pointer events for a trigger to hear. The span
-                is the element that keeps hearing them. */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <span className="inline-flex">

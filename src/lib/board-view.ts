@@ -12,15 +12,6 @@ import type {
   ViewSort,
 } from "@/types";
 
-/**
- * A view never owns records — it describes how to read the board's.
- *
- * Schema (name, type, config) lives on the column and is shared by every view.
- * Presentation (order, width, visibility) is per view, so hiding a column in
- * the table cannot change what Kanban or Calendar show.
- */
-
-/** Columns in view order, with per-view width and visibility applied. */
 export function resolveColumns(board: Board, view: SavedView | null): readonly BoardColumn[] {
   const byPosition = [...board.columns].sort((a, b) => a.position - b.position);
   if (!view) return byPosition;
@@ -44,8 +35,6 @@ export function visibleColumns(columns: readonly BoardColumn[]): readonly BoardC
   return columns.filter((column) => !column.hidden);
 }
 
-/* ----------------------------------------------------------------- filters */
-
 export function matchesFilter(
   row: BoardRow,
   filter: ViewFilter,
@@ -59,8 +48,6 @@ export function matchesFilter(
 
   if (value.kind === "date") return matchesDate(value.iso, filter);
 
-  // Identity types compare against the stored id first, then the label, so a
-  // filter written by the UI (an id) and one written by hand (a name) agree.
   if (value.kind === "select" || value.kind === "user" || value.kind === "relation") {
     const ids = idsOf(value);
     const needle = filter.value.trim().toLowerCase();
@@ -108,7 +95,6 @@ function idsOf(value: CellValue): readonly string[] {
   return [];
 }
 
-/** Date conditions compare calendar days, not instants. */
 function matchesDate(iso: string | null, filter: ViewFilter): boolean {
   if (!iso) return false;
 
@@ -138,8 +124,6 @@ function dayNumber(iso: string): number {
   return Math.floor(Date.parse(iso.slice(0, 10)) / 86_400_000);
 }
 
-/* -------------------------------------------------------------------- sort */
-
 export function compareRows(
   a: BoardRow,
   b: BoardRow,
@@ -154,7 +138,6 @@ export function compareRows(
     const left = cellSortKey(cellOf(a, column), column, context);
     const right = cellSortKey(cellOf(b, column), column, context);
 
-    // Empty always sinks, whichever direction the sort runs.
     if (left.isEmpty !== right.isEmpty) return left.isEmpty ? 1 : -1;
     if (left.isEmpty) continue;
 
@@ -170,27 +153,16 @@ function compareKeys(a: string | number, b: string | number): number {
   return String(a).localeCompare(String(b));
 }
 
-/* ------------------------------------------------------------------ apply */
-
 export interface ViewQueryInput {
   readonly view: SavedView | null;
   readonly rowsById: RowMap;
   readonly rowOrder: readonly string[];
   readonly columns: readonly BoardColumn[];
   readonly context: CellContext;
-  /** Free-text search across every visible column. */
   readonly search?: string;
-  /**
-   * Archived records are frozen, not deleted: they stay out of every view
-   * until the board is explicitly asked to show them (SY-ARC-37).
-   */
   readonly includeArchived?: boolean;
 }
 
-/**
- * The single query the whole board runs: filters, then search, then sort.
- * Table, Kanban, Calendar and Timeline all consume the row ids it returns.
- */
 export function queryRowIds({
   view,
   rowsById,
@@ -248,18 +220,6 @@ function rowMatchesSearch(
   );
 }
 
-/**
- * Move a saved view to a position in the tab strip.
- *
- * A view has no `position` field the way a column does — the array *is* the
- * order — so this is a splice on a copy rather than a renumbering, and it
- * returns the original array untouched when nothing would move. That identity
- * check is what lets a caller skip the round trip for a drop that landed back
- * where it started.
- *
- * `toIndex` is clamped rather than validated: a drop past the last tab means
- * "last", which is what the gesture looked like.
- */
 export function reorderViews(
   views: readonly SavedView[],
   viewId: string,
@@ -279,12 +239,6 @@ export function reorderViews(
   return next;
 }
 
-/** Drop filters and sorts that point at a column the schema no longer has. */
-/**
- * Drop every reference to a column the schema no longer has — filters, sorts,
- * grouping and the calendar/timeline anchors. The view survives the deletion
- * instead of rendering against a column that is gone.
- */
 export function pruneView(view: SavedView, columns: readonly BoardColumn[]): SavedView {
   const ids = new Set(columns.map((column) => column.id));
   const keep = (id: string | null) => (id !== null && ids.has(id) ? id : null);
@@ -294,8 +248,6 @@ export function pruneView(view: SavedView, columns: readonly BoardColumn[]): Sav
   const columnOrder = view.columnOrder.filter((id) => ids.has(id));
   const hiddenColumnIds = view.hiddenColumnIds.filter((id) => ids.has(id));
 
-  // Presentation keyed by column id has to go the same way as the rest: a view
-  // that still names a deleted column is a view carrying a dead reference.
   const columnDisplay = Object.fromEntries(
     Object.entries(view.columnDisplay ?? {}).filter(([id]) => ids.has(id)),
   );

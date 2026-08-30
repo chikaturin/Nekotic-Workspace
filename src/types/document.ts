@@ -1,6 +1,5 @@
 import type { UserSummary } from "./user";
 
-/** Every block kind the editor can render. */
 export type BlockType =
   | "heading1"
   | "heading2"
@@ -31,7 +30,6 @@ interface BlockBase {
   readonly id: string;
 }
 
-/** Blocks rendered as a single editable line of prose. */
 export interface TextBlock extends BlockBase {
   readonly type: "heading1" | "heading2" | "heading3" | "paragraph" | "quote";
   readonly text: string;
@@ -54,9 +52,7 @@ export interface CodeBlock extends BlockBase {
   readonly language: CodeLanguage;
 }
 
-/** One picture inside an image block. A block holds as many as you add. */
 export interface DocumentImage {
-  /** Asset id once uploaded; null for images seeded by the mock dataset. */
   readonly assetId: string | null;
   readonly url: string;
   readonly alt: string;
@@ -87,11 +83,9 @@ export interface LinkBlock extends BlockBase {
 export interface TableBlock extends BlockBase {
   readonly type: "table";
   readonly hasHeaderRow: boolean;
-  /** Rectangular grid — every row carries the same number of cells. */
   readonly rows: readonly (readonly string[])[];
 }
 
-/** DV-EMB-25: two ids, never a copy of the board's records. */
 export interface EmbedBlock extends BlockBase {
   readonly type: "embed";
   readonly boardNodeId: string | null;
@@ -109,18 +103,15 @@ export type Block =
   | TableBlock
   | EmbedBlock;
 
-/** Blocks that hold a single editable `text` field. */
 export type TextualBlock = TextBlock | ChecklistBlock | ListBlock;
 
 export type TextualBlockType = TextualBlock["type"];
 
 export interface WorkspaceDocument {
   readonly id: string;
-  /** Drive node this document is addressed by. */
   readonly nodeId: string;
   readonly workspaceId: string;
   readonly title: string;
-  /** Emoji shown next to the title. */
   readonly icon: string;
   readonly blocks: readonly Block[];
   readonly isPinned: boolean;
@@ -133,7 +124,6 @@ export interface WorkspaceDocument {
   readonly version: number;
 }
 
-/** Patch accepted by `documentService.save` — never the whole document. */
 export interface DocumentDraft {
   readonly title: string;
   readonly icon: string;
@@ -146,7 +136,6 @@ export interface SaveState {
   readonly status: SaveStatus;
   readonly lastSavedAt: string | null;
   readonly error: string | null;
-  /** True when edits exist that have not reached the service yet. */
   readonly hasPendingChanges: boolean;
 }
 
@@ -161,13 +150,10 @@ export type DocumentActionId =
   | "restore"
   | "delete";
 
-/** Where the caret should land after a structural edit. */
 export type CaretPosition = "start" | "end";
 
 export interface FocusRequest {
   readonly blockId: string;
-  /** Start, end, or an explicit character offset after a merge. */
   readonly position: CaretPosition | number;
-  /** Bumped on every request so repeated focuses of the same block still fire. */
   readonly nonce: number;
 }

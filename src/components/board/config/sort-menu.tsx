@@ -11,13 +11,8 @@ import { columnVisual } from "@/lib/board-visuals";
 import { useBoardStore } from "@/store/board-store";
 import type { ViewSort } from "@/types";
 
-/** One step for every control in a level, so the rows line up. */
 const CONTROL_SIZE = "sm" as const;
 
-/**
- * Multi-level sort. Level order is the tie-break order — the first entry
- * decides, later ones only settle ties, which is what `compareRows` walks.
- */
 export function SortMenu({ model }: { model: BoardViewModel }) {
   const { view, columns } = model;
   const setSorts = useBoardStore((state) => state.setSorts);
@@ -60,9 +55,6 @@ export function SortMenu({ model }: { model: BoardViewModel }) {
         ) : (
           <ol className="space-y-1.5">
             {sorts.map((sort, index) => {
-              // A level keeps its own column and offers the ones no other
-              // level has claimed; taking one twice would make the second
-              // copy dead weight, since the first already settled that key.
               const levelOptions = columns
                 .filter((column) => column.id === sort.columnId || !used.has(column.id))
                 .map((column) => ({
@@ -80,9 +72,6 @@ export function SortMenu({ model }: { model: BoardViewModel }) {
                   <Select
                     aria-label={`Sort level ${index + 1} column`}
                     size={CONTROL_SIZE}
-                    // The native select this replaces had the platform's
-                    // typeahead, and a wide board is exactly where it was
-                    // being used; the search field hands it back.
                     isSearchable
                     options={levelOptions}
                     value={sort.columnId}
@@ -93,9 +82,6 @@ export function SortMenu({ model }: { model: BoardViewModel }) {
                     className="min-w-0 flex-1"
                   />
 
-                  {/* Two words, so the direction stays a native select: it
-                      keeps the platform's keyboard and opens no second portal
-                      inside the popover. */}
                   <SelectField
                     aria-label={`Sort level ${index + 1} direction`}
                     size={CONTROL_SIZE}

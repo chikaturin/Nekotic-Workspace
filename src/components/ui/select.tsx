@@ -30,46 +30,12 @@ import { useListboxKeyboard } from "@/hooks/use-roving-focus";
 import { Chip } from "@/components/ui/chip";
 import { cn } from "@/lib/utils";
 
-/**
- * The rich Select, and its multi-value twin.
- *
- * This stands *beside* `SelectField`, the native one, and does not replace it:
- * a plain list of words is better served by a real `<select>`, which brings
- * the platform's own keyboard, its mobile picker and its accessibility for
- * free. What a native `<option>` cannot hold is an icon, a colour swatch, a
- * second line of description or an avatar — and board configuration and
- * permissions need all four. The column dialog's colour picker is the proof:
- * it paints the option palette onto the `<select>` element itself, because
- * there is nowhere else to put it, and the swatch it is trying to show never
- * appears in the popup the browser draws.
- *
- * Two things here are load-bearing:
- *
- * 1. Nothing about the list is built while the select is shut. The options are
- *    not filtered, no row is constructed, and the popover's contents are one
- *    unrendered element. These live inside virtualised grid cells, where a few
- *    hundred closed selects can be mounted at once and any per-option work on
- *    the closed path is paid several hundred times per scroll frame.
- *
- * 2. `aria-activedescendant` follows DOM focus. It sits on the trigger while
- *    the trigger is focused and on the search field once focus moves there;
- *    announcing a highlight against an element the user is not on is the same
- *    as not announcing it.
- */
-
 export type SelectSize = ListboxSize;
 export type SelectVariant = "default" | "ghost";
 
-/** Stable empty arrays, so the closed path allocates nothing at all. */
 const NO_OPTIONS: readonly ListboxOption[] = [];
 const NO_VALUES: readonly string[] = [];
 
-/**
- * A trigger holding chips has to grow with them, so its fixed height is
- * swapped for a floor. `h-auto` wins over the shell's `h-*` through
- * tailwind-merge; the `min-h-*` beside it is what keeps an empty MultiSelect
- * exactly as tall as the Select next to it.
- */
 const MULTI_TRIGGER_HEIGHT: Readonly<Record<SelectSize, string>> = {
   xs: "h-auto min-h-[var(--control-xs)]",
   sm: "h-auto min-h-[var(--control-sm)]",
@@ -83,7 +49,6 @@ interface SelectBaseProps {
   readonly placeholder?: string;
   readonly size?: SelectSize;
   readonly variant?: SelectVariant;
-  /** Adds a search field inside the dropdown and moves focus into it. */
   readonly isSearchable?: boolean;
   readonly isClearable?: boolean;
   readonly isLoading?: boolean;
@@ -103,13 +68,7 @@ interface SelectBaseProps {
 
 export interface SelectProps extends SelectBaseProps {
   readonly value: string | null;
-  /**
-   * Symmetric with `value`, which is why it takes `null`: a clearable select
-   * has no value to report once it is cleared, and a second `onClear` callback
-   * would be one more thing that can disagree with this one.
-   */
   readonly onValueChange: (value: string | null) => void;
-  /** Owns the trigger's whole value area — a chip, a breadcrumb, a preview. */
   readonly renderValue?: (option: ListboxOption | null) => ReactNode;
 }
 
@@ -142,8 +101,6 @@ export function Select({
 
   const selectedOption = useMemo(() => findListboxOption(options, value), [options, value]);
 
-  // The closed path in one expression: no filtering, no allocation, and a
-  // keyboard hook that walks an empty array in constant time.
   const visibleOptions = useMemo(() => {
     if (!isOpen) return NO_OPTIONS;
     return isSearchable ? filterListboxOptions(options, query) : options;
@@ -184,10 +141,6 @@ export function Select({
 
     setIsOpen(true);
 
-    // Open onto the current selection rather than the top of the list. The
-    // query is always empty at this point — it is cleared on close, not on
-    // open — so the index into `options` is the index into the visible rows,
-    // and the highlight the hook stores under the empty query still matches.
     const index = options.findIndex((option) => option.value === value);
     if (index >= 0) keyboard.setActiveIndex(index);
   }
@@ -203,13 +156,8 @@ export function Select({
       return;
     }
 
-    // Only reached by the non-searchable select: once there is a search field
-    // it has focus, and it runs the same handler from inside the popover.
     if (event.key === " " || event.key === "Tab") {
       const option = keyboard.activeOption;
-      // Tab commits and moves on, the way a native select does; Space commits
-      // and stays. Both are taken over so neither reaches the page as a scroll
-      // or as a tab through a popover the user thinks they just answered.
       if (event.key === " ") event.preventDefault();
       if (option) commit(option);
       return;
@@ -262,9 +210,6 @@ export function Select({
 
       <PopoverContent
         align={align}
-        // Keeping focus on the trigger is what makes `aria-activedescendant`
-        // on the trigger true. The searchable variant wants the opposite, and
-        // lets Radix move focus into the search field it renders first.
         onOpenAutoFocus={isSearchable ? undefined : (event) => event.preventDefault()}
         className={cn(
           "w-[var(--radix-popover-trigger-width)] min-w-56 overflow-hidden p-0",
@@ -294,23 +239,12 @@ export function Select({
   );
 }
 
-/* -------------------------------------------------------------- MultiSelect */
-
 export interface MultiSelectProps extends SelectBaseProps {
   readonly values: readonly string[];
   readonly onValuesChange: (values: readonly string[]) => void;
-  /** How many chips fit before the rest collapse into a “+n” badge. */
   readonly maxVisibleChips?: number;
 }
 
-/**
- * The same machine with the list left open between picks.
- *
- * Closing after every choice is the single biggest reason people mis-use a
- * multi-select: it looks like it took one answer and threw the question away.
- * The search field lives in the dropdown rather than in the trigger so the
- * chips keep the whole width of the control they belong to.
- */
 export function MultiSelect({
   options,
   values,
@@ -370,14 +304,6 @@ export function MultiSelect({
     [values, onValuesChange],
   );
 
-  /**
-   * Removal is not `toggle` with the value already in it.
-   *
-   * An option can be switched off in configuration long after somebody picked
-   * it, and routing the chip's X through `toggle` would refuse to take it back
-   * — leaving a value on the record that the record is no longer allowed to
-   * hold, and no way to remove it. Taking something away is always permitted.
-   */
   const remove = useCallback(
     (value: string) => onValuesChange(values.filter((current) => current !== value)),
     [values, onValuesChange],
@@ -409,8 +335,6 @@ export function MultiSelect({
       return;
     }
 
-    // Space toggles the highlighted row, the same as Enter. Left alone it
-    // would reach the page as a scroll, which yanks the open list off screen.
     if (event.key === " ") {
       event.preventDefault();
       const option = keyboard.activeOption;
@@ -422,9 +346,6 @@ export function MultiSelect({
   }
 
   function handlePanelKeyDown(event: KeyboardEvent<HTMLElement>) {
-    // Backspace on an empty query drops the last chip. It is the one gesture
-    // people try unprompted in a field full of tokens, and without it the only
-    // way back out of a mistake is to find the row again in the list.
     if (event.key === "Backspace" && query.length === 0 && values.length > 0) {
       onValuesChange(values.slice(0, -1));
       return;
@@ -473,9 +394,6 @@ export function MultiSelect({
                   size="xs"
                   color={option.color}
                   leading={<ListboxOptionVisual option={option} size="xs" />}
-                  // The trigger is a button: a mousedown on the remove glyph
-                  // would otherwise reach it and reopen the popup the click
-                  // just closed.
                   onMouseDown={(event) => event.stopPropagation()}
                   onClick={(event) => event.stopPropagation()}
                   {...(isDisabled ? {} : { onRemove: () => remove(option.value) })}
@@ -523,8 +441,6 @@ export function MultiSelect({
   );
 }
 
-/* ---------------------------------------------------------------- internals */
-
 const OPENING_KEYS: readonly string[] = ["ArrowDown", "ArrowUp", "Home", "End", "Enter", " "];
 
 function isOpeningKey(key: string): boolean {
@@ -551,14 +467,6 @@ interface SelectPanelProps {
   readonly activeDescendantId: string | undefined;
 }
 
-/**
- * Everything behind the popover, in its own component on purpose.
- *
- * `PopoverContent` renders nothing while closed, but JSX children are built
- * eagerly: written inline, one element per option would be allocated on every
- * render of every closed Select on the page. One `<SelectPanel/>` element is
- * allocated instead, and this function does not run until the list is open.
- */
 function SelectPanel({
   listboxId,
   label,

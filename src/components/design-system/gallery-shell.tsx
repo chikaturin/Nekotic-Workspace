@@ -3,14 +3,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/**
- * The frame every gallery entry renders in.
- *
- * A component library page is only useful if the states are on screen next to
- * each other — the reason five different disabled treatments survived in this
- * app for so long is that nobody ever saw two of them at once.
- */
-
 export function Section({
   id,
   title,
@@ -40,7 +32,6 @@ export function Row({
   readonly label: string;
   readonly note?: string;
   readonly children: ReactNode;
-  /** Stack instead of inlining — for controls that want their full width. */
   readonly isColumn?: boolean;
 }) {
   return (
@@ -61,7 +52,6 @@ export function Row({
   );
 }
 
-/** A swatch grid for the token sections, where the value is the point. */
 export function TokenGrid({ children }: { readonly children: ReactNode }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">{children}</div>

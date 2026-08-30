@@ -8,13 +8,6 @@ import { formatRelativeTime } from "@/lib/format";
 import { devtoolsService } from "@/services/devtools-service";
 import type { SecretAuditEntry } from "@/types";
 
-/**
- * The document's own trail.
- *
- * Every reveal, copy and rotation, allowed or refused, with who and when — and
- * no values. A trail that recorded what was revealed would be a second copy of
- * the secrets, in a log, readable by everyone who can read logs.
- */
 export function SecretAuditPanel({ nodeId }: { nodeId: string }) {
   const loader = useCallback(
     (signal: AbortSignal) => devtoolsService.listSecretAudit(nodeId, signal),

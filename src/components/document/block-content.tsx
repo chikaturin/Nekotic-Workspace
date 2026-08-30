@@ -24,7 +24,6 @@ export interface BlockContentProps {
   readonly onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
 }
 
-/** Renders the right editor for a block type. */
 export function BlockContent({
   block,
   ordinal,

@@ -1,6 +1,16 @@
 "use client";
 
-import { Archive, Download, Eye, Plus, RotateCcw, Search, Upload } from "lucide-react";
+import {
+  Archive,
+  Download,
+  Eye,
+  Plus,
+  RotateCcw,
+  Search,
+  Settings,
+  Upload,
+} from "lucide-react";
+import { DriveItemMenu } from "@/components/drive/drive-item-menu";
 import { WatchButton } from "@/components/collab/watch-button";
 import { SimulationMenu } from "@/components/files/simulation-menu";
 import { Badge, CountBadge } from "@/components/ui/badge";
@@ -19,28 +29,34 @@ import { ViewConfigBar } from "@/components/board/config/view-config-bar";
 import { ViewTabs } from "@/components/board/config/view-tabs";
 import type { BoardViewModel } from "@/hooks/use-board-view";
 import { formatCount } from "@/lib/format";
+import { hrefForNode } from "@/lib/tree";
 import { useBoardStore } from "@/store/board-store";
-import type { EntityRef, PermissionResolver } from "@/types";
+import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
+import type { BoardNode, EntityRef, PermissionResolver } from "@/types";
 
 interface BoardToolbarProps {
+  readonly node: BoardNode;
   readonly model: BoardViewModel;
   readonly onReload: () => void;
-  /** Bound resolver — every affordance in the bar gates on its own key. */
   readonly can: PermissionResolver;
   readonly onImport: () => void;
   readonly onExport: () => void;
+  readonly onOpenSettings: () => void;
 }
 
-/** Saved views, search, column visibility, import/export and the write indicator. */
 export function BoardToolbar({
+  node,
   model,
   onReload,
   can,
   onImport,
   onExport,
+  onOpenSettings,
 }: BoardToolbarProps) {
-  const { board, columns, rowIds, totalRows, archivedRows, isShowingArchived } = model;
+  const { board, columns, rowIds, totalRows, archivedRows, isShowingArchived } =
+    model;
 
+  const tree = useWorkspaceStore(selectTree);
   const setSearch = useBoardStore((state) => state.setSearch);
   const setShowArchived = useBoardStore((state) => state.setShowArchived);
   const setColumnHidden = useBoardStore((state) => state.setColumnHidden);
@@ -50,9 +66,9 @@ export function BoardToolbar({
 
   const hiddenCount = columns.filter((column) => column.hidden).length;
 
-  // One sentence for the button's name and its hover hint, so the two cannot
-  // describe different halves of the same toggle.
-  const archivedHint = isShowingArchived ? "Hide archived records" : "Show archived records";
+  const archivedHint = isShowingArchived
+    ? "Hide archived records"
+    : "Show archived records";
 
   const boardTarget: EntityRef | null = board
     ? { kind: "board", nodeId: board.nodeId, label: board.name }
@@ -74,8 +90,6 @@ export function BoardToolbar({
           </p>
         </div>
 
-        {/* No label on the spinner: the line above it already says "saving…",
-            and a second announcement of the same fact is noise. */}
         {pendingWrites > 0 && <Spinner className="text-accent" />}
 
         <div className="relative">
@@ -86,8 +100,6 @@ export function BoardToolbar({
             placeholder="Search records…"
             onChange={(event) => setSearch(event.target.value)}
             aria-label="Search records"
-            // The left padding clears the search glyph drawn over the field,
-            // which is the one thing the size variant cannot know about.
             className="w-56 pl-7"
           />
         </div>
@@ -107,7 +119,9 @@ export function BoardToolbar({
                 key={column.id}
                 checked={!column.hidden}
                 disabled={column.isPrimary}
-                onCheckedChange={(checked) => void setColumnHidden(column.id, !checked)}
+                onCheckedChange={(checked) =>
+                  void setColumnHidden(column.id, !checked)
+                }
               >
                 {column.name}
               </DropdownMenuCheckboxItem>
@@ -116,9 +130,6 @@ export function BoardToolbar({
         </DropdownMenu>
 
         {archivedRows > 0 && (
-          // Its only text is a number, so without a name it announces as
-          // "seven, button". `IconButton` is the one that will not let that
-          // happen, and it carries the tooltip this already had.
           <IconButton
             size="sm"
             variant={isShowingArchived ? "subtle" : "outline"}
@@ -156,10 +167,25 @@ export function BoardToolbar({
           <Download />
           <span className="hidden lg:inline">Export</span>
         </Button>
-
-        <IconButton size="icon" variant="outline" aria-label="Reload board" onClick={onReload}>
+        <IconButton
+          size="icon"
+          variant="outline"
+          aria-label="Reload board"
+          onClick={onReload}
+        >
           <RotateCcw />
         </IconButton>
+
+        <IconButton
+          size="icon"
+          variant="outline"
+          aria-label="Board settings"
+          onClick={onOpenSettings}
+        >
+          <Settings />
+        </IconButton>
+
+        <DriveItemMenu node={node} href={hrefForNode(tree, node.id)} trigger="toolbar" />
 
         <SimulationMenu />
 

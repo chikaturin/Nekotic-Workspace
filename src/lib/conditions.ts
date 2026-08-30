@@ -9,18 +9,6 @@ import type {
   ConditionOperator,
 } from "@/types";
 
-/**
- * One condition evaluator for the whole app.
- *
- * It answers a single question — "does this record satisfy this rule?" — over
- * the board's own cell values, and knows nothing about *why* it is being asked.
- * Conditional select options use it today; view filters and any later
- * rule-based feature can use the same shape.
- *
- * It is deliberately not a workflow engine: there are no actions, no triggers
- * and no side effects. A group in, a boolean out.
- */
-
 export const OPERATOR_LABELS: Readonly<Record<ConditionOperator, string>> = {
   is: "is",
   isNot: "is not",
@@ -57,11 +45,6 @@ const IDENTITY_OPERATORS: readonly ConditionOperator[] = ["is", "isNot", ...PRES
 
 const DATE_OPERATORS: readonly ConditionOperator[] = ["before", "after", "on", ...PRESENCE];
 
-/**
- * The operators each column type offers. There is no number column in this
- * schema, so the numeric comparisons the spec lists have no column to apply
- * to — they are left out rather than faked against text.
- */
 const OPERATORS_BY_TYPE: Readonly<Record<ColumnType, readonly ConditionOperator[]>> = {
   text: TEXT_OPERATORS,
   longText: TEXT_OPERATORS,
@@ -76,7 +59,6 @@ export function conditionOperatorsFor(type: ColumnType): readonly ConditionOpera
   return OPERATORS_BY_TYPE[type];
 }
 
-/** Whether the operator needs a value at all, one value, or a list. */
 export type ConditionValueArity = "none" | "single" | "list";
 
 export function valueArityFor(operator: ConditionOperator): ConditionValueArity {
@@ -85,7 +67,6 @@ export function valueArityFor(operator: ConditionOperator): ConditionValueArity 
   return "single";
 }
 
-/** Keep an operator the new column supports, otherwise fall back to its first. */
 export function reconcileConditionOperator(
   type: ColumnType,
   operator: ConditionOperator,
@@ -94,7 +75,6 @@ export function reconcileConditionOperator(
   return allowed.includes(operator) ? operator : (allowed[0] ?? "isNotEmpty");
 }
 
-/** A condition that is already valid the moment it is added to a group. */
 export function makeCondition(column: BoardColumn, id: string): Condition {
   return {
     id,
@@ -108,7 +88,6 @@ export function makeConditionGroup(id: string): ConditionGroup {
   return { id, conjunction: "and", conditions: [], groups: [] };
 }
 
-/** True when the group holds nothing to test — an empty rule never gates. */
 export function isConditionGroupEmpty(group: ConditionGroup | null | undefined): boolean {
   if (!group) return true;
   return (
@@ -116,9 +95,6 @@ export function isConditionGroupEmpty(group: ConditionGroup | null | undefined):
   );
 }
 
-/* ------------------------------------------------------------------ values */
-
-/** Ids stored by an identity cell, whatever its kind. */
 function idsOf(value: CellValue): readonly string[] {
   if (value.kind === "select") return value.optionIds;
   if (value.kind === "user") return value.userIds;
@@ -131,17 +107,11 @@ function dayNumber(iso: string): number {
   return Number.isNaN(parsed) ? Number.NaN : Math.floor(parsed / 86_400_000);
 }
 
-/** Values a set operator tests against — `values` when given, else `value`. */
 function needlesOf(condition: Condition): readonly string[] {
   if (condition.values && condition.values.length > 0) return condition.values;
   return condition.value.trim().length > 0 ? [condition.value] : [];
 }
 
-/**
- * Identity cells match on the stored id first and the rendered label second,
- * so a rule written by the builder (an id) and one written by hand (a name)
- * agree — the same tolerance `matchesFilter` already applies to view filters.
- */
 function matchesIdentity(
   value: CellValue,
   column: BoardColumn,
@@ -178,21 +148,12 @@ function matchesDate(iso: string | null, condition: Condition): boolean {
   }
 }
 
-/* --------------------------------------------------------------- evaluate */
-
 export interface ConditionScope {
   readonly row: BoardRow;
   readonly columns: ReadonlyMap<string, BoardColumn>;
   readonly context: CellContext;
 }
 
-/**
- * One condition against one record.
- *
- * A condition that points at a column the board no longer has is *ignored*
- * (returns true) rather than failing closed: a deleted column must not silently
- * lock every option that mentioned it.
- */
 export function evaluateCondition(condition: Condition, scope: ConditionScope): boolean {
   const column = scope.columns.get(condition.columnId);
   if (!column) return true;
@@ -249,12 +210,6 @@ export function evaluateCondition(condition: Condition, scope: ConditionScope): 
   }
 }
 
-/**
- * A whole group, nested groups included.
- *
- * An empty group is satisfied — "no conditions" means "no gate", which is what
- * makes an option with no rules behave exactly as it did before rules existed.
- */
 export function evaluateConditionGroup(
   group: ConditionGroup | null | undefined,
   scope: ConditionScope,
@@ -272,9 +227,6 @@ export function evaluateConditionGroup(
   return group.conjunction === "or" ? results.some(Boolean) : results.every(Boolean);
 }
 
-/* -------------------------------------------------------------- describe */
-
-/** Human sentence for one condition — what the lock tooltip shows. */
 export function describeCondition(
   condition: Condition,
   columns: readonly BoardColumn[],
@@ -302,7 +254,6 @@ function labelFor(
   return needle;
 }
 
-/** The whole group as one line, e.g. `QA Status is Passed and Reviewer is not empty`. */
 export function describeConditionGroup(
   group: ConditionGroup | null | undefined,
   columns: readonly BoardColumn[],
@@ -320,9 +271,6 @@ export function describeConditionGroup(
   return parts.join(group.conjunction === "or" ? " or " : " and ");
 }
 
-/* ---------------------------------------------------------------- editing */
-
-/** Immutable group edits — every helper returns a new group. */
 export function withCondition(group: ConditionGroup, condition: Condition): ConditionGroup {
   return { ...group, conditions: [...group.conditions, condition] };
 }

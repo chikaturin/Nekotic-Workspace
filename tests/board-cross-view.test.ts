@@ -4,7 +4,6 @@ import { buildGroups, groupKeyOf, groupValueFor } from "@/lib/board-grouping";
 import { buildBars, timelineScale } from "@/lib/board-timeline";
 import { queryRowIds } from "@/lib/board-view";
 import { cellOf } from "@/lib/cell-values";
-import { boardService } from "@/services/board-service";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useBoardStore } from "@/store/board-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
@@ -94,7 +93,6 @@ function projections(harness: Harness) {
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-  boardService.reset();
 
   useWorkspaceStore.setState({
     workspaces: [TEST_WORKSPACE],

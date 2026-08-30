@@ -21,7 +21,6 @@ import type { ExportFormat, ExportScope } from "@/types";
 interface ExportDialogProps {
   readonly isOpen: boolean;
   readonly controller: ExportController;
-  /** Scope the dialog opens on — "selection" when it came from the bulk bar. */
   readonly initialScope?: ExportScope;
   readonly onClose: () => void;
 }
@@ -41,7 +40,6 @@ const FORMAT_HINTS: Readonly<Record<ExportFormat, string>> = {
 const SCOPES: readonly ExportScope[] = ["board", "view", "selection"];
 const FORMATS: readonly ExportFormat[] = ["xlsx", "csv", "pdf"];
 
-/** Format · scope · what the file will and will not contain (SY-EXP-36). */
 export function ExportDialog({
   isOpen,
   controller,
@@ -71,20 +69,9 @@ export function ExportDialog({
         </DialogHeader>
 
         <DialogBody className="space-y-4">
-          {/* Both groups are one question with one answer, so both are radios
-              rather than the `aria-pressed` cards this dialog used to draw:
-              three independent toggles is not what "pick a format" means, and
-              a screen reader had no way to say which of the three was on.
-              RadioCard over ToggleGroup for the same reason in both places —
-              it carries the icon, the hint line, the trailing count and the
-              disabled treatment as slots, which is every piece these two
-              groups need and all of what would otherwise be re-written by
-              hand at the call site. */}
           <RadioGroup
             label="Format"
             value={format}
-            // The group hands back a plain string; the only ones it can hand
-            // back are the three `FORMATS` rendered just below.
             onValueChange={(value) => setFormat(value as ExportFormat)}
             listClassName="grid grid-cols-3 gap-2"
           >
@@ -117,8 +104,6 @@ export function ExportDialog({
                   key={candidate}
                   value={candidate}
                   label={EXPORT_SCOPE_LABELS[candidate]}
-                  // A scope with nothing in it stays visible and unpickable,
-                  // so the reason the export is empty is on screen.
                   disabled={count === 0}
                   meta={<span className="metric">{formatCount(count, "record")}</span>}
                 />
@@ -145,9 +130,6 @@ export function ExportDialog({
           <Button
             size="sm"
             variant="default"
-            // `isLoading` already blocks the click and swaps the leading icon
-            // for the spinner, so the only reason left to disable is an empty
-            // scope.
             isLoading={controller.isExporting}
             disabled={isEmpty}
             onClick={() => {

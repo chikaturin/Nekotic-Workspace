@@ -14,28 +14,9 @@ import {
 import { collectRovingItems, useRovingFocus } from "@/hooks/use-roving-focus";
 import { cn } from "@/lib/utils";
 
-/**
- * Tabs, built on `useRovingFocus` because `@radix-ui/react-tabs` is not a
- * dependency.
- *
- * The app had grown three tab strips: the record drawer's and the permission
- * dialog's were a byte-level copy of each other, and the notification tray's
- * was the same widget wearing a different skin. All three were `<button>`s in
- * a `role="tablist"` with no arrow keys and no roving tabindex, so a keyboard
- * user tabbed through every tab one at a time to reach the panel. Both skins
- * survive here as variants — the difference between a section switcher inside
- * a panel and a filter chip row is real — but the keyboard behaviour is now
- * written once.
- *
- * Controlled only. Every existing consumer already holds the active tab in its
- * own state, usually because a route or a parent needs to read it.
- */
-
 const tabsListVariants = cva("flex items-center", {
   variants: {
     variant: {
-      // The underline strip sits on a rule that runs the full width of its
-      // container, so it owns the border and the triggers hang off it.
       underline: "shrink-0 gap-0.5 border-b border-border px-[var(--control-pad-md)]",
       pill: "gap-0.5",
     },
@@ -54,8 +35,6 @@ const tabsTriggerVariants = cva(
   {
     variants: {
       variant: {
-        // -mb-px pulls the 2px indicator over the list's 1px rule so the two
-        // read as one line rather than as a bar floating above a border.
         underline: "-mb-px h-[var(--control-lg)] border-b-2 px-[var(--control-pad-md)] text-ui",
         pill: "h-[var(--control-sm)] rounded-md px-[var(--control-pad-sm)] text-ui",
       },
@@ -89,8 +68,6 @@ const tabsCountVariants = cva("metric rounded-full px-1 text-micro", {
     state: { active: "", inactive: "" },
   },
   compoundVariants: [
-    // A solid accent counter is right on a pill that is already tinted, and
-    // far too loud next to an underline tab whose only mark is a hairline.
     { variant: "pill", state: "active", class: "bg-accent text-accent-foreground" },
     { variant: "underline", state: "active", class: "bg-accent-soft text-accent" },
     { state: "inactive", class: "bg-hover text-faint-foreground" },
@@ -136,9 +113,6 @@ export function Tabs({
   className,
   ...props
 }: TabsProps) {
-  // Ids are generated rather than derived from the tab values so two tab
-  // strips with the same value names — "details" appears in three places —
-  // cannot end up with colliding `aria-controls` targets on the same page.
   const baseId = useId();
 
   const context = useMemo(
@@ -153,10 +127,6 @@ export function Tabs({
   );
 }
 
-/**
- * An accessible name is required, not optional: a screen reader announcing
- * "tab list" with no idea which one is the failure mode this exists to stop.
- */
 export type TabsListProps = ComponentProps<"div"> & { readonly "aria-label": string };
 
 export function TabsList({ className, children, onKeyDown, ...props }: TabsListProps) {
@@ -176,9 +146,6 @@ export function TabsList({ className, children, onKeyDown, ...props }: TabsListP
     },
   });
 
-  // Composed rather than overwritten: spreading `props` over the arrow-key
-  // handler would let a call site that only wanted to watch for Escape take
-  // the whole keyboard away without ever noticing.
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     onKeyDown?.(event);
     if (!event.defaultPrevented) roving.handleKeyDown(event);
@@ -204,7 +171,6 @@ export function TabsList({ className, children, onKeyDown, ...props }: TabsListP
 
 export type TabsTriggerProps = ComponentProps<"button"> & {
   readonly value: string;
-  /** Rendered as a counter chip, and only when there is something to count. */
   readonly count?: number;
 };
 
@@ -225,9 +191,6 @@ export function TabsTrigger({
   const isSelected = value === selected;
   const state = isSelected ? "active" : "inactive";
 
-  // A trigger the list could not see — wrapped in a Fragment, or in a tooltip
-  // component — keeps its own tab stop. Degrading to "reachable but not in the
-  // roving order" is survivable; tabIndex -1 with nothing to rove to is not.
   const isRoving = index >= 0;
 
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
@@ -259,11 +222,6 @@ export function TabsTrigger({
 
 export type TabsContentProps = ComponentProps<"div"> & { readonly value: string };
 
-/**
- * Inactive panels unmount. These carry comment threads, activity feeds and
- * permission tables that each fetch on mount, so keeping all three alive
- * behind `hidden` would triple the work every time a drawer opens.
- */
 export function TabsContent({ value, className, ...props }: TabsContentProps) {
   const { value: selected, baseId } = useTabsContext("TabsContent");
   if (value !== selected) return null;
@@ -274,9 +232,6 @@ export function TabsContent({ value, className, ...props }: TabsContentProps) {
       data-slot="tabs-content"
       id={`${baseId}-panel-${value}`}
       aria-labelledby={`${baseId}-tab-${value}`}
-      // The panel takes a tab stop so that Tab out of the strip lands on the
-      // content it just switched to, including when that content is a static
-      // block with nothing focusable in it.
       tabIndex={0}
       className={cn(
         "min-h-0 flex-1 outline-none focus-visible:ring-2 focus-visible:ring-ring",

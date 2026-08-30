@@ -30,35 +30,9 @@ const MAX_PANEL_WIDTH = 560;
 
 interface GanttBoardProps {
   readonly model: BoardViewModel;
-  /** Whether this person may write a record at all — `row.update`, nothing
-   *  Gantt-specific. Bars stay read-only either way; this gates the one action
-   *  that writes, which is filling in a missing date. */
   readonly canEdit: boolean;
 }
 
-/**
- * Gantt over the shared board records.
- *
- * There is no Gantt data source. The rows are the same ids every other view
- * renders, nested by the same hierarchy the table nests with, filtered and
- * sorted by the same engine — so a date changed here is a cell written on the
- * record, and the table, the drawer and the calendar have it on the next frame.
- *
- * Two structures sit side by side: a task panel that stays put while the chart
- * scrolls sideways, and a chart whose lanes line up with it row for row. Both
- * are driven by one virtual window, so the name on the left is always the bar
- * on the right.
- *
- * The chart is a *view* of the schedule and does not edit it. Dragging a bar to
- * a new date was removed: a chart that rewrites dates on a mouse slip is worse
- * than one that asks you to type them, and the drawer and the grid already have
- * proper date editors. Clicking a bar opens the record, where the dates live.
- *
- * Rendering is layered — background rules, then bars, then connectors — rather
- * than each row drawing its own grid. That is what lets a rule run the whole
- * height of the chart, and it keeps the background's cost tied to the width of
- * the window rather than to the number of records.
- */
 export function GanttBoard({ model, canEdit }: GanttBoardProps) {
   const { board, view, columns, columnsShown, rowIds, dateColumn, endDateColumn, context } = model;
 
@@ -72,12 +46,8 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
 
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH);
   const scroll = useRef<HTMLDivElement>(null);
-  /** The day to keep under the middle of the viewport across a zoom change. */
   const anchorDay = useRef<number | null>(null);
 
-  // A saved view may still hold a scale this chart no longer draws — "day" was
-  // removed — so the stored value is normalised on the way in rather than
-  // trusted straight into the pixel tables.
   const zoom: GanttZoom = normalizeGanttZoom(view?.ganttZoom);
   const showDependencies = view?.showDependencies ?? true;
 
@@ -114,11 +84,6 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
     [entries, rowsById, model.hierarchy, dateColumn, endDateColumn, model.completionColumn, scale.startIso],
   );
 
-  /**
-   * Built whether or not they are shown, so the toolbar can say how many there
-   * are. A toggle that looks identical either way — which is what it does on a
-   * board where nothing is blocked by anything — reads as a broken button.
-   */
   const allLinks = useMemo(
     () => buildGanttLinks(scheduled, rowsById, columns),
     [scheduled, rowsById, columns],
@@ -129,7 +94,6 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
     [showDependencies, allLinks],
   );
 
-  /** Rows whose start falls before something they are blocked by finishes. */
   const conflicted = useMemo(
     () => new Set(links.filter((link) => link.isConflict).map((link) => link.toRowId)),
     [links],
@@ -140,10 +104,6 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
     rowHeight: ROW_HEIGHT,
   });
 
-  /**
-   * Put today in the middle of the chart. Only the viewport moves — no record's
-   * dates are touched by this, or by anything else on this surface.
-   */
   const scrollToToday = useCallback(() => {
     const element = scroll.current;
     if (!element) return;
@@ -152,11 +112,6 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
     element.scrollLeft = Math.max(0, centre);
   }, [scale.todayOffset, scale.dayWidth, panelWidth]);
 
-  /**
-   * Open on today, not on whatever the earliest record happens to be. A chart
-   * that opens three months in the past makes the reader hunt for the present
-   * before they can read anything.
-   */
   const hasCentred = useRef(false);
   useLayoutEffect(() => {
     if (hasCentred.current || scheduled.length === 0) return;
@@ -164,14 +119,6 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
     scrollToToday();
   }, [scheduled.length, scrollToToday]);
 
-  /**
-   * Fill in the dates a record is missing.
-   *
-   * An ordinary cell edit on the same columns the view reads — optimistic,
-   * permission-checked and revertible like any other write, and visible in the
-   * table and the drawer the moment it lands. Nothing about it is special to
-   * the chart, which is exactly why the chart is allowed to offer it.
-   */
   const fillDates = useCallback(
     (targets: readonly GanttRow[]) => {
       const edits = fillScheduleEdits(targets, rowsById, dateColumn, endDateColumn, MOCK_NOW);
@@ -180,10 +127,6 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
     [rowsById, dateColumn, endDateColumn, editCells],
   );
 
-  /**
-   * Zoom keeps its place. Without this, every scale change scrolls back to the
-   * start of the project and the reader loses whatever they were looking at.
-   */
   function changeZoom(next: GanttZoom) {
     const element = scroll.current;
     if (element) {
@@ -202,9 +145,6 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
     element.scrollLeft = day * scale.dayWidth - (element.clientWidth - panelWidth) / 2;
   }, [scale.dayWidth, panelWidth]);
 
-  // A duration needs both ends. With only one column chosen every record would
-  // fall through to Unscheduled, which looks like a broken chart rather than an
-  // unfinished setup — so the setup is what gets shown.
   if (!dateColumn || !endDateColumn) {
     return (
       <GanttSetup
@@ -259,8 +199,6 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
           className="min-h-0 flex-1 overflow-auto"
         >
           <div className="w-max min-w-full">
-            {/* The date header stays put vertically; the task column stays put
-                horizontally. Both have to, or one of them stops being a label. */}
             <div
               style={{ height: HEADER_HEIGHT }}
               className="sticky top-0 z-sticky flex border-b border-border bg-elevated"
@@ -297,14 +235,7 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
 
               <PanelResizer width={panelWidth} onResize={setPanelWidth} />
 
-              {/* Three layers, painted bottom to top: the background rules,
-                  the dependency wires, then the bars. The order is the whole
-                  point — a wire between distant rows has to cross the lanes in
-                  between, and it must read as passing *behind* those tasks
-                  rather than being drawn across their titles. */}
               <div style={{ width: chartWidth }} className="relative shrink-0">
-                {/* One background for the whole chart, so a rule runs its full
-                    height instead of stopping at every row border. */}
                 <GanttGridLayer scale={scale} height={bodyHeight} />
 
                 {showDependencies && (
@@ -352,7 +283,6 @@ export function GanttBoard({ model, canEdit }: GanttBoardProps) {
   );
 }
 
-/** Drag to trade task-list width for chart width. */
 function PanelResizer({
   width,
   onResize,

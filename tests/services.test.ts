@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import { blockIcon, BLOCK_PLACEHOLDER, TEXT_BLOCK_CLASS } from "@/lib/block-visuals";
 import { BLOCK_COMMANDS } from "@/lib/block-commands";
-import { fileService } from "@/services/file-service";
-import { linkService } from "@/services/link-service";
+import { fileFake } from "./msw/fake/file.fake";
+import { linkFake } from "./msw/fake/link.fake";
 import {
   appError,
   isCancellation,
@@ -106,7 +106,7 @@ describe("file service uploads", () => {
   test("reports progress and returns an asset", async () => {
     const progress: number[] = [];
 
-    const asset = await fileService.upload({
+    const asset = await fileFake.upload({
       file: makeFile("report.txt", 2048),
       folderId: ID.frontend,
       owner: CURRENT_USER,
@@ -123,7 +123,7 @@ describe("file service uploads", () => {
 
   test("rejects a file the workspace does not accept", async () => {
     await expect(
-      fileService.upload({
+      fileFake.upload({
         file: makeFile("virus.exe"),
         folderId: null,
         owner: CURRENT_USER,
@@ -136,7 +136,7 @@ describe("file service uploads", () => {
 
   test("fails late for a file marked to fail", async () => {
     await expect(
-      fileService.upload({
+      fileFake.upload({
         file: makeFile("will-fail.txt"),
         folderId: null,
         owner: CURRENT_USER,
@@ -149,7 +149,7 @@ describe("file service uploads", () => {
 
   test("aborts when the caller cancels", async () => {
     const controller = new AbortController();
-    const pending = fileService.upload({
+    const pending = fileFake.upload({
       file: makeFile("slow.txt"),
       folderId: null,
       owner: CURRENT_USER,
@@ -163,43 +163,43 @@ describe("file service uploads", () => {
 
 describe("file service listing", () => {
   test("returns the files of a folder", async () => {
-    const files = await fileService.listFiles({ folderId: ID.payment, canView: true });
+    const files = await fileFake.listFiles({ folderId: ID.payment, canView: true });
 
     expect(files.map((file) => file.name).sort()).toEqual(["flow.png", "spec.pdf"]);
   });
 
   test("lists the workspace root when no folder is given", async () => {
-    const files = await fileService.listFiles({ folderId: null, canView: true });
+    const files = await fileFake.listFiles({ folderId: null, canView: true });
     expect(files.every(isFile)).toBe(true);
   });
 
   test("refuses when the caller cannot view the folder", async () => {
     await expect(
-      fileService.listFiles({ folderId: ID.payment, canView: false }),
+      fileFake.listFiles({ folderId: ID.payment, canView: false }),
     ).rejects.toSatisfy(
       (error: unknown) => isServiceError(error) && error.appError.code === "permission_denied",
     );
   });
 
   test("reports an unknown folder as not found", async () => {
-    await expect(fileService.listFiles({ folderId: "nope", canView: true })).rejects.toSatisfy(
+    await expect(fileFake.listFiles({ folderId: "nope", canView: true })).rejects.toSatisfy(
       (error: unknown) => isServiceError(error) && error.appError.code === "not_found",
     );
   });
 
   test("honours the simulated failure modes", async () => {
     setSimulation({ listFailure: "network" });
-    await expect(fileService.listFiles({ folderId: null, canView: true })).rejects.toSatisfy(
+    await expect(fileFake.listFiles({ folderId: null, canView: true })).rejects.toSatisfy(
       (error: unknown) => isServiceError(error) && error.appError.code === "network",
     );
 
     setSimulation({ listFailure: "permission" });
-    await expect(fileService.listFiles({ folderId: null, canView: true })).rejects.toSatisfy(
+    await expect(fileFake.listFiles({ folderId: null, canView: true })).rejects.toSatisfy(
       (error: unknown) => isServiceError(error) && error.appError.code === "permission_denied",
     );
 
     setSimulation({ listFailure: "empty" });
-    expect(await fileService.listFiles({ folderId: null, canView: true })).toHaveLength(0);
+    expect(await fileFake.listFiles({ folderId: null, canView: true })).toHaveLength(0);
   });
 });
 
@@ -211,7 +211,7 @@ describe("file service previews", () => {
   };
 
   test("images resolve to an image preview", async () => {
-    const preview = await fileService.getPreview(
+    const preview = await fileFake.getPreview(
       fileNode("t_development_backend_payment_flow_png"),
     );
 
@@ -219,7 +219,7 @@ describe("file service previews", () => {
   });
 
   test("PDFs resolve to a pdf preview with a usable url", async () => {
-    const preview = await fileService.getPreview(
+    const preview = await fileFake.getPreview(
       fileNode("t_development_backend_payment_spec_pdf"),
     );
 
@@ -228,7 +228,7 @@ describe("file service previews", () => {
   });
 
   test("uploaded text files preview their real content", async () => {
-    const asset = await fileService.upload({
+    const asset = await fileFake.upload({
       file: new File(["hello from the upload"], "notes.txt", { type: "text/plain" }),
       folderId: null,
       owner: CURRENT_USER,
@@ -244,7 +244,7 @@ describe("file service previews", () => {
       mimeType: "text/plain",
     };
 
-    const preview = await fileService.getPreview(node);
+    const preview = await fileFake.getPreview(node);
 
     expect(preview.kind).toBe("text");
     if (preview.kind === "text") expect(preview.content).toContain("hello from the upload");
@@ -257,7 +257,7 @@ describe("file service previews", () => {
       extension: "mp4",
     };
 
-    const preview = await fileService.getPreview(node);
+    const preview = await fileFake.getPreview(node);
 
     expect(preview.kind).toBe("unsupported");
     if (preview.kind === "unsupported") expect(preview.reason).toContain("MP4");
@@ -273,11 +273,11 @@ describe("file service previews", () => {
       mimeType: "text/markdown",
     };
 
-    const result = await fileService.saveText(node, "# Edited in place");
+    const result = await fileFake.saveText(node, "# Edited in place");
 
     expect(result.sizeBytes).toBeGreaterThan(0);
 
-    const preview = await fileService.getPreview(node);
+    const preview = await fileFake.getPreview(node);
     expect(preview.kind).toBe("text");
     if (preview.kind === "text") expect(preview.content).toBe("# Edited in place");
   });
@@ -292,7 +292,7 @@ describe("file service previews", () => {
       mimeType: "application/vnd.ms-excel",
     };
 
-    await expect(fileService.saveText(node, "nope")).rejects.toSatisfy(
+    await expect(fileFake.saveText(node, "nope")).rejects.toSatisfy(
       (error: unknown) => toAppError(error).code === "conflict",
     );
   });
@@ -307,7 +307,7 @@ describe("file service previews", () => {
       mimeType: "text/plain",
     };
 
-    await expect(fileService.saveText(node, "content")).rejects.toSatisfy(
+    await expect(fileFake.saveText(node, "content")).rejects.toSatisfy(
       (error: unknown) => toAppError(error).isRetryable,
     );
   });
@@ -322,7 +322,7 @@ describe("file service previews", () => {
       mimeType: "text/csv",
     };
 
-    const preview = await fileService.getPreview(node);
+    const preview = await fileFake.getPreview(node);
 
     expect(preview.kind).toBe("sheet");
     if (preview.kind === "sheet") expect(preview.rows.length).toBeGreaterThan(1);
@@ -347,10 +347,10 @@ describe("file service previews", () => {
         mimeType: "application/octet-stream",
       };
 
-      const result = await fileService.saveSheet(node, rows);
+      const result = await fileFake.saveSheet(node, rows);
       expect(result.sizeBytes).toBeGreaterThan(0);
 
-      const preview = await fileService.getPreview(node);
+      const preview = await fileFake.getPreview(node);
       expect(preview.kind).toBe("sheet");
       if (preview.kind === "sheet") expect(preview.rows).toEqual(rows);
     }
@@ -366,28 +366,28 @@ describe("file service previews", () => {
       mimeType: "text/plain",
     };
 
-    await expect(fileService.saveSheet(node, [["a"]])).rejects.toSatisfy(
+    await expect(fileFake.saveSheet(node, [["a"]])).rejects.toSatisfy(
       (error: unknown) => toAppError(error).code === "conflict",
     );
   });
 
 
   test("a download url is produced for any file", async () => {
-    const url = await fileService.getDownloadUrl(fileNode("t_development_backend_payment_spec_pdf"));
+    const url = await fileFake.getDownloadUrl(fileNode("t_development_backend_payment_spec_pdf"));
     expect(url.length).toBeGreaterThan(0);
   });
 
   test("releasing every cached url is safe to call twice", () => {
     expect(() => {
-      fileService.releaseAll();
-      fileService.releaseAll();
+      fileFake.releaseAll();
+      fileFake.releaseAll();
     }).not.toThrow();
   });
 });
 
 describe("link service", () => {
   test("resolves metadata from a url", async () => {
-    const metadata = await linkService.resolve("https://stripe.com/docs/webhook-signatures");
+    const metadata = await linkFake.resolve("https://stripe.com/docs/webhook-signatures");
 
     expect(metadata.siteName).toBe("stripe.com");
     expect(metadata.title).toBe("Webhook Signatures");
@@ -395,15 +395,15 @@ describe("link service", () => {
   });
 
   test("adds a protocol when the user omits it", async () => {
-    const metadata = await linkService.resolve("example.com/pricing");
+    const metadata = await linkFake.resolve("example.com/pricing");
     expect(metadata.url.startsWith("https://")).toBe(true);
   });
 
   test("rejects input that is not a url", async () => {
-    await expect(linkService.resolve("not a url")).rejects.toSatisfy(
+    await expect(linkFake.resolve("not a url")).rejects.toSatisfy(
       (error: unknown) => isServiceError(error) && error.appError.code === "validation",
     );
-    await expect(linkService.resolve("   ")).rejects.toThrow();
+    await expect(linkFake.resolve("   ")).rejects.toThrow();
   });
 });
 

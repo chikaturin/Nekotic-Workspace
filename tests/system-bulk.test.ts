@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { partitionBulkTargets, describeBulkResult, bulkTone } from "@/lib/bulk";
 import { isRowArchived } from "@/lib/archive";
-import { boardIdFor, boardService } from "@/services/board-service";
+import { boardService } from "@/services/board-service";
+import { boardIdFor } from "./msw/fake/board.fake";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useBoardStore } from "@/store/board-store";
 import { useGridStore } from "@/store/grid-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardRow, BulkResult } from "@/types";
-import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
+import { buildTestTree, csvFile, ID, mapToColumns, TEST_WORKSPACE } from "./helpers";
 
 /**
  * SY-BLK-34 — bulk actions.
@@ -36,7 +37,6 @@ function columnNamed(name: string): string {
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-  boardService.reset();
   useGridStore.getState().reset();
 
   useWorkspaceStore.setState({
@@ -122,13 +122,19 @@ describe("bulk writes", () => {
     const board = await loadBoard();
 
     // Grow the board past the metric in the PRD, then write across all of it.
-    const created = await boardService.importRows({
+    const titleId = board.columns.find((column) => column.name === "Title")!.id;
+    const outcome = await boardService.importRows({
       boardId: board.id,
-      rows: Array.from({ length: 96 }, () => ({})),
+      file: csvFile("bulk.csv", [
+        ["Title"],
+        ...Array.from({ length: 96 }, (_, index) => [`Bulk ${index + 1}`]),
+      ]),
+      mappings: mapToColumns([titleId]),
+      invalidPolicy: "skip",
     });
-    expect(created).toHaveLength(96);
+    expect(outcome.rowIds).toHaveLength(96);
 
-    const rowIds = [...Array.from({ length: 4 }, (_, index) => rowIdAt(index + 1)), ...created.map((row) => row.id)];
+    const rowIds = [...Array.from({ length: 4 }, (_, index) => rowIdAt(index + 1)), ...outcome.rowIds];
     expect(rowIds).toHaveLength(100);
 
     const statusId = columnNamed("Status");
@@ -230,6 +236,8 @@ describe("moving records to another board", () => {
     const board = await loadBoard();
     const target = await createBugBoard();
 
+    if (target === null) throw new Error("destination board was not created");
+
     const result = await boardService.bulkMove({
       boardId: board.id,
       rowIds: [rowIdAt(1), rowIdAt(2)],
@@ -249,6 +257,8 @@ describe("moving records to another board", () => {
   test("columns the destination has no counterpart for are reported by name", async () => {
     const board = await loadBoard();
     const target = await createBugBoard();
+
+    if (target === null) throw new Error("destination board was not created");
 
     const result = await boardService.bulkMove({
       boardId: board.id,

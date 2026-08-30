@@ -15,14 +15,9 @@ import type { BreadcrumbItem } from "@/types";
 
 interface BreadcrumbCrumbProps {
   readonly item: BreadcrumbItem;
-  /** Workspace crumb resolves to the tree root rather than a node id. */
   readonly dropTargetId: string | null;
 }
 
-/**
- * A single crumb: navigates on click, offers sibling folders in a menu, and
- * accepts drops so items can be moved back up the tree.
- */
 export function BreadcrumbCrumb({ item, dropTargetId }: BreadcrumbCrumbProps) {
   const { dropProps, isOver } = useDropTarget({ targetId: dropTargetId });
 

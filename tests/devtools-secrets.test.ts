@@ -7,7 +7,6 @@ import {
   toEnvText,
 } from "@/lib/env-file";
 import { CONFIG_FORMATS, formatFromName, isConfigFormat, tokenize } from "@/lib/syntax";
-import { boardService } from "@/services/board-service";
 import { devtoolsService } from "@/services/devtools-service";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { doc, hydrate, project, type NodeSpec } from "@/mock/factory";
@@ -16,6 +15,7 @@ import { useWorkspaceStore } from "@/store/workspace-store";
 import type { DriveNode, WorkspaceRole } from "@/types";
 
 import { testWorkspace } from "./helpers";
+import { devtoolsFake } from "./msw/fake/devtools.fake";
 
 const WORKSPACE_ID = "ws_sec";
 
@@ -57,8 +57,6 @@ function signedInAs(role: WorkspaceRole) {
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-  boardService.reset();
-  devtoolsService.reset();
 
   useWorkspaceStore.setState({
     workspaces: [testWorkspace(WORKSPACE_ID)],
@@ -385,7 +383,7 @@ describe("copying secrets in bulk", () => {
     const document = await devtoolsService.getSecrets(ID.secret);
     const [first, , third] = document.entries;
 
-    const result = await devtoolsService.copySecrets({
+    const result = await devtoolsFake.copySecrets({
       nodeId: ID.secret,
       secretIds: [first!.id, third!.id],
       role: "admin",
@@ -402,7 +400,7 @@ describe("copying secrets in bulk", () => {
   test("copy all takes every secret in the document", async () => {
     const document = await devtoolsService.getSecrets(ID.secret);
 
-    const result = await devtoolsService.copySecrets({
+    const result = await devtoolsFake.copySecrets({
       nodeId: ID.secret,
       secretIds: [],
       role: "admin",
@@ -415,7 +413,7 @@ describe("copying secrets in bulk", () => {
     const document = await devtoolsService.getSecrets(ID.secret);
     const chosen = document.entries.slice(0, 2);
 
-    const { text } = await devtoolsService.copySecrets({
+    const { text } = await devtoolsFake.copySecrets({
       nodeId: ID.secret,
       secretIds: chosen.map((entry) => entry.id),
       role: "admin",
@@ -435,7 +433,7 @@ describe("copying secrets in bulk", () => {
     const document = await devtoolsService.getSecrets(ID.secret);
 
     await expect(
-      devtoolsService.copySecrets({
+      devtoolsFake.copySecrets({
         nodeId: ID.secret,
         secretIds: [document.entries[0]!.id],
         role: "member",
@@ -451,7 +449,7 @@ describe("copying secrets in bulk", () => {
     signedInAs("member");
 
     await expect(
-      devtoolsService.copySecrets({
+      devtoolsFake.copySecrets({
         nodeId: ID.secret,
         secretIds: [document.entries[0]!.id],
         role: "admin",
@@ -467,7 +465,7 @@ describe("editing a secret document", () => {
     const document = await devtoolsService.getSecrets(ID.secret);
     const target = document.entries[0]!;
 
-    const before = await devtoolsService.revealSecret({
+    const before = await devtoolsFake.revealSecret({
       nodeId: ID.secret,
       secretId: target.id,
       role: "admin",
@@ -475,7 +473,7 @@ describe("editing a secret document", () => {
     });
 
     // No `value` on the draft: the editor is renaming, not rotating.
-    const saved = await devtoolsService.saveSecrets({
+    const saved = await devtoolsFake.saveSecrets({
       nodeId: ID.secret,
       role: "admin",
       entries: document.entries.map((entry) =>
@@ -485,7 +483,7 @@ describe("editing a secret document", () => {
 
     expect(saved.entries[0]?.key).toBe("RENAMED_KEY");
 
-    const after = await devtoolsService.revealSecret({
+    const after = await devtoolsFake.revealSecret({
       nodeId: ID.secret,
       secretId: saved.entries[0]!.id,
       role: "admin",
@@ -497,7 +495,7 @@ describe("editing a secret document", () => {
   test("a new secret is added with the value it was given", async () => {
     const document = await devtoolsService.getSecrets(ID.secret);
 
-    const saved = await devtoolsService.saveSecrets({
+    const saved = await devtoolsFake.saveSecrets({
       nodeId: ID.secret,
       role: "admin",
       entries: [
@@ -510,7 +508,7 @@ describe("editing a secret document", () => {
     expect(added.maskedValue).toMatch(/^•+$/);
     expect(JSON.stringify(saved)).not.toContain("tok_123");
 
-    const value = await devtoolsService.revealSecret({
+    const value = await devtoolsFake.revealSecret({
       nodeId: ID.secret,
       secretId: added.id,
       role: "admin",
@@ -523,7 +521,7 @@ describe("editing a secret document", () => {
     const document = await devtoolsService.getSecrets(ID.secret);
     const [dropped, ...kept] = document.entries;
 
-    const saved = await devtoolsService.saveSecrets({
+    const saved = await devtoolsFake.saveSecrets({
       nodeId: ID.secret,
       role: "admin",
       entries: kept.map((entry) => ({ id: entry.id, key: entry.key })),
@@ -531,7 +529,7 @@ describe("editing a secret document", () => {
 
     expect(saved.entries).toHaveLength(kept.length);
     await expect(
-      devtoolsService.revealSecret({
+      devtoolsFake.revealSecret({
         nodeId: ID.secret,
         secretId: dropped!.id,
         role: "admin",
@@ -544,7 +542,7 @@ describe("editing a secret document", () => {
     const document = await devtoolsService.getSecrets(ID.secret);
 
     await expect(
-      devtoolsService.saveSecrets({
+      devtoolsFake.saveSecrets({
         nodeId: ID.secret,
         role: "admin",
         entries: [
@@ -560,7 +558,7 @@ describe("editing a secret document", () => {
 
   test("a key the store cannot hold is refused", async () => {
     await expect(
-      devtoolsService.saveSecrets({
+      devtoolsFake.saveSecrets({
         nodeId: ID.secret,
         role: "admin",
         entries: [{ id: null, key: "two words", value: "x" }],
@@ -571,7 +569,7 @@ describe("editing a secret document", () => {
   test("every change is audited as a rotation, with no value in the trail", async () => {
     const document = await devtoolsService.getSecrets(ID.secret);
 
-    await devtoolsService.saveSecrets({
+    await devtoolsFake.saveSecrets({
       nodeId: ID.secret,
       role: "admin",
       entries: [
@@ -591,7 +589,7 @@ describe("editing a secret document", () => {
     signedInAs("manager");
 
     await expect(
-      devtoolsService.saveSecrets({
+      devtoolsFake.saveSecrets({
         nodeId: ID.secret,
         role: "manager",
         entries: document.entries.map((entry) => ({ id: entry.id, key: entry.key })),

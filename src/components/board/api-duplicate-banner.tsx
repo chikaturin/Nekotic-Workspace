@@ -5,10 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { useGridStore } from "@/store/grid-store";
 import type { DuplicateReport } from "@/lib/api-catalog";
 
-/**
- * DV-API-20 warning. Duplicates are surfaced, never blocked: the catalogue may
- * legitimately hold a draft of an endpoint while it is being replaced.
- */
 export function ApiDuplicateBanner({ report }: { report: DuplicateReport }) {
   if (report.groups.length === 0) return null;
 

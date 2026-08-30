@@ -8,10 +8,6 @@ import { isFile } from "@/types";
 import { findNodeById } from "@/lib/tree";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
 
-/**
- * Connects the workspace-wide "preview this node" state to the shared file
- * preview surface, so the drive and the file manager show the same thing.
- */
 export function DrivePreviewDialog() {
   const previewNodeId = useWorkspaceStore((state) => state.previewNodeId);
   const closePreview = useWorkspaceStore((state) => state.closePreview);
@@ -20,7 +16,6 @@ export function DrivePreviewDialog() {
   const node = previewNodeId ? findNodeById(tree, previewNodeId) : null;
   const fileNode = node && isFile(node) ? node : null;
 
-  // Previewing a file is opening it, so it belongs in Recent.
   useTrackRecent(useMemo(() => (fileNode ? nodeRef(fileNode) : null), [fileNode]));
 
   return <FilePreviewDialog node={fileNode} onClose={closePreview} />;

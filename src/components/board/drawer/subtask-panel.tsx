@@ -25,22 +25,8 @@ interface SubtaskPanelProps {
   readonly canEdit: boolean;
 }
 
-/** Fields shown beside a subtask's title, in the order the board declares them. */
 const CHIP_TYPES: readonly BoardColumn["type"][] = ["select", "user", "date"];
 
-/**
- * Subtasks of one record.
- *
- * Every line here is a board record with its own display id, status, owner and
- * history — clicking one opens *its* drawer, with its own comments, activity
- * and attachments. Nothing about a subtask is stored on the parent, which is
- * why ticking one in the table updates this list, and vice versa, with no
- * synchronisation code anywhere.
- *
- * Completing every subtask deliberately does *not* complete the parent. That
- * would be an automation rule, and no such rule has been configured — the
- * progress bar reports, it does not act.
- */
 export function SubtaskPanel({
   parentRowId,
   parentDisplayId,
@@ -62,11 +48,6 @@ export function SubtaskPanel({
     (column) => !column.isPrimary && CHIP_TYPES.includes(column.type),
   );
 
-  /**
-   * Ticking the box writes the completion column on the subtask — the same
-   * cell edit the grid would make, through the same store action, so the same
-   * transition rules apply.
-   */
   function toggleCompleted(rowId: string, isCompleted: boolean) {
     if (!completionColumn || !canEdit) return;
 

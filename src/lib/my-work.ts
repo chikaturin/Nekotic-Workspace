@@ -11,20 +11,10 @@ import type {
   SelectColor,
 } from "@/types";
 
-/**
- * Reading a board "as work".
- *
- * My Work spans boards built from different templates, so it cannot address
- * columns by id. It picks them by role instead — assignee, due date, status —
- * and a board that has no column for a role simply contributes nothing to the
- * widgets that need it, rather than guessing.
- */
-
 const ASSIGNEE_NAMES = /assign|owner|tester|responsible/i;
 const DUE_NAMES = /due|deadline/i;
 const STATUS_NAMES = /status|result|state/i;
 
-/** Status labels that mean "no longer open" — they drop out of My Work. */
 export const DONE_LABELS: ReadonlySet<string> = new Set([
   "done",
   "complete",
@@ -59,8 +49,6 @@ function pick<T extends BoardColumn>(
 export function lensesFor(board: Board): BoardLenses {
   return {
     assignee: pick<BoardColumnOf<"user">>(board.columns, "user", ASSIGNEE_NAMES, true),
-    // A date column only counts as a deadline when it is named like one:
-    // "Found on" and "Executed on" are history, not work that is due.
     due: pick<BoardColumnOf<"date">>(board.columns, "date", DUE_NAMES, false),
     status: pick<BoardColumnOf<"select">>(board.columns, "select", STATUS_NAMES, true),
     primary: board.columns.find((column) => column.id === board.primaryColumnId) ?? null,
@@ -148,15 +136,29 @@ export function toItem({
   };
 }
 
-/** True when a date falls on the reference day, both read in UTC. */
 export function isSameCalendarDay(iso: string | null, referenceIso: string): boolean {
   const day = dayKey(iso);
   return day !== null && day === dayKey(referenceIso);
 }
 
-/** True when a date is strictly before the reference day. */
 export function isBeforeDay(iso: string | null, referenceIso: string): boolean {
   const day = dayKey(iso);
   const reference = dayKey(referenceIso);
   return day !== null && reference !== null && day < reference;
+}
+
+export function isWithinDays(
+  iso: string | null,
+  referenceIso: string,
+  days: number,
+): boolean {
+  const day = dayKey(iso);
+  const reference = dayKey(referenceIso);
+  if (day === null || reference === null) return false;
+
+  const horizon = dayKey(
+    new Date(Date.parse(`${reference}T00:00:00.000Z`) + days * 86_400_000).toISOString(),
+  );
+
+  return horizon !== null && day > reference && day <= horizon;
 }

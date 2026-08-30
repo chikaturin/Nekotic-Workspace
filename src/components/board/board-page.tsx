@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ApiDuplicateBanner } from "@/components/board/api-duplicate-banner";
 import { ConflictNotices } from "@/components/board/conflict-notices";
 import { BoardToolbar } from "@/components/board/board-toolbar";
+import { BoardSettingsDrawer } from "@/components/board/settings/board-settings-drawer";
 import { RowDrawer } from "@/components/board/drawer/row-drawer";
 import { ExportDialog } from "@/components/board/export/export-dialog";
 import { ImportDialog } from "@/components/board/import/import-dialog";
@@ -31,13 +32,6 @@ import { selectSelectedRowIds, useGridStore } from "@/store/grid-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardNode, ExportScope } from "@/types";
 
-/**
- * Board surface for a board node.
- *
- * One board, one record set, many views. The toolbar switches saved views and
- * the table renders the current one; Kanban, Calendar and Gantt all plug into
- * the same `useBoardView` query.
- */
 export function BoardPage({ node }: { node: BoardNode }) {
   const { status, error, reload } = useBoard(node.id);
   const model = useBoardView();
@@ -46,13 +40,9 @@ export function BoardPage({ node }: { node: BoardNode }) {
   const selectedMap = useGridStore(selectSelectedRowIds);
 
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [exportScope, setExportScope] = useState<ExportScope | null>(null);
 
-  /**
-   * A board archived in its own right freezes here; an ancestor's freeze is
-   * already closed inside the resolver. Wrapping rather than passing a flag
-   * keeps every gate below reading from one answer.
-   */
   const can = useMemo(
     () => (isArchivedNode(node) ? frozenResolver(nodeCan) : nodeCan),
     [nodeCan, node],
@@ -64,7 +54,6 @@ export function BoardPage({ node }: { node: BoardNode }) {
   const clearRowRequest = useWorkspaceStore((state) => state.clearRowRequest);
   const pushFeedback = useWorkspaceStore((state) => state.pushFeedback);
   const openDrawer = useGridStore((state) => state.openDrawer);
-  /** Which board the store actually holds — "ready" alone can mean the last one. */
   const loadedNodeId = useBoardStore((state) => state.nodeId);
 
   useTrackRecent(useMemo(() => nodeRef(node), [node]));
@@ -77,20 +66,11 @@ export function BoardPage({ node }: { node: BoardNode }) {
   const exporter = useBoardExport({
     model,
     selectedIds,
-    // Columns that look like credentials only leave the workspace with someone
-    // who is allowed to read a secret in the first place.
     canViewSensitive: can("secret.reveal"),
   });
 
-  /**
-   * A notification, a search hit or a My Work card can ask for one record.
-   * The request survives the navigation in the workspace store because the
-   * grid store is reset for every board that loads.
-   */
   useEffect(() => {
     if (!rowRequest || rowRequest.nodeId !== node.id) return;
-    // Navigating between boards re-renders with the new node while the store
-    // still holds the previous board's records. Wait for this board's own.
     if (status !== "ready" || loadedNodeId !== node.id) return;
 
     if (rowsById[rowRequest.rowId]) openDrawer(rowRequest.rowId);
@@ -108,7 +88,6 @@ export function BoardPage({ node }: { node: BoardNode }) {
     pushFeedback,
   ]);
 
-  /** API boards check their own catalogue for duplicate endpoint + method. */
   const duplicates = useMemo(() => {
     const pair = apiColumns(model.board, model.columns);
     if (!pair) return EMPTY_DUPLICATE_REPORT;
@@ -141,16 +120,15 @@ export function BoardPage({ node }: { node: BoardNode }) {
   return (
     <div className="flex h-full flex-col">
       <BoardToolbar
+        node={node}
         model={model}
         onReload={reload}
         can={can}
         onImport={() => setIsImportOpen(true)}
         onExport={() => setExportScope("board")}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
-      {/* Deliberately the unfrozen resolver: `can` refuses every write on a
-          board archived in its own right, and Restore is the one write that
-          has to survive that — otherwise nothing could ever be un-archived. */}
       <ArchivedBanner
         source={archiveSource}
         subject={node}
@@ -159,13 +137,10 @@ export function BoardPage({ node }: { node: BoardNode }) {
 
       <ConflictNotices />
 
-      {/* Every view renders the same records; only the reading changes. */}
       <ApiDuplicateBanner report={duplicates} />
 
       {model.view?.type === "kanban" && <KanbanBoard model={model} canEdit={canEdit} />}
       {model.view?.type === "calendar" && <CalendarBoard model={model} canEdit={canEdit} />}
-      {/* The roadmap is read-only: dates change on the record, not by dragging.
-          `canEdit` only unlocks filling in a date a record does not have. */}
       {model.view?.type === "gantt" && <GanttBoard model={model} canEdit={canEdit} />}
       {(model.view?.type === "table" || !model.view) && (
         <TableGrid
@@ -179,11 +154,17 @@ export function BoardPage({ node }: { node: BoardNode }) {
 
       <RowDrawer model={model} folderId={node.parentId} canEdit={canEdit} />
 
+      <BoardSettingsDrawer
+        isOpen={isSettingsOpen}
+        model={model}
+        node={node}
+        folderId={node.parentId}
+        can={can}
+        onClose={() => setIsSettingsOpen(false)}
+      />
+
       <ImportDialog isOpen={isImportOpen} model={model} onClose={() => setIsImportOpen(false)} />
 
-      {/* Keyed on the scope it was opened with: the toolbar opens it on the
-          whole board, the bulk bar on the selection, and a remount is what
-          makes the dialog actually start on the right one. */}
       <ExportDialog
         key={exportScope ?? "closed"}
         isOpen={exportScope !== null}

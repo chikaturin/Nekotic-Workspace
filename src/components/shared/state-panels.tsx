@@ -11,29 +11,12 @@ import type { AppError } from "@/types";
 
 interface StatePanelAction {
   readonly label: string;
-  /** A link instead of a handler — "back to the workspace root" and friends. */
   readonly href?: string;
   readonly onClick?: () => void;
 }
 
-/**
- * How much the panel is claiming.
- *
- * `neutral` is "there is nothing here yet", which is the ordinary state of an
- * empty list and should not be dressed up as a fault. `danger` is "something
- * failed". `warning` is the step between them that was missing: the request
- * worked and the answer is unwelcome — a path that no longer resolves — which
- * a red panel overstates and a grey one understates, leaving the caution icon
- * sitting in chrome that disagrees with it.
- */
 export type StatePanelTone = "neutral" | "warning" | "danger";
 
-/*
- * Built the same way as the badge ramp — a tenth of the colour behind it, a
- * third of it on the border, the colour itself on the glyph — so a state panel
- * and a status badge on the same screen read as one family, and a fourth tone
- * is two lines rather than a design decision.
- */
 const TONE_FRAME: Record<StatePanelTone, string> = {
   neutral: "border-border bg-surface",
   warning: "border-warning/30 bg-warning/10",
@@ -53,11 +36,9 @@ interface StatePanelProps {
   readonly tone?: StatePanelTone;
   readonly action?: StatePanelAction;
   readonly className?: string;
-  /** Retry is the common case, so the icon is opt-out rather than opt-in. */
   readonly hasActionIcon?: boolean;
 }
 
-/** Shared shell for the non-happy paths so they all read the same. */
 export function StatePanel({
   icon: Icon,
   title,
@@ -78,10 +59,6 @@ export function StatePanel({
         className,
       )}
     >
-      {/* `shadow-raise` is the shallowest step on the elevation ladder and is
-          what stops the frame reading as a hole in the canvas: it is the same
-          lift a button carries, which is the note this glyph wants — present,
-          not floating. */}
       <span
         aria-hidden="true"
         className={cn(
@@ -93,10 +70,6 @@ export function StatePanel({
       </span>
 
       <div className="space-y-1">
-        {/* The title is the section heading for whatever is missing, so it
-            takes the title step rather than sharing the body step with the
-            sentence under it — with both at 13px the only thing separating
-            them was the font weight. */}
         <p className="text-title font-semibold text-foreground">{title}</p>
         <p className="mx-auto max-w-sm text-lead text-muted-foreground">{description}</p>
       </div>
@@ -141,16 +114,12 @@ export function PermissionDeniedState({ error }: { error: AppError }) {
 export function InlineSpinner({ label }: { label: string }) {
   return (
     <span className="flex items-center gap-1.5 text-body text-muted-foreground">
-      {/* The label is right there in the markup, so the spinner stays silent
-          rather than announcing the same word a second time as its own live
-          region. */}
       <Spinner size="sm" />
       {label}
     </span>
   );
 }
 
-/** Row skeletons matching the file table layout. */
 export function ListLoadingState({ rows = 5 }: { rows?: number }) {
   return (
     <div className="flex flex-col gap-1.5 p-1" aria-busy="true" aria-live="polite">

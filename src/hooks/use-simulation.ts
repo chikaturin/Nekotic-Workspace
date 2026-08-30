@@ -15,7 +15,6 @@ const SERVER_SNAPSHOT: SimulationConfig = {
   latency: "normal",
 };
 
-/** Read/write access to the mock failure switches shown in the dev menu. */
 export function useSimulation(): {
   config: SimulationConfig;
   update: (patch: Partial<SimulationConfig>) => void;

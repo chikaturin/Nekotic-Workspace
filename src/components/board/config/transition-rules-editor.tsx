@@ -28,35 +28,9 @@ interface TransitionRulesEditorProps {
   readonly rules: TransitionRules;
   readonly onChange: (rules: TransitionRules) => void;
   readonly columnName: string;
-  /**
-   * Whether this person may rewrite the workflow — `board.column.update`,
-   * resolved by the caller. Read-only is a *mode*, not a hidden section: the
-   * rule that refuses your drag is worth being able to look up, and a board
-   * whose workflow is invisible to the people working it is one where every
-   * refusal reads as a bug.
-   */
   readonly canEdit: boolean;
 }
 
-/**
- * The workflow, as one line per status.
- *
- * Each row reads as a sentence — "From **Debug** → can move to: Fixing,
- * Backlog" — and every target is a tappable pill of the status itself, so the
- * thing you click looks like the thing you see on the board. One click per
- * edge, no dialog, no expression, no workflow vocabulary.
- *
- * A grid — status × status — was the other candidate, and is genuinely denser
- * to *scan*. It is worse to *use*: with eight statuses a cell sits at row 6,
- * column 7 of an unlabelled checkbox field, the table scrolls sideways on any
- * narrow screen, and every tick asks the reader to re-derive which pair they
- * are looking at. A per-status list grows downwards instead, which is the
- * direction a page already scrolls. A node graph was rejected outright: it
- * needs a layout engine and edge routing to say what a list says in text.
- *
- * There is no code path anywhere that knows a particular status pair — only
- * this table, keyed by option id so a rename cannot break it.
- */
 export function TransitionRulesEditor({
   options,
   rules,
@@ -83,9 +57,7 @@ export function TransitionRulesEditor({
           onChange={(event) =>
             onChange(
               event.target.checked
-                ? // Re-enabling keeps whatever table was already written; a
-                  // first enable starts from a workflow rather than a blank
-                  // allow-list that would strand every card on the board.
+                ?
                   Object.keys(rules.transitions).length > 0
                   ? { ...rules, enabled: true }
                   : seedTransitionRules(options)
@@ -238,14 +210,6 @@ export function TransitionRulesEditor({
   );
 }
 
-/**
- * The workflow as a reader sees it.
- *
- * Same table, no controls: every governed status and where a card sitting on
- * it may go. Statuses the table says nothing about are left out entirely — a
- * row reading "Backlog → (unrestricted)" is noise on a screen whose whole job
- * is to explain the restrictions.
- */
 function TransitionRulesSummary({
   options,
   rules,
@@ -326,7 +290,6 @@ function Preset({
   );
 }
 
-/** One target, as the status pill itself: lit when allowed, muted when not. */
 function TargetToggle({
   optionKey,
   options,

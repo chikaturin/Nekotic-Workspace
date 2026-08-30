@@ -1,21 +1,6 @@
 import { GRAMMARS, type Grammar } from "@/lib/syntax/grammars";
 import type { ConfigFormat } from "@/types";
 
-/**
- * A small tokeniser for the config dialects the workspace stores.
- *
- * It exists so config documents get real syntax colour without pulling a
- * highlighting engine — and its own parsers — into a static bundle. What it
- * produces is *colour*, not a parse tree: nothing downstream asks it what the
- * code means, so a construct it renders as plain text is a missing highlight
- * and never a wrong answer. That is the trade being made, deliberately, and it
- * is why the formatter refuses to touch any language this file merely colours.
- *
- * Block comments are the one thing that cannot be decided a line at a time, so
- * the pass threads a small state through the document rather than restarting
- * at every newline.
- */
-
 export type TokenKind =
   | "key"
   | "string"
@@ -36,7 +21,6 @@ export interface Token {
   readonly text: string;
 }
 
-/** Colour per token kind, resolved from the workspace's syntax palette. */
 export const TOKEN_CLASSES: Readonly<Record<TokenKind, string>> = {
   key: "text-syntax-key",
   string: "text-syntax-string",
@@ -52,8 +36,6 @@ export const TOKEN_CLASSES: Readonly<Record<TokenKind, string>> = {
   attribute: "text-syntax-attribute",
   text: "text-syntax-foreground",
 };
-
-/* ------------------------------------------------------- line-shaped ones */
 
 const JSON_PATTERN =
   /("(?:[^"\\]|\\.)*"\s*:)|("(?:[^"\\]|\\.)*")|(\btrue\b|\bfalse\b|\bnull\b)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|([{}[\],:])/g;
@@ -125,18 +107,9 @@ function valueKind(value: string): TokenKind {
   return "string";
 }
 
-/* ------------------------------------------------------------ markup */
-
 const MARKUP_PATTERN =
   /(<!--[\s\S]*?-->)|(<\/?[A-Za-z][\w:.-]*)|(\/?>)|([A-Za-z_:][\w:.-]*)(?==)|("[^"]*"|'[^']*')/g;
 
-/**
- * HTML and XML.
- *
- * The same shape either way: a tag name, attributes, quoted values. Nothing
- * here parses nesting, and it does not need to — an unclosed tag is the
- * author's problem to see, which is easier when the tag is coloured.
- */
 function tokenizeMarkup(line: string): readonly Token[] {
   const tokens: Token[] = [];
   let cursor = 0;
@@ -159,14 +132,11 @@ function tokenizeMarkup(line: string): readonly Token[] {
   return tokens;
 }
 
-/* ------------------------------------------------------------ the lexer */
-
 const IDENT_START = /[A-Za-z_$@]/;
 const IDENT_BODY = /[\w$-]/;
 const OPERATORS = new Set("+-*/%=<>!&|^~?:".split(""));
 const PUNCTUATION = new Set("{}[]().,;#".split(""));
 
-/** Whether the tokeniser is currently inside a comment that spans lines. */
 export interface TokenizeState {
   readonly inBlockComment: boolean;
 }
@@ -185,7 +155,6 @@ function startsWithAt(line: string, at: number, prefixes: readonly string[]): st
   return null;
 }
 
-/** Reads a quoted run, tolerating a string the author has not closed yet. */
 function readString(line: string, at: number, quote: string): number {
   let cursor = at + 1;
 
@@ -213,8 +182,6 @@ function identifierKind(word: string, grammar: Grammar, next: string): TokenKind
   if (has(grammar.keywords)) return "keyword";
   if (has(grammar.types)) return "type";
 
-  // A word immediately followed by "(" is being called, and one followed by
-  // ":" is naming something — the two cases worth colouring without a parser.
   if (next === "(") return "function";
   if (next === ":") return "key";
   return "text";
@@ -317,8 +284,6 @@ function tokenizeWith(line: string, grammar: Grammar, state: TokenizeState): Lin
   return { tokens, state: { inBlockComment } };
 }
 
-/* --------------------------------------------------------------- surface */
-
 export function tokenizeLine(line: string, format: ConfigFormat): readonly Token[] {
   return tokenizeLineWithState(line, format, INITIAL_STATE).tokens;
 }
@@ -348,7 +313,6 @@ function tokenizeLineWithState(
   }
 }
 
-/** The whole document, with block-comment state carried between lines. */
 export function tokenize(content: string, format: ConfigFormat): readonly (readonly Token[])[] {
   let state = INITIAL_STATE;
 

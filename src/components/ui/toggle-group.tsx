@@ -14,32 +14,10 @@ import {
 import { collectRovingItems, useRovingFocus } from "@/hooks/use-roving-focus";
 import { cn } from "@/lib/utils";
 
-/**
- * A single-select segmented control — pick exactly one of two or three.
- *
- * The app hand-rolled this four times and got a different answer each time:
- * the drive toolbar's is a `role="radiogroup"` whose children are
- * `role="radio"` with no `aria-checked`, so a screen reader reads three radios
- * and cannot say which one is on; the Gantt zoom and the export format grid
- * use `aria-pressed`, which describes three independent toggles rather than
- * one choice. None of the four had arrow keys. This is the radiogroup pattern
- * done once: one tab stop, arrows move and choose, `aria-checked` on every
- * item.
- *
- * `role="radio"` is deliberate over `aria-pressed`: the semantics of "one of
- * these is on" are what the control actually means, and it is what makes the
- * arrow keys expected rather than surprising.
- */
-
 const toggleGroupVariants = cva("", {
   variants: {
     variant: {
-      // The track carries the border and padding, and its height is the whole
-      // control's height — box-sizing means the 1px rule and the 2px inset are
-      // paid out of it. The hand-rolled version sized the *items* instead and
-      // came out 30px tall, matching no other control in the toolbar.
       segmented: "inline-flex items-center rounded-md border border-border bg-surface p-0.5",
-      // Cards size to their content; the caller supplies the column count.
       card: "grid gap-2",
     },
     size: { xs: "", sm: "", md: "" },
@@ -70,13 +48,6 @@ const toggleGroupItemVariants = cva(
         card: "flex-col items-start justify-start gap-1 rounded-lg border p-2.5 text-left [&_svg]:size-4",
       },
       state: { on: "", off: "" },
-      /**
-       * An icon with no label gets a square hit area instead of one padded to
-       * the width of absent text. Derived from the children rather than asked
-       * for as a prop, because a prop invites the call site where the prop and
-       * the children disagree — and CSS cannot decide it alone: `:only-child`
-       * ignores text nodes, so an icon beside a bare label still matches it.
-       */
       shape: { auto: "", square: "" },
     },
     compoundVariants: [
@@ -119,10 +90,6 @@ export type ToggleGroupProps = ComponentProps<"div"> & {
   readonly onValueChange: (value: string) => void;
   readonly variant?: ToggleGroupVariant;
   readonly size?: ToggleGroupSize;
-  /**
-   * Required. A radiogroup with no name is announced as a bare group of
-   * radios, which is exactly as useful as it sounds.
-   */
   readonly "aria-label": string;
 };
 
@@ -142,8 +109,6 @@ export function ToggleGroup({
   const roving = useRovingFocus({
     count: items.length,
     orientation: "horizontal",
-    // Selection is the source of truth for which item holds the tab stop, so
-    // the group has one state, not two that have to be kept in step.
     activeIndex: values.indexOf(value),
     isEnabled: (index) => items[index]?.isDisabled === false,
     onSelect: (index) => {
@@ -152,9 +117,6 @@ export function ToggleGroup({
     },
   });
 
-  // Composed rather than overwritten: spreading `props` over the arrow-key
-  // handler would let a call site that only wanted to watch for Delete take
-  // the whole keyboard away without ever noticing.
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     onKeyDown?.(event);
     if (!event.defaultPrevented) roving.handleKeyDown(event);
@@ -200,8 +162,6 @@ export function ToggleGroupItem({
   const index = group.values.indexOf(value);
   const isOn = value === group.value;
 
-  // An item the group could not see — wrapped in a Fragment or a tooltip —
-  // keeps its own tab stop rather than becoming unreachable.
   const isRoving = index >= 0;
   const isIconOnly = Children.count(children) === 1 && isValidElement(children);
 

@@ -4,12 +4,13 @@ import { Pencil, Reply } from "lucide-react";
 import { useState } from "react";
 import { CommentAttachments } from "@/components/comments/comment-attachments";
 import { CommentBody } from "@/components/comments/comment-body";
+import { plainBody } from "@/lib/mentions";
 import { MentionTextarea } from "@/components/comments/mention-textarea";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { CURRENT_USER } from "@/mock/users";
+import { useCurrentUserId } from "@/store/session-store";
 import type { Comment, DirectoryUser } from "@/types";
 
 interface CommentItemProps {
@@ -17,18 +18,10 @@ interface CommentItemProps {
   readonly people: readonly DirectoryUser[];
   readonly isBusy: boolean;
   readonly onEdit: (body: string) => Promise<boolean>;
-  /** Absent on replies — the thread is only ever two levels deep. */
   readonly onReply?: () => void;
   readonly isReply?: boolean;
 }
 
-/**
- * One comment.
- *
- * Editing happens in place with the same mention-aware textarea the composer
- * uses, and an edited comment keeps a visible label — the PRD asks for the
- * change to be admitted, not hidden.
- */
 export function CommentItem({
   comment,
   people,
@@ -38,7 +31,7 @@ export function CommentItem({
   isReply = false,
 }: CommentItemProps) {
   const [editValue, setEditValue] = useState<string | null>(null);
-  const isMine = comment.author.id === CURRENT_USER.id;
+  const isMine = comment.author.id === useCurrentUserId();
   const isEditing = editValue !== null;
 
   async function save() {
@@ -134,7 +127,8 @@ export function CommentItem({
                     size="sm"
                     variant="ghost"
                     className="h-5 gap-1 px-1.5 text-micro"
-                    onClick={() => setEditValue(comment.body)}
+                    // Mở ra để sửa thì hiện `@Tên`, không phải dạng lưu trữ.
+                    onClick={() => setEditValue(plainBody(comment.body))}
                   >
                     <Pencil />
                     Edit

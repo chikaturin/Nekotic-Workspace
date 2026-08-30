@@ -22,18 +22,33 @@ import { cn } from "@/lib/utils";
 import { useEffectiveRole, usePermissions } from "@/hooks/use-permissions";
 import { useMyWorkspaces } from "@/hooks/use-workspace-access";
 import { ROLE_LABELS } from "@/lib/permissions";
-import { selectPreviewRole, usePermissionStore } from "@/store/permission-store";
-import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspace-store";
+import {
+  selectPreviewRole,
+  usePermissionStore,
+} from "@/store/permission-store";
+import {
+  selectActiveWorkspace,
+  useWorkspaceStore,
+} from "@/store/workspace-store";
 import { WORKSPACE_ROLES, type Workspace } from "@/types";
 
-function WorkspaceTile({ workspace, className }: { workspace: Workspace; className?: string }) {
+function WorkspaceTile({
+  workspace,
+  className,
+}: {
+  workspace: Workspace;
+  className?: string;
+}) {
   return (
     <span
       className={cn(
         "metric flex size-7 shrink-0 items-center justify-center rounded-md text-body font-bold",
         className,
       )}
-      style={{ backgroundColor: `color-mix(in oklch, ${workspace.color} 22%, transparent)`, color: workspace.color }}
+      style={{
+        backgroundColor: `color-mix(in oklch, ${workspace.color} 22%, transparent)`,
+        color: workspace.color,
+      }}
     >
       {workspace.badge}
     </span>
@@ -44,13 +59,6 @@ interface WorkspaceSwitcherProps {
   readonly isCollapsed: boolean;
 }
 
-/**
- * Tenant switcher: swapping workspaces swaps the whole drive tree.
- *
- * It lists the workspaces this person is a member of, and no others — read
- * from `useMyWorkspaces` rather than filtered here, so a workspace they are not
- * in is absent from the data the component holds rather than hidden by it.
- */
 export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
   const router = useRouter();
   const workspaces = useMyWorkspaces();
@@ -61,11 +69,11 @@ export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
   const previewRole = usePermissionStore(selectPreviewRole);
   const setPreviewRole = usePermissionStore((state) => state.setPreviewRole);
   const active = useWorkspaceStore(selectActiveWorkspace);
-  const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
+  const setActiveWorkspace = useWorkspaceStore(
+    (state) => state.setActiveWorkspace,
+  );
 
   function handleSelect(workspaceId: string) {
-    // The store refuses a workspace this person is not in. It cannot happen
-    // from this menu — it can from a restored session or a stale link.
     if (setActiveWorkspace(workspaceId)) router.push(DRIVE_ROOT_PATH);
   }
 
@@ -83,9 +91,8 @@ export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
         {!isCollapsed && (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-lead font-semibold text-foreground">{active.name}</span>
-              <span className="metric block text-micro uppercase tracking-wider text-faint-foreground">
-                {active.plan} plan
+              <span className="block truncate text-lead font-semibold text-foreground">
+                {active.name}
               </span>
             </span>
             <ChevronsUpDown className="size-3.5 shrink-0 text-faint-foreground transition-colors group-hover:text-muted-foreground" />
@@ -101,7 +108,10 @@ export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
             onSelect={() => handleSelect(workspace.id)}
             className="gap-2.5 py-2"
           >
-            <WorkspaceTile workspace={workspace} className="size-6 text-micro" />
+            <WorkspaceTile
+              workspace={workspace}
+              className="size-6 text-micro"
+            />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-lead">{workspace.name}</span>
               <span className="block truncate text-body text-faint-foreground">
@@ -118,9 +128,6 @@ export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
 
         <DropdownMenuSeparator />
 
-        {/* Reachable from every screen, because the whole point is to walk the
-            app as somebody else. Previewing can only ever take affordances
-            away — a member previewing as admin still sees a member's app. */}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
             <Eye />
@@ -132,13 +139,20 @@ export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
           <DropdownMenuSubContent className="w-52">
             <DropdownMenuItem onSelect={() => setPreviewRole(null)}>
               My role ({ROLE_LABELS[role]})
-              {previewRole === null && <Check className="ml-auto size-4 text-accent" />}
+              {previewRole === null && (
+                <Check className="ml-auto size-4 text-accent" />
+              )}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {WORKSPACE_ROLES.map((candidate) => (
-              <DropdownMenuItem key={candidate} onSelect={() => setPreviewRole(candidate)}>
+              <DropdownMenuItem
+                key={candidate}
+                onSelect={() => setPreviewRole(candidate)}
+              >
                 {ROLE_LABELS[candidate]}
-                {previewRole === candidate && <Check className="ml-auto size-4 text-accent" />}
+                {previewRole === candidate && (
+                  <Check className="ml-auto size-4 text-accent" />
+                )}
               </DropdownMenuItem>
             ))}
           </DropdownMenuSubContent>
@@ -151,8 +165,6 @@ export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
           Create workspace
         </DropdownMenuItem>
 
-        {/* Settings is offered only to somebody with a reason to open it. The
-            dialog decides which tabs exist; this decides whether the door does. */}
         {can("workspace.settings.view") && (
           <DropdownMenuItem onSelect={() => setIsConfiguring(true)}>
             <Settings />
@@ -161,7 +173,10 @@ export function WorkspaceSwitcher({ isCollapsed }: WorkspaceSwitcherProps) {
         )}
       </DropdownMenuContent>
 
-      <CreateWorkspaceDialog isOpen={isCreating} onClose={() => setIsCreating(false)} />
+      <CreateWorkspaceDialog
+        isOpen={isCreating}
+        onClose={() => setIsCreating(false)}
+      />
       <WorkspaceSettingsDialog
         isOpen={isConfiguring}
         onClose={() => setIsConfiguring(false)}

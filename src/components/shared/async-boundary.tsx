@@ -7,17 +7,12 @@ import type { AsyncState } from "@/types";
 interface AsyncBoundaryProps<T> {
   readonly state: AsyncState<T>;
   readonly loading: ReactNode;
-  /** Rendered when the request succeeds but returns nothing. */
   readonly empty?: ReactNode;
   readonly isEmpty?: (data: T) => boolean;
   readonly onRetry?: () => void;
   readonly children: (data: T) => ReactNode;
 }
 
-/**
- * Single place where every async surface decides between loading, error,
- * permission denied, empty and content — so no screen can forget one.
- */
 export function AsyncBoundary<T>({
   state,
   loading,

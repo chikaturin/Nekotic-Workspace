@@ -9,10 +9,10 @@ import {
 import { createRealtimeClient } from "@/lib/realtime/client";
 import { createLocalTransport, createTransport } from "@/lib/realtime/transport";
 import { CURRENT_USER, directoryAt } from "@/mock/users";
-import { notificationService } from "@/services/notification-service";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useNotificationStore } from "@/store/notification-store";
 import type { AppNotification, RealtimeEvent } from "@/types";
+import { collabFake } from "./msw/fake/collab.fake";
 
 function notification(id: string, overrides: Partial<AppNotification> = {}): AppNotification {
   return {
@@ -36,7 +36,6 @@ function frame(id: string, payload: RealtimeEvent["payload"]): RealtimeEvent {
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-  notificationService.reset();
 
   useNotificationStore.setState({
     status: "idle",
@@ -169,7 +168,7 @@ describe("inbox state", () => {
   });
 
   test("service writes reach the store through the shared client", async () => {
-    notificationService.emit({
+    collabFake.emitForTest({
       reason: "assigned",
       recipientId: CURRENT_USER.id,
       actor: directoryAt(2),

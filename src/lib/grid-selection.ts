@@ -1,4 +1,3 @@
-/** Selection maths for the grid. Coordinates are indexes into the current view. */
 
 export interface CellAddress {
   readonly rowIndex: number;
@@ -91,7 +90,6 @@ export function moveAddress(
   }
 }
 
-/** Tab wraps to the next row, the way a spreadsheet does. */
 export function advanceAddress(address: CellAddress, bounds: GridBounds): CellAddress {
   if (address.columnIndex < bounds.columnCount - 1) {
     return { ...address, columnIndex: address.columnIndex + 1 };

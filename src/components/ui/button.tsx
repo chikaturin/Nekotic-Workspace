@@ -18,19 +18,10 @@ const buttonVariants = cva(
         danger: "bg-danger/12 text-danger hover:bg-danger/20",
         link: "text-accent underline-offset-4 hover:underline",
       },
-      /* Height, padding and type step move together, because they are one
-       * decision: a 28px button with 12px of padding and a 12px label is a
-       * different control than a 28px button, not a smaller one. Heights come
-       * from the shared control ladder so a Button, an Input and a Select
-       * placed side by side in a toolbar line up without anyone measuring. */
       size: {
         xs: "h-[var(--control-xs)] px-[var(--control-pad-xs)] text-body [&_svg]:size-3",
         sm: "h-[var(--control-sm)] px-[var(--control-pad-sm)] text-body [&_svg]:size-3.5",
         default: "h-[var(--control-md)] px-[var(--control-pad-md)] text-ui [&_svg]:size-4",
-        // The same step under the name the density ladder uses. `default` is
-        // kept so no existing call site moves, but every other control in the
-        // system spells 32px `md`, and `<Input size="md">` beside
-        // `<Button size="md">` should not be a type error.
         md: "h-[var(--control-md)] px-[var(--control-pad-md)] text-ui [&_svg]:size-4",
         lg: "h-[var(--control-lg)] px-[var(--control-pad-lg)] text-ui [&_svg]:size-4",
         icon: "size-[var(--control-md)] [&_svg]:size-4",
@@ -44,24 +35,9 @@ const buttonVariants = cva(
 export type ButtonProps = ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     readonly asChild?: boolean;
-    /**
-     * Swaps the leading icon for a spinner, marks the button busy and blocks
-     * further clicks. The label is deliberately left in place: hiding it
-     * shrinks the button under the pointer that is still on it, which is how
-     * a second submit lands on whatever moved into that spot.
-     */
     readonly isLoading?: boolean;
   };
 
-/**
- * Replaces a leading icon with the spinner, or prepends one if the button is
- * all text. `Children.toArray` hands back strings for text nodes, so a first
- * child that is an element is the icon and a first child that is a string is
- * the label — which is the whole distinction we need. A button whose entire
- * content is one wrapper element is read as icon-only and gets swapped; that
- * is the right answer for an icon button and the reason not to wrap a label
- * in a bare `<span>` here.
- */
 function withLeadingSpinner(children: ReactNode): ReactNode {
   const items = Children.toArray(children);
   const [leading, ...rest] = items;
@@ -85,14 +61,6 @@ export function Button({
   return (
     <Comp
       data-slot="button"
-      /**
-       * A <button> inside a <form> defaults to type="submit", so a button that
-       * meant to do something else silently submits the form instead. Raw
-       * elements in this app all wrote `type="button"` by hand; the component
-       * that replaced them has to keep the default it inherits from them.
-       * `asChild` skips it — Slot forwards to whatever the consumer rendered,
-       * and forcing a type onto an <a> is nonsense.
-       */
       {...(asChild ? {} : { type: "button" as const })}
       data-loading={isLoading ? "" : undefined}
       aria-busy={isLoading || undefined}
@@ -100,10 +68,6 @@ export function Button({
       className={cn(buttonVariants({ variant, size }), className)}
       {...props}
     >
-      {/* Slot demands exactly one child and the consumer owns that element's
-          insides, so composed buttons keep their own content and only get the
-          busy flag. The spinner takes its size from the size variant's
-          `[&_svg]` rule, which outranks the spinner's own class. */}
       {isLoading && !asChild ? withLeadingSpinner(children) : children}
     </Comp>
   );

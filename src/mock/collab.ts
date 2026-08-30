@@ -4,13 +4,6 @@ import { extractMentionIds, mentionToken } from "@/lib/mentions";
 import { CURRENT_USER, directoryAt } from "@/mock/users";
 import type { AppNotification, Comment, EntityRef } from "@/types";
 
-/**
- * Collaboration fixtures.
- *
- * Everything points at ids the drive tree actually produces, so clicking a
- * seeded notification navigates to a real record instead of a dead end.
- */
-
 const HOUR_MS = 3_600_000;
 const at = (hoursAgo: number) => new Date(Date.parse(MOCK_NOW) - hoursAgo * HOUR_MS).toISOString();
 
@@ -23,7 +16,6 @@ const API_BOARD = `brd_${API_NODE}`;
 const NOTES_NODE = "nd_development_backend_payment_payment_integration_notes";
 const HANDBOOK_NODE = "nd_development_engineering_handbook";
 
-/** Refs the seeds share with the notification fan-out. */
 export const SEED_REFS: Readonly<Record<string, EntityRef>> = {
   sprintTask4: rowRef({
     nodeId: SPRINT_NODE,
@@ -119,7 +111,6 @@ const COMMENT_SEEDS: readonly CommentSeed[] = [
   },
 ];
 
-/** Seeded comments, keyed by the target they belong to. */
 export function seedComments(): Map<string, Comment[]> {
   const byTarget = new Map<string, Comment[]>();
 
@@ -149,7 +140,6 @@ export function seedComments(): Map<string, Comment[]> {
   return byTarget;
 }
 
-/** Targets the signed-in user already follows, so the tab is never empty. */
 export const SEED_WATCHES: readonly EntityRef[] = [
   SEED_REFS.sprintTask4!,
   SEED_REFS.paymentNotes!,

@@ -1,14 +1,9 @@
 import type { AppNotification, NotificationReason, NotificationTab } from "@/types";
 
-/**
- * Inbox tabs are a projection of `reason`, not a second field on the record —
- * one notification can never disagree with the tab it lands in.
- */
 const TAB_REASONS: Readonly<Record<NotificationTab, readonly NotificationReason[] | null>> = {
   all: null,
   mentions: ["mention"],
   assigned: ["assigned"],
-  // Following covers everything you get because you watch the target.
   following: ["watch", "comment"],
 };
 
@@ -40,7 +35,6 @@ export function countUnread(notifications: readonly AppNotification[]): number {
   return notifications.reduce((total, item) => (item.isRead ? total : total + 1), 0);
 }
 
-/** Unread badge per tab, computed in one pass over the inbox. */
 export function unreadByTab(
   notifications: readonly AppNotification[],
 ): Readonly<Record<NotificationTab, number>> {
@@ -61,10 +55,6 @@ export function unreadByTab(
   return counts;
 }
 
-/**
- * Mark a set of ids read. Immutable, and the array identity is preserved when
- * nothing actually changed so subscribers do not re-render.
- */
 export function markRead(
   notifications: readonly AppNotification[],
   ids: readonly string[],
@@ -90,7 +80,6 @@ export function markAllRead(
   );
 }
 
-/** Newest first, then insert or replace by id — the realtime ingest path. */
 export function upsertNotification(
   notifications: readonly AppNotification[],
   incoming: AppNotification,

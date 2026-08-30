@@ -8,7 +8,6 @@ import { blockIcon } from "@/lib/block-visuals";
 import { cn } from "@/lib/utils";
 import type { BlockType } from "@/types";
 
-/** Blocks worth a one-click button; the rest live behind the slash menu. */
 const QUICK_BLOCKS: readonly BlockType[] = [
   "heading1",
   "heading2",
@@ -27,7 +26,6 @@ const QUICK_BLOCKS: readonly BlockType[] = [
 
 interface EditorToolbarProps {
   readonly onInsert: (type: BlockType) => void;
-  /** Locked pages disable every control rather than hiding them. */
   readonly isDisabled: boolean;
   readonly className?: string;
 }
@@ -36,7 +34,6 @@ export function EditorToolbar({ onInsert, isDisabled, className }: EditorToolbar
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  /** Roving tabindex: the toolbar is one tab stop, arrows move inside it. */
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     const delta = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
     if (delta === 0) return;

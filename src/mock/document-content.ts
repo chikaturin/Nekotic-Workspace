@@ -1,9 +1,5 @@
 import type { Block } from "@/types";
 
-/**
- * Seed content per document slug. Kept free of tree imports so the tree can
- * derive block counts and excerpts from it without a cycle.
- */
 export const DOCUMENT_CONTENT: Readonly<Record<string, readonly Block[]>> = {
   "payment-integration-notes": [
     { id: "pin_1", type: "heading1", text: "Payment integration notes" },

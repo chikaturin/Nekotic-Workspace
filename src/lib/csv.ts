@@ -1,9 +1,5 @@
 import { normalizeGrid, type Grid } from "@/lib/grid";
 
-/**
- * RFC 4180 CSV — quoted fields, escaped quotes (`""`), embedded separators and
- * newlines. Delimiter is a parameter so the same code reads TSV.
- */
 export function parseDelimited(text: string, delimiter = ","): Grid {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -66,7 +62,6 @@ export function toDelimited(rows: Grid, delimiter = ","): string {
     .join("\n");
 }
 
-/** `.tsv` files are tab separated; everything else in this app is a comma. */
 export function delimiterFor(extension: string): string {
   return extension.toLowerCase() === "tsv" ? "\t" : ",";
 }

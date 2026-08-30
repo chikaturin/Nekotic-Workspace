@@ -1,14 +1,6 @@
-/**
- * JSON validation with a caret position.
- *
- * `JSON.parse` is the parser — nothing hand-rolled can match it for accuracy.
- * What is added here is turning the engine's message into a line and column
- * the editor can underline.
- */
 
 export interface JsonProblem {
   readonly message: string;
-  /** 1-based. */
   readonly line: number;
   readonly column: number;
   readonly offset: number;
@@ -46,7 +38,6 @@ function locate(text: string, message: string): JsonProblem {
   return { message: clean(message), line, column, offset };
 }
 
-/** Engines append their own position text; the editor shows it separately. */
 function clean(message: string): string {
   return message
     .replace(/\s*in JSON at position \d+.*$/i, "")
@@ -65,7 +56,6 @@ function offsetOf(text: string, line: number, column: number): number {
   return offset + column - 1;
 }
 
-/** Pretty-print, leaving the text untouched when it does not parse. */
 export function formatJson(text: string): string {
   try {
     return `${JSON.stringify(JSON.parse(text), null, 2)}\n`;

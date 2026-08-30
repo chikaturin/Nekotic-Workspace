@@ -47,7 +47,6 @@ export function defaultConfigFor<T extends ColumnType>(type: T): ColumnConfigByT
   return DEFAULT_CONFIG[type]();
 }
 
-/** Build a column of `type` with the defaults its editors expect. */
 export function makeColumn(
   id: string,
   name: string,
@@ -71,8 +70,6 @@ export function clampColumnWidth(width: number): number {
   return Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, Math.round(width)));
 }
 
-/* ---------------------------------------------------------- schema updates */
-
 export function upsertColumn(
   columns: readonly BoardColumn[],
   column: BoardColumn,
@@ -95,7 +92,6 @@ export function patchColumn(
       ...column,
       ...(patch.name === undefined ? {} : { name: patch.name }),
       ...(patch.width === undefined ? {} : { width: clampColumnWidth(patch.width) }),
-      // The primary column titles the row, so it can never be hidden.
       ...(patch.hidden === undefined || column.isPrimary ? {} : { hidden: patch.hidden }),
     };
 
@@ -103,13 +99,6 @@ export function patchColumn(
   });
 }
 
-/**
- * Put a column at a position, renumbering the whole schema.
- *
- * Order is `position`, not the array's index, so "insert to the left of B"
- * means "take B's position and push everything from there along" — expressed
- * once here rather than as `index + 1` arithmetic at each call site.
- */
 export function insertColumnAt(
   columns: readonly BoardColumn[],
   column: BoardColumn,
@@ -121,14 +110,6 @@ export function insertColumnAt(
   return reposition([...ordered.slice(0, at), column, ...ordered.slice(at)]);
 }
 
-/**
- * The only column the board refuses to delete.
- *
- * It is the one that titles a record — the row's identity — and nothing else is
- * protected. A column is not made permanent by where it came from: one an
- * import created is a column like any other, and there is no `system`,
- * `locked` or `isImported` flag anywhere in the schema for it to be caught by.
- */
 export function isProtectedColumn(column: BoardColumn): boolean {
   return column.isPrimary;
 }
@@ -143,16 +124,12 @@ export function removeColumn(
   return reposition(columns.filter((column) => column.id !== columnId));
 }
 
-/* ------------------------------------------------------------------ names */
-
 const NAME_NOISE = /[^a-z0-9]/g;
 
-/** Two column names collide when they differ only in case and punctuation. */
 export function normalizeColumnName(name: string): string {
   return name.trim().toLowerCase().replace(NAME_NOISE, "");
 }
 
-/** The column already wearing this name, ignoring the one being renamed. */
 export function findColumnByName(
   columns: readonly BoardColumn[],
   name: string,
@@ -166,7 +143,6 @@ export function findColumnByName(
   );
 }
 
-/** `Notes`, then `Notes 2`, `Notes 3` — a name a new column can actually take. */
 export function uniqueColumnName(columns: readonly BoardColumn[], base: string): string {
   const trimmed = base.trim() || "New column";
   if (!findColumnByName(columns, trimmed)) return trimmed;
@@ -179,7 +155,6 @@ export function uniqueColumnName(columns: readonly BoardColumn[], base: string):
   return trimmed;
 }
 
-/** Move a column to an index, renumbering `position` for the whole schema. */
 export function moveColumn(
   columns: readonly BoardColumn[],
   columnId: string,
@@ -205,7 +180,6 @@ function reposition(columns: readonly BoardColumn[]): readonly BoardColumn[] {
   );
 }
 
-/** Change a column's type. Values are converted separately, by the caller. */
 export function retypeColumn(
   columns: readonly BoardColumn[],
   columnId: string,
@@ -219,15 +193,10 @@ export function retypeColumn(
   );
 }
 
-/* --------------------------------------------------------- select options */
-
-/** Deterministic colour so a new option never repeats its neighbour. */
 export function nextOptionColor(options: readonly SelectOption[]): SelectColor {
   return SELECT_COLORS[options.length % SELECT_COLORS.length] ?? "gray";
 }
 
-
-/** Options already holding `label`, case-insensitively. */
 export function findOptionByLabel(
   options: readonly SelectOption[],
   label: string,
@@ -247,14 +216,6 @@ export const SELECT_COLOR_CLASSES: Readonly<Record<SelectColor, string>> = {
   pink: "bg-kind-video/15 text-kind-video border-kind-video/30",
 };
 
-/**
- * The same tokens at full strength.
- *
- * A chip is a label and can afford to be faint; a bar has to carry a
- * proportion on its own, so it takes the colour solid. The Gantt draws the
- * finished part of a task with these and the rest with the track below, which
- * is what makes "how far along" readable without a second colour.
- */
 export const SELECT_SOLID_CLASSES: Readonly<Record<SelectColor, string>> = {
   gray: "bg-kind-other",
   blue: "bg-kind-folder",
@@ -266,11 +227,6 @@ export const SELECT_SOLID_CLASSES: Readonly<Record<SelectColor, string>> = {
   pink: "bg-kind-video",
 };
 
-/**
- * The unfinished part of a bar: filled, not outlined — solid enough to read as
- * a block of colour, muted enough that the finished part drawn over it is
- * visibly denser.
- */
 export const SELECT_TRACK_CLASSES: Readonly<Record<SelectColor, string>> = {
   gray: "bg-kind-other/40",
   blue: "bg-kind-folder/40",

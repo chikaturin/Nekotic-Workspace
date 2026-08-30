@@ -3,6 +3,7 @@
 import { ChevronRight, Star } from "lucide-react";
 import Link from "next/link";
 import type { MouseEvent } from "react";
+import { DriveItemMenu } from "@/components/drive/drive-item-menu";
 import { TREE_INDENT } from "@/config/app";
 import { useDragSource, useDropTarget } from "@/hooks/use-node-dnd";
 import { routableHref } from "@/lib/exported-routes";
@@ -22,9 +23,18 @@ export interface TreeRowProps {
 }
 
 /**
- * One tree row. Containers navigate and accept drops, files open the quick
- * preview. Shared by both tree engines so behaviour never drifts.
+ * Nút "…" của một dòng trong cây.
+ *
+ * Nó nằm NGOÀI thẻ liên kết chứ không lồng bên trong: một nút bấm nằm trong
+ * `<a>` là HTML không hợp lệ, và mọi cú bấm vào nút cũng sẽ kích hoạt luôn liên
+ * kết. Đặt tuyệt đối lên phần lề phải mà dòng đã chừa sẵn (`pr-8`) nên chữ
+ * không bao giờ chui xuống dưới nút.
  */
+const ROW_MENU_CLASS = cn(
+  "absolute right-1 top-1/2 z-raised size-6 -translate-y-1/2 opacity-0 transition-opacity",
+  "group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100",
+);
+
 export function TreeRow({ node, depth, href, isExpanded, isActive, onToggle }: TreeRowProps) {
   const container = isContainer(node);
   const { Icon, colorClass } = nodeVisual(node, container && isExpanded);
@@ -66,38 +76,37 @@ export function TreeRow({ node, depth, href, isExpanded, isActive, onToggle }: T
   );
 
   const className = cn(
-    "group relative flex h-[30px] w-full items-center gap-1.5 rounded-md pr-2 text-lead outline-none transition-colors",
+    "group relative flex h-[30px] w-full items-center gap-1.5 rounded-md pr-8 text-lead outline-none transition-colors",
     "focus-visible:ring-2 focus-visible:ring-ring",
     isActive ? "bg-selection text-foreground" : "text-muted-foreground hover:bg-hover hover:text-foreground",
     isOver && "bg-accent-soft ring-1 ring-accent",
     isDragging && "is-dragging",
   );
 
-  if (node.type === "file") {
-    return (
-      <button
-        type="button"
-        onClick={() => openPreview(node.id)}
-        className={cn(className, "text-left")}
-        {...dragProps}
-      >
-        {content}
-      </button>
-    );
-  }
-
-  // `routableHref` because a folder created or renamed since the build has an
-  // address the static export has never written a file for; a plain link to it
-  // is a hard navigation into the host's 404.
   return (
-    <Link
-      href={routableHref(href)}
-      className={className}
-      {...dragProps}
-      {...dropProps}
-      data-node-id={node.id}
-    >
-      {content}
-    </Link>
+    <div className="group/row relative">
+      {node.type === "file" ? (
+        <button
+          type="button"
+          onClick={() => openPreview(node.id)}
+          className={cn(className, "text-left")}
+          {...dragProps}
+        >
+          {content}
+        </button>
+      ) : (
+        <Link
+          href={routableHref(href)}
+          className={className}
+          {...dragProps}
+          {...dropProps}
+          data-node-id={node.id}
+        >
+          {content}
+        </Link>
+      )}
+
+      <DriveItemMenu node={node} href={href} className={ROW_MENU_CLASS} />
+    </div>
   );
 }

@@ -14,15 +14,6 @@ interface AttachmentPanelProps {
   readonly canEdit: boolean;
 }
 
-/**
- * Attachments on a record, in the drawer.
- *
- * Reads exactly the same cells the table's attachment column shows — one
- * section per attachment column the board declares. There is no
- * `drawerAttachments`: uploading here writes the record, so the table's cell
- * updates on the next frame, and an upload started in the cell shows up here
- * mid-flight with its progress intact.
- */
 export function AttachmentPanel({ rowId, columns, folderId, canEdit }: AttachmentPanelProps) {
   const fields = attachmentColumns(columns) as readonly BoardColumnOf<"attachment">[];
   if (fields.length === 0) return null;
@@ -53,7 +44,6 @@ interface SectionProps {
   readonly rowId: string;
   readonly folderId: string | null;
   readonly canEdit: boolean;
-  /** Only worth naming the column when the board has more than one. */
   readonly showName: boolean;
 }
 

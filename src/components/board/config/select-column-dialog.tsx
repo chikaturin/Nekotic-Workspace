@@ -26,15 +26,6 @@ import type {
   UnavailableOptionBehavior,
 } from "@/types";
 
-/**
- * The palette, as design-system options.
- *
- * It used to be a native `<select>` with the colour painted onto the element
- * itself, which is the one thing a native select cannot show: the popup the
- * browser draws is the browser's, so the list you actually pick from was eight
- * lowercase words and no colour anywhere. The dot is what a colour picker is
- * for, and `Select` has drawn one on both the row and the trigger all along.
- */
 const COLOUR_OPTIONS: readonly ListboxOption[] = SELECT_COLORS.map((color) => ({
   value: color,
   label: `${color.charAt(0).toUpperCase()}${color.slice(1)}`,
@@ -43,16 +34,8 @@ const COLOUR_OPTIONS: readonly ListboxOption[] = SELECT_COLORS.map((color) => ({
 
 interface SelectColumnDialogProps {
   readonly column: BoardColumnOf<"select"> | null;
-  /** Every column on the board — what a condition can be written against. */
   readonly columns: readonly BoardColumn[];
   readonly people: readonly DirectoryUser[];
-  /**
-   * `can("board.column.update")`, resolved by the caller. Everything in this
-   * dialog is column *configuration* — the options, the rules that gate them
-   * and the workflow between them — so one key governs the lot rather than
-   * each section inventing its own. Without it the dialog is a reference:
-   * readable, and with nothing on it that writes.
-   */
   readonly canEdit: boolean;
   readonly onClose: () => void;
   readonly onSave: (config: SelectConfigDraft) => void;
@@ -67,28 +50,8 @@ export interface SelectConfigDraft {
 
 let seed = 0;
 
-/**
- * A new option's id, scoped to the column it belongs to.
- *
- * The counter alone was not enough: it starts again at zero on every reload, so
- * an option added to one column after a refresh could take an id an option on
- * another column already had. Option ids key the completed set, the transition
- * table and the conditions written against them, and two columns sharing one is
- * a collision waiting for whichever of those looks an id up without its column.
- */
 const nextOptionId = (columnId: string): string => `opt_${columnId}_${(seed += 1).toString(36)}`;
 
-/**
- * Everything a Select column can be configured to do, in one place.
- *
- * Options are a list the user owns — order, colour, on/off, and the conditions
- * under which each may be chosen. Beside them sit the two board-wide switches
- * this column drives: which options mean "finished" (subtask progress counts
- * against those) and which transitions Kanban permits.
- *
- * The dialog edits a draft and commits once, so a half-written rule never
- * reaches the board and cannot lock a card mid-edit.
- */
 export function SelectColumnDialog({
   column,
   columns,
@@ -97,18 +60,8 @@ export function SelectColumnDialog({
   onClose,
   onSave,
 }: SelectColumnDialogProps) {
-  /**
-   * The draft is stored with the column it belongs to, so opening a different
-   * column falls back to that column's own stored config by derivation. No
-   * effect re-seeds anything, and half-typed edits are never clobbered.
-   */
   const [edited, setEdited] = useState<{ columnId: string; draft: SelectConfigDraft } | null>(null);
 
-  /**
-   * Which option's rule builder is open — stored with its column for the same
-   * reason the draft is. Two columns can hold options at the same position, and
-   * an id remembered from one of them must not open a row on the other.
-   */
   const [expanded, setExpanded] = useState<{ columnId: string; optionId: string } | null>(null);
 
   const draft: SelectConfigDraft | null =
@@ -133,13 +86,6 @@ export function SelectColumnDialog({
 
   const expandedId = expanded?.columnId === column.id ? expanded.optionId : null;
 
-  /**
-   * Leaving the dialog drops the draft.
-   *
-   * Reopening therefore always shows what the column actually stores, rather
-   * than an edit that was abandoned — including on a *different* column, where
-   * a leftover draft is indistinguishable from that column's own settings.
-   */
   const close = () => {
     setEdited(null);
     setExpanded(null);
@@ -180,8 +126,6 @@ export function SelectColumnDialog({
   const removeOption = (optionId: string) => {
     const options = draft.options.filter((option) => option.id !== optionId);
 
-    // Removing an option must take its rules with it, or the table keeps
-    // referring to a status that no longer exists.
     patch({
       options,
       completedOptionIds: draft.completedOptionIds.filter((id) => id !== optionId),
@@ -419,8 +363,6 @@ export function SelectColumnDialog({
           >
             {canEdit ? "Cancel" : "Close"}
           </Button>
-          {/* No Save without the permission to write one. The service refuses
-              the call either way — this is only about not offering it. */}
           {canEdit && (
             <Button
               size="sm"

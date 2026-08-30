@@ -2,13 +2,26 @@
 
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import type { ComponentProps } from "react";
+import { PopupAncestry, usePopupLayer } from "@/components/ui/popup-layer";
 import { cn } from "@/lib/utils";
 
-/**
- * Anchored panel for configuration surfaces. A dropdown menu steals typing for
- * its own typeahead, so anything with an input inside belongs here instead.
- */
-export const Popover = PopoverPrimitive.Root;
+/** Popover, có ghi tên vào sổ đăng ký popup — xem `popup-layer.tsx`. */
+export function Popover({
+  open,
+  defaultOpen,
+  onOpenChange,
+  children,
+  ...props
+}: ComponentProps<typeof PopoverPrimitive.Root>) {
+  const layer = usePopupLayer({ open, defaultOpen, onOpenChange });
+
+  return (
+    <PopoverPrimitive.Root {...props} open={layer.isOpen} onOpenChange={layer.setOpen}>
+      <PopupAncestry ancestry={layer.ancestry}>{children}</PopupAncestry>
+    </PopoverPrimitive.Root>
+  );
+}
+
 export const PopoverTrigger = PopoverPrimitive.Trigger;
 export const PopoverAnchor = PopoverPrimitive.Anchor;
 export const PopoverClose = PopoverPrimitive.Close;

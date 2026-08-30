@@ -9,12 +9,10 @@ export interface MentionPicker {
   readonly query: string;
   readonly candidates: readonly DirectoryUser[];
   readonly activeIndex: number;
-  /** Re-read the caret after any change to the value or the selection. */
   readonly sync: (text: string, caret: number) => void;
   readonly close: () => void;
   readonly choose: (user: DirectoryUser) => void;
   readonly setActiveIndex: (index: number) => void;
-  /** Returns true when the picker consumed the key press. */
   readonly handleKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => boolean;
 }
 
@@ -25,14 +23,6 @@ interface MentionPickerInput {
   readonly textareaRef: RefObject<HTMLTextAreaElement | null>;
 }
 
-/**
- * The `@` picker (CO-MEN-27).
- *
- * All of the text arithmetic lives in `lib/mentions`; this hook owns only the
- * open token, the highlighted row, and the keys it takes over from the
- * textarea. `handleKeyDown` reports whether it handled the press so the
- * composer knows when Enter still means "send".
- */
 export function useMentionPicker({
   people,
   value,
@@ -54,8 +44,6 @@ export function useMentionPicker({
       const next = findMentionQuery(text, caret);
       setRange(next);
 
-      // Only reset the highlight when the token itself changed. A sync that
-      // resolves to the same token must leave the user's selection alone.
       if (range?.start !== next?.start || range?.query !== next?.query) setActiveIndex(0);
     },
     [range],
@@ -71,7 +59,6 @@ export function useMentionPicker({
       onChange(next.text);
       setRange(null);
 
-      // Restore the caret after React has committed the new value.
       requestAnimationFrame(() => {
         const element = textareaRef.current;
         if (!element) return;
@@ -83,11 +70,6 @@ export function useMentionPicker({
     [range, value, onChange, textareaRef],
   );
 
-  /**
-   * Consuming a key also stops it propagating. The composer lives inside a
-   * dialog whose Escape listener sits on `document`: without this, Escape
-   * would close the whole drawer instead of the picker in front of it.
-   */
   const consume = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {
     event.preventDefault();
     event.stopPropagation();

@@ -6,11 +6,9 @@ import type { ImportOutcome } from "@/types";
 
 interface ImportResultStepProps {
   readonly outcome: ImportOutcome;
-  /** The view is sorting, so what lands is not read in the file's order. */
   readonly isSorted?: boolean;
 }
 
-/** Step 4: what actually landed, and what did not. */
 export function ImportResultStep({ outcome, isSorted = false }: ImportResultStepProps) {
   const hasCreated = outcome.created > 0;
 
@@ -48,9 +46,6 @@ export function ImportResultStep({ outcome, isSorted = false }: ImportResultStep
         </p>
       )}
 
-      {/* Records were written in the file's order. A view that sorts shows them
-          in its own, which is worth saying once here rather than leaving
-          somebody to conclude the import shuffled their rows. */}
       {hasCreated && isSorted && (
         <p className="mx-auto max-w-md rounded-lg border border-border bg-surface px-3 py-2 text-body text-muted-foreground">
           They were imported in the file&rsquo;s row order. This view is sorted, so it is showing

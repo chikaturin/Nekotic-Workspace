@@ -16,10 +16,6 @@ import type { BoardColumnOf, CellValue, DirectoryUser } from "@/types";
 
 type UserValue = Extract<CellValue, { kind: "user" }>;
 
-/**
- * People who left the workspace keep their name and gain an `Inactive` tag —
- * the PRD is explicit that a removed member must not blank out the cell.
- */
 export function UserChip({ person }: { person: DirectoryUser }) {
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5">
@@ -102,7 +98,6 @@ export function UserCellEditor({ value, column, people, onCommit, onCancel }: Us
         )
       : people;
 
-    // Active members first; former members stay reachable but sink.
     return [...pool].sort((a, b) => Number(b.isActive) - Number(a.isActive));
   }, [people, query]);
 

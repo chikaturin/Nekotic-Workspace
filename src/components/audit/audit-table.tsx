@@ -19,13 +19,6 @@ const SEVERITY_CLASSES: Readonly<Record<AuditSeverity, string>> = {
   error: "border-danger/30 bg-danger/10 text-danger",
 };
 
-/**
- * The trail itself (SY-AUD-41).
- *
- * Six columns and no seventh: there is no actions column, because a record of
- * what happened that someone can tidy up is not a record. The detail line is a
- * sentence the service wrote — never a payload rendered as JSON.
- */
 export function AuditTable({ events }: { events: readonly AuditEvent[] }) {
   return (
     <table className="w-full border-collapse text-ui">

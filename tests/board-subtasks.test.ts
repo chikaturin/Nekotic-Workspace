@@ -13,7 +13,6 @@ import {
 } from "@/lib/board-hierarchy";
 import { flattenGroups, flattenUngrouped } from "@/lib/board-grouping";
 import { indexRows, type RowMap } from "@/lib/board-records";
-import { boardService } from "@/services/board-service";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useBoardStore } from "@/store/board-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
@@ -261,7 +260,6 @@ describe("subtasks through the store and service", () => {
   beforeEach(async () => {
     resetSimulation();
     setSimulation({ latency: "fast" });
-    boardService.reset();
 
     useWorkspaceStore.setState({
       workspaces: [TEST_WORKSPACE],

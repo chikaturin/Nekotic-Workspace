@@ -7,24 +7,6 @@ import { Button } from "@/components/ui/button";
 import { useMyWorkspaces, useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { useWorkspaceStore } from "@/store/workspace-store";
 
-/**
- * The outermost gate (SY-WSA).
- *
- * Nothing inside a workspace renders until membership is settled. That
- * ordering is the point: a shell that mounts the drive and *then* checks has
- * already fetched a tree, filled a cache and painted a breadcrumb for
- * somebody who should never have had any of it.
- *
- * Two screens, and they are different questions:
- *
- *   - no workspaces at all — a first run, which offers the way forward,
- *   - a workspace that is not theirs — a refusal, which names nothing.
- *
- * The refusal answers the same way for a workspace that does not exist as for
- * one they are not in, so the URL cannot be used to find out which workspaces
- * are real. None of this is enforcement: the backend still has to refuse every
- * request the shell would have made.
- */
 export function WorkspaceGuard({ children }: { readonly children: ReactNode }) {
   const access = useWorkspaceAccess();
   const mine = useMyWorkspaces();

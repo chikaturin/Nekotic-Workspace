@@ -10,7 +10,6 @@ interface CodeEditorProps {
   readonly format: ConfigFormat;
   readonly onChange: (value: string) => void;
   readonly readOnly?: boolean;
-  /** 1-based line to underline, from the JSON linter. */
   readonly errorLine?: number | null;
   readonly ariaLabel: string;
 }
@@ -18,25 +17,6 @@ interface CodeEditorProps {
 const INDENT = "  ";
 const GUTTER = "3rem";
 
-/**
- * Syntax-highlighted editor.
- *
- * A transparent textarea sits exactly on top of a coloured `<pre>`: the user
- * types into the textarea and reads the pre. Both share the same font metrics
- * and padding, and the textarea drives the scroll position of the other two
- * layers, so the caret never drifts from the text under it.
- *
- * The type metrics on the three layers are load-bearing rather than stylistic —
- * change one and the caret walks out of the glyphs — which is why they are
- * arbitrary values here and exempted from the design system's type scale by
- * name in the lint config.
- *
- * There is no find widget, and it needs none: the coloured `<pre>` is real
- * text in the document, so the browser's own find highlights matches in it.
- * The surface takes its colours from `--syntax-*`, which is a full palette in
- * both themes — the editor follows the workspace rather than pinning itself
- * dark.
- */
 export function CodeEditor({
   value,
   format,

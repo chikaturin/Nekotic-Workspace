@@ -15,20 +15,8 @@ interface StepNumberingDialogProps {
   readonly onSave: (numbering: StepNumbering) => void;
 }
 
-/** Enough of a sequence to see the shape, and short enough to read at a glance. */
 const PREVIEW_STEPS = 3;
 
-/**
- * Step numbering for one long-text column.
- *
- * Three fields, because there are only three things to decide: what goes in
- * front of the number, what number to start at, and what follows it. Anything
- * more would be a template language, and a QA step has never needed one.
- *
- * The draft is stored with the column it belongs to, so opening a different
- * column reads that column's own configuration rather than whatever was left
- * behind — the same shape the select dialog uses, for the same reason.
- */
 export function StepNumberingDialog({ column, onClose, onSave }: StepNumberingDialogProps) {
   const [edited, setEdited] = useState<{ columnId: string; draft: StepNumbering } | null>(null);
 
@@ -121,7 +109,6 @@ export function StepNumberingDialog({ column, onClose, onSave }: StepNumberingDi
             </label>
           </div>
 
-          {/* The three fields are abstract until you see what they produce. */}
           <div className="rounded-md border border-border bg-surface px-3 py-2">
             <p className="text-body text-faint-foreground">Result</p>
             <ul className="metric mt-1 space-y-0.5 text-ui text-foreground">

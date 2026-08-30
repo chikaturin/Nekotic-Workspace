@@ -14,7 +14,6 @@ import { useDriveSegments } from "@/hooks/use-current-target";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspace-store";
 import type { BreadcrumbTrail } from "@/types";
 
-/** Path + search + identity. The breadcrumb tracks the drive tree live. */
 export function AppHeader() {
   const pathname = usePathname();
   const segments = useDriveSegments();
@@ -26,7 +25,6 @@ export function AppHeader() {
   const trail = useMemo<BreadcrumbTrail>(() => {
     if (pathname.startsWith(DRIVE_ROOT_PATH)) return breadcrumbs;
 
-    // The file manager mirrors the drive path, so it reuses the same crumbs.
     if (pathname.startsWith(FILES_ROOT_PATH)) {
       return breadcrumbs.map((crumb, index) => ({
         ...crumb,

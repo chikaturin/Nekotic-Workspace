@@ -9,16 +9,6 @@ import { Input } from "@/components/ui/input";
 import { DRIVE_ROOT_PATH } from "@/config/app";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspace-store";
 
-/**
- * Deleting a workspace.
- *
- * Typing the name is not friction for its own sake: it is the one confirmation
- * that cannot be given by muscle memory, and this is the only action in the
- * product that takes a whole tenant with it.
- *
- * Deleting is not removing and not leaving. The other two are in Members,
- * where they belong, and none of the three shares a control with another.
- */
 export function WorkspaceDangerZone({ onDeleted }: { readonly onDeleted: () => void }) {
   const router = useRouter();
   const workspace = useWorkspaceStore(selectActiveWorkspace);
@@ -48,9 +38,6 @@ export function WorkspaceDangerZone({ onDeleted }: { readonly onDeleted: () => v
         </p>
       </div>
 
-      {/* The caption carries the name the field is waiting for, so it is also
-          the field's accessible name — a reader hears which word to type
-          rather than a generic instruction to type something. */}
       <FormField
         label={
           <>

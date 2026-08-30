@@ -15,17 +15,14 @@ import type {
   ProjectStatus,
 } from "@/types";
 
-/* --------------------------------------------------------------- authoring */
-
 interface SpecBase {
   readonly name: string;
-  /** Hours before `MOCK_NOW` the node was last touched. */
   readonly updatedHoursAgo?: number;
   readonly ownerIndex?: number;
   readonly favorite?: boolean;
+  readonly pinned?: boolean;
   readonly shared?: boolean;
   readonly trashed?: boolean;
-  /** Access limited to admins — drives the permission-denied screens. */
   readonly restricted?: boolean;
 }
 
@@ -58,12 +55,10 @@ export interface BoardSpec extends SpecBase {
   readonly boardKind: BoardKind;
   readonly itemCount: number;
   readonly openCount: number;
-  /** Template that supplies the board's schema. */
   readonly templateId?: string;
 }
 
 export interface FileSpec extends SpecBase {
-  /** `name` carries the extension, e.g. `webhook-flow.png`. */
   readonly kind: "file";
   readonly sizeBytes: number;
   readonly excerpt?: string;
@@ -77,8 +72,6 @@ export const folder = (spec: Omit<FolderSpec, "kind">): FolderSpec => ({ ...spec
 export const doc = (spec: Omit<DocumentSpec, "kind">): DocumentSpec => ({ ...spec, kind: "document" });
 export const board = (spec: Omit<BoardSpec, "kind">): BoardSpec => ({ ...spec, kind: "board" });
 export const file = (spec: Omit<FileSpec, "kind">): FileSpec => ({ ...spec, kind: "file" });
-
-/* --------------------------------------------------------------- hydration */
 
 const HOUR_MS = 3_600_000;
 
@@ -110,10 +103,6 @@ interface HydrateContext {
   readonly idPrefix: string;
 }
 
-/**
- * Turn a nested authoring spec into fully-linked `DriveNode`s: ids derived from
- * the path, slugs de-duplicated per level, `parentId` wired both ways.
- */
 export function hydrate(specs: readonly NodeSpec[], context: HydrateContext): readonly DriveNode[] {
   const takenSlugs: string[] = [];
 
@@ -134,6 +123,7 @@ export function hydrate(specs: readonly NodeSpec[], context: HydrateContext): re
       createdAt: timestamp((spec.updatedHoursAgo ?? (index + 1) * 7) + 720),
       updatedAt,
       isFavorite: spec.favorite ?? false,
+      isPinned: spec.pinned ?? false,
       isTrashed: spec.trashed ?? false,
       isShared: spec.shared ?? false,
       ...(spec.restricted ? { accessMode: "restricted" as const } : {}),
@@ -175,7 +165,6 @@ export function hydrate(specs: readonly NodeSpec[], context: HydrateContext): re
           icon: spec.icon,
           blockCount: spec.blockCount,
           excerpt: spec.excerpt,
-          isPinned: spec.pinned ?? false,
           isLocked: spec.locked ?? false,
           isArchived: spec.archived ?? false,
         };

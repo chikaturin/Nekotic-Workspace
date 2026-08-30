@@ -6,13 +6,11 @@ import type { CommentAttachment } from "@/types";
 
 interface CommentAttachmentsProps {
   readonly attachments: readonly CommentAttachment[];
-  /** Present only in the composer, where an attachment can still be removed. */
   readonly onRemove?: (id: string) => void;
 }
 
 const isImage = (file: CommentAttachment) => file.mimeType.startsWith("image/");
 
-/** Files on a comment: image thumbnails inline, everything else as a chip. */
 export function CommentAttachments({ attachments, onRemove }: CommentAttachmentsProps) {
   if (attachments.length === 0) return null;
 

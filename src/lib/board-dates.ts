@@ -1,15 +1,12 @@
-/** UTC day arithmetic shared by the calendar and the timeline. */
 
 export const DAY_MS = 86_400_000;
 
-/** `YYYY-MM-DD` for an instant, or null when there is no date. */
 export function dayKey(iso: string | null): string | null {
   if (!iso) return null;
   const at = Date.parse(iso);
   return Number.isNaN(at) ? null : new Date(at).toISOString().slice(0, 10);
 }
 
-/** Midnight UTC of the day an instant falls in. */
 export function startOfDay(iso: string): string {
   const key = dayKey(iso);
   return key ? `${key}T00:00:00.000Z` : iso;
@@ -35,12 +32,10 @@ export function isSameDay(a: string | null, b: string | null): boolean {
   return a !== null && b !== null && dayKey(a) === dayKey(b);
 }
 
-/** Monday-first weekday index: Monday is 0, Sunday is 6. */
 export function weekdayIndex(iso: string): number {
   return (new Date(startOfDay(iso)).getUTCDay() + 6) % 7;
 }
 
-/** Saturday or Sunday, in UTC — what the chart shades. */
 export function isWeekend(iso: string): boolean {
   return weekdayIndex(iso) >= 5;
 }
@@ -92,7 +87,6 @@ export function shortDayLabel(iso: string): string {
   return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()] ?? ""}`;
 }
 
-/** `26 Aug 2026` — the unambiguous form a tooltip should carry. */
 export function longDayLabel(iso: string): string {
   const date = new Date(startOfDay(iso));
   return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()] ?? ""} ${date.getUTCFullYear()}`;

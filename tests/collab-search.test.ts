@@ -2,11 +2,10 @@ import { beforeEach, describe, expect, test } from "vitest";
 import { groupResults, scoreMatch, snippetAround, totalResults } from "@/lib/search-index";
 import { refKey, rowRef } from "@/lib/entity-ref";
 import { board, doc, file, folder, hydrate, project, type NodeSpec } from "@/mock/factory";
-import { boardIdFor, boardService } from "@/services/board-service";
+import { boardService } from "@/services/board-service";
+import { boardIdFor } from "./msw/fake/board.fake";
 import { commentService } from "@/services/comment-service";
-import { notificationService } from "@/services/notification-service";
-import { searchService } from "@/services/search-service";
-import { watchService } from "@/services/watch-service";
+import { searchFake } from "./msw/fake/search.fake";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { CURRENT_USER } from "@/mock/users";
 import { useWorkspaceStore } from "@/store/workspace-store";
@@ -71,7 +70,7 @@ function buildSearchTree(): readonly DriveNode[] {
 }
 
 function search(query: string) {
-  return searchService.search({ query, role: "member", user: CURRENT_USER });
+  return searchFake.search({ query, role: "member", user: CURRENT_USER });
 }
 
 function kinds(groups: readonly SearchGroup[]): readonly SearchResultKind[] {
@@ -85,11 +84,6 @@ function flat(groups: readonly SearchGroup[]): readonly SearchResult[] {
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-
-  boardService.reset();
-  commentService.reset();
-  notificationService.reset();
-  watchService.reset();
 
   useWorkspaceStore.setState({
     workspaces: [testWorkspace(WORKSPACE_ID)],
@@ -235,7 +229,7 @@ describe("search failure", () => {
     setSimulation({ listFailure: "network" });
 
     await expect(
-      searchService.search({ query: "payment", role: "admin", user: CURRENT_USER }),
+      searchFake.search({ query: "payment" , role: "admin", user: CURRENT_USER }),
     ).rejects.toThrow();
 
     resetSimulation();

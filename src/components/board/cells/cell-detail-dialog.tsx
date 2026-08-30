@@ -17,36 +17,14 @@ import { cellText, type CellContext } from "@/lib/cell-values";
 import type { BoardColumn, CellValue } from "@/types";
 
 interface CellDetailDialogProps {
-  /** The column being read, or null when nothing is open. */
   readonly column: BoardColumn | null;
   readonly value: CellValue | null;
   readonly context: CellContext;
-  /** What the record is called, so the reader knows whose value this is. */
   readonly recordLabel?: string;
   readonly onClose: () => void;
-  /** Offered only where this reader has an editor to hand over to. */
   readonly onEdit?: (() => void) | undefined;
 }
 
-/**
- * One cell, read in full.
- *
- * A QA step is four lines of instructions, and the two ways a table had to
- * show that were a clipped line and the browser's own hover tooltip. Neither
- * is a way to read four lines: the tooltip appears where the pointer happens
- * to be, sets its own width, cannot be scrolled, cannot be selected from, and
- * vanishes the moment you move towards it.
- *
- * This is the alternative, and it is deliberately a *reader* rather than a
- * second editor: a centred card, the value laid out in full with its line
- * breaks intact, and one button that hands over to the real editor for anyone
- * who may write. Being read-only is what lets it open for everybody, including
- * on a board somebody only has permission to look at.
- *
- * Width is `xl` rather than the default: the point of the card is to show a
- * paragraph as a paragraph, and 32rem breaks a numbered step across two lines
- * about as often as the cell did.
- */
 export function CellDetailDialog({
   column,
   value,
@@ -55,14 +33,6 @@ export function CellDetailDialog({
   onClose,
   onEdit,
 }: CellDetailDialogProps) {
-  /**
-   * True while this close is a hand-over to an editor.
-   *
-   * Radix returns focus to whatever opened the dialog once it unmounts, and
-   * that is the cell the editor has just mounted inside. The restore would
-   * blur the editor, and a blurred cell editor commits and closes — so Edit
-   * appeared to do nothing at all. Handing over means declining the restore.
-   */
   const isHandingOver = useRef(false);
 
   if (!column || !value) {
@@ -97,23 +67,6 @@ export function CellDetailDialog({
           )}
         </DialogHeader>
 
-        {/*
-          The value as text, laid out by this card rather than by the column it
-          came from — line breaks kept, long words broken, and selectable so it
-          can be copied out.
-
-          Deliberately not `CellRenderer`: a cell view is built to fill a row of
-          fixed height and clips to it (`h-full overflow-hidden`), which inside
-          a scrolling dialog body would hide the end of a long value instead of
-          letting the body scroll to it. The one job here is the opposite of a
-          cell's.
-        */}
-        {/*
-          Focusable, because it scrolls. Every other stop in this card is in
-          the header or the footer, so without it a value taller than the
-          viewport could be scrolled with a wheel and by no other means — the
-          keyboard would tab Close, Edit, ✕ and never reach the text.
-        */}
         <DialogBody
           tabIndex={0}
           role="region"
@@ -158,7 +111,6 @@ export function CellDetailDialog({
   );
 }
 
-/** "4 lines", or nothing worth saying for a value that is one. */
 function countLines(text: string): string {
   const lines = text.split("\n").length;
   return lines === 1 ? "1 line" : `${lines} lines`;

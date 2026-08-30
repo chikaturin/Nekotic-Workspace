@@ -15,31 +15,14 @@ interface CellRendererProps {
   readonly value: CellValue;
   readonly column: BoardColumn;
   readonly context: CellContext;
-  /**
-   * How much of the value this view shows. Only the text types can use it —
-   * chips, dates and avatars are laid out rather than flowed, so a second line
-   * would show nothing more of them.
-   */
   readonly mode?: CellDisplayMode;
-  /**
-   * Lay the value out for this width rather than the column's. The detail
-   * dialog is far wider than the cell the value came from, and reusing the
-   * column's width there would wrap a paragraph as if it were still in a
-   * 180px column.
-   */
   readonly width?: number;
-  /** True only where the surface delegates the reader — the grid. */
   readonly hasReader?: boolean;
 }
 
 const EMPTY_PEOPLE = new Map();
 const EMPTY_LABELS = new Map<string, string>();
 
-/**
- * Read-only projection of a cell. One renderer per type, dispatched on the
- * column — the value's own kind is checked so a schema change mid-flight can
- * never hand a date editor a text value.
- */
 export const CellRenderer = memo(function CellRenderer({
   value,
   column,

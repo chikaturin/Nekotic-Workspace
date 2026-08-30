@@ -7,6 +7,7 @@ import { RelationCellEditor } from "@/components/board/cells/relation-cell";
 import { SelectCellEditor } from "@/components/board/cells/select-cell";
 import { TextCellEditor } from "@/components/board/cells/text-cell";
 import { UserCellEditor } from "@/components/board/cells/user-cell";
+import type { CellMove } from "@/lib/cell-arrow-exit";
 import { emptyCellFor, type CellContext } from "@/lib/cell-values";
 import { stepNumberingOf } from "@/lib/step-numbering";
 import type { BoardColumn, CellValue, DirectoryUser, SelectOption } from "@/types";
@@ -17,26 +18,26 @@ export interface CellEditorProps {
   readonly rowId: string;
   readonly boardId: string;
   readonly primaryColumnId: string;
-  /** Folder that attachment uploads are filed into. */
   readonly folderId: string | null;
   readonly people: readonly DirectoryUser[];
-  /** The board's schema and lookups — what an option rule is evaluated against. */
   readonly columns: readonly BoardColumn[];
   readonly context: CellContext;
   readonly initialText?: string;
-  /** A value inside the cell the editor should open on — see `EditIntent`. */
   readonly focusId?: string | undefined;
-  readonly onCommit: (value: CellValue, move?: "down" | "none") => void;
+  readonly onCommit: (value: CellValue, move?: CellMove) => void;
   readonly onCancel: () => void;
+  /**
+   * Mũi tên chạm biên đoạn chữ thì ghi ô lại rồi sang ô kế bên.
+   *
+   * Chỉ bảng bật cờ này. Ngăn kéo chi tiết không có ô kế bên để đi tới, nên ở
+   * đó mũi tên phải luôn thuộc về đoạn chữ.
+   */
+  readonly canExitByArrow?: boolean;
   readonly onCreateOption: (label: string) => Promise<SelectOption | null>;
 }
 
-/**
- * One editor per cell type. Every editor gets the same contract — commit a
- * value or cancel — so the grid never needs to know which type it opened.
- */
 export function CellEditor(props: CellEditorProps) {
-  const { column, value, onCommit, onCancel } = props;
+  const { column, value, onCommit, onCancel, canExitByArrow = false } = props;
   const safe = value.kind === column.type ? value : emptyCellFor(column.type);
 
   switch (column.type) {
@@ -47,6 +48,7 @@ export function CellEditor(props: CellEditorProps) {
           initialText={props.initialText}
           onCommit={onCommit}
           onCancel={onCancel}
+          canExitByArrow={canExitByArrow}
         />
       ) : null;
 
@@ -60,6 +62,7 @@ export function CellEditor(props: CellEditorProps) {
           label={column.name}
           onCommit={onCommit}
           onCancel={onCancel}
+          canExitByArrow={canExitByArrow}
         />
       ) : null;
 
@@ -94,8 +97,6 @@ export function CellEditor(props: CellEditorProps) {
       ) : null;
 
     case "attachment":
-      // The attachment editor writes through the board record itself, so it
-      // takes no value and returns none — see `use-attachment-field`.
       return (
         <AttachmentCellEditor
           column={column}
@@ -111,6 +112,7 @@ export function CellEditor(props: CellEditorProps) {
         <RelationCellEditor
           value={safe}
           column={column}
+          boardId={props.boardId}
           targetBoardId={column.config.boardId ?? props.boardId}
           primaryColumnId={column.config.displayColumnId ?? props.primaryColumnId}
           onCommit={onCommit}

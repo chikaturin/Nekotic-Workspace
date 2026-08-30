@@ -19,15 +19,6 @@ interface FilePreviewDialogProps {
   readonly onClose: () => void;
 }
 
-/**
- * Full-page file viewer: the file fills the screen, its details sit beside it,
- * and every file — previewable or not — offers metadata plus a download.
- *
- * It opens the file that was asked for and nothing else. There is no paging to
- * the file beside it: a spreadsheet is not a slide, and arrow keys that quietly
- * swap the document under the reader are a way to lose your place, not a way to
- * browse. Choosing a different file happens in the list that opened this one.
- */
 export function FilePreviewDialog({ node, onClose }: FilePreviewDialogProps) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(true);
   const capabilities = useCapabilities(node);
@@ -42,8 +33,6 @@ export function FilePreviewDialog({ node, onClose }: FilePreviewDialogProps) {
       <DialogContent fullscreen hideClose className="flex flex-col bg-background p-0">
         {node && (
           <>
-            {/* The viewer draws its own chrome, but a dialog still has to be
-                announceable: without a title it opens as an unnamed region. */}
             <DialogTitle className="sr-only">{node.name}</DialogTitle>
             <DialogDescription className="sr-only">
               File preview. Press I to toggle the details panel.

@@ -22,13 +22,6 @@ export interface FileCatalog {
   readonly reload: () => void;
 }
 
-/**
- * Files of one folder, wrapped in the async states the UI must handle.
- *
- * The request decides *whether* the folder can be read (access, latency,
- * failures); the rendered list then comes from the workspace tree, so an upload
- * or a favourite toggle shows up immediately instead of waiting for a refetch.
- */
 export function useFileCatalog(folderId: string | null): FileCatalog {
   const tree = useWorkspaceStore(selectTree);
 
@@ -41,11 +34,17 @@ export function useFileCatalog(folderId: string | null): FileCatalog {
   const canView = capabilities.view;
 
   const loader = useCallback(
-    (signal: AbortSignal) => fileService.listFiles({ folderId, canView, signal }),
-    [folderId, canView],
+    (signal: AbortSignal) =>
+      folderId === null
+        ? Promise.resolve([])
+        : fileService.listFiles({ folderId, signal }),
+    [folderId],
   );
 
-  const resource = useAsyncResource(loader, { keepPreviousData: true });
+  const resource = useAsyncResource(loader, {
+    enabled: canView,
+    keepPreviousData: true,
+  });
 
   const liveFiles = useMemo(
     () => visibleFilesOf(tree, folder) as readonly FileNode[],
@@ -55,8 +54,6 @@ export function useFileCatalog(folderId: string | null): FileCatalog {
   const state = useMemo<AsyncState<readonly FileNode[]>>(() => {
     if (resource.state.status !== "success") return resource.state;
 
-    // A listing that genuinely came back empty stays empty; otherwise the live
-    // tree is the display source.
     return resource.state.data.length === 0 ? resource.state : successState(liveFiles);
   }, [resource.state, liveFiles]);
 

@@ -14,19 +14,15 @@ import { selectActiveWorkspace, selectTree, useWorkspaceStore } from "@/store/wo
 import type { DashboardWidgetId } from "@/types";
 
 const WIDGET_ICONS: Readonly<Record<DashboardWidgetId, LucideIcon>> = {
-  task: ListChecks,
+  tasks: ListChecks,
   qa: ShieldCheck,
-  deadline: CalendarClock,
+  deadlines: CalendarClock,
 };
 
-/**
- * Dashboard (SY-DSH-44).
- *
- * Three readings of the boards the user can open — task progress, QA outcome
- * and what is due. It owns no data: every number here is a count over records
- * that live on a board, which is why opening one from a card lands on the real
- * thing rather than a copy of it.
- */
+function widgetIcon(id: DashboardWidgetId): LucideIcon {
+  return WIDGET_ICONS[id] ?? LayoutDashboard;
+}
+
 export function DashboardPage() {
   const resource = useDashboard();
   const workspace = useWorkspaceStore(selectActiveWorkspace);
@@ -74,7 +70,7 @@ export function DashboardPage() {
                 <DashboardWidget
                   key={widget.id}
                   widget={widget}
-                  icon={WIDGET_ICONS[widget.id]}
+                  icon={widgetIcon(widget.id)}
                   onOpenSource={openBoard}
                 />
               ))}

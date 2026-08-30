@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { useNotifications } from "@/hooks/use-notifications";
 import { formatCount } from "@/lib/format";
 
-/** The full inbox — the same feed the bell shows, with room to read it. */
 export function NotificationsPage() {
   const controller = useNotifications();
 

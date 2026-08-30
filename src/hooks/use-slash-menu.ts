@@ -5,7 +5,6 @@ import { matchBlockCommands, type BlockCommand } from "@/lib/block-commands";
 
 export interface SlashMenuState {
   readonly isOpen: boolean;
-  /** Block the menu was opened from. */
   readonly blockId: string | null;
   readonly query: string;
   readonly activeIndex: number;
@@ -17,7 +16,6 @@ export interface SlashMenu extends SlashMenuState {
   readonly close: () => void;
   readonly setQuery: (query: string) => void;
   readonly moveActive: (delta: number) => void;
-  /** Command under the cursor, or null when the query matches nothing. */
   readonly activeCommand: BlockCommand | null;
 }
 
@@ -29,10 +27,6 @@ const CLOSED: SlashMenuState = {
   results: [],
 };
 
-/**
- * Slash-command state machine. Filtering and ranking live in
- * `lib/block-commands`; this only tracks what is open and highlighted.
- */
 export function useSlashMenu(): SlashMenu {
   const [state, setState] = useState<SlashMenuState>(CLOSED);
 

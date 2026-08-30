@@ -17,15 +17,6 @@ import { useBoardStore } from "@/store/board-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardRow, ExportFormat, ExportOutcome, ExportScope } from "@/types";
 
-/**
- * Board export (SY-EXP-36).
- *
- * Excel, CSV and PDF are three writers over one projection, so they cannot
- * disagree about what a record says. Columns the viewer may not read are
- * dropped from that projection *before* any writer sees it — there is no path
- * where a withheld column reaches a file.
- */
-
 export interface ExportController {
   readonly rowCounts: Readonly<Record<ExportScope, number>>;
   readonly omittedColumns: readonly string[];
@@ -36,7 +27,6 @@ export interface ExportController {
 export interface ExportInput {
   readonly model: BoardViewModel;
   readonly selectedIds: readonly string[];
-  /** Whether this viewer may read columns that look like credentials. */
   readonly canViewSensitive: boolean;
 }
 
@@ -127,7 +117,6 @@ function writeFile(
   }
 
   if (format === "csv") {
-    // The BOM is what makes Excel read the file as UTF-8 rather than Latin-1.
     downloadText(`﻿${toDelimited(grid)}`, fileName, EXPORT_MIME_TYPES.csv);
     return;
   }

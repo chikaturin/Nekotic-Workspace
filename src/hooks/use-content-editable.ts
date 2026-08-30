@@ -12,12 +12,6 @@ interface UseContentEditableInput {
   readonly focusRequest: FocusRequest | null;
 }
 
-/**
- * Bridge between React state and a `contentEditable` node.
- *
- * The DOM is only written when it genuinely diverges from the model, which is
- * what keeps the caret from jumping to the end on every keystroke.
- */
 export function useContentEditable({
   value,
   onChange,
@@ -53,7 +47,6 @@ export function useContentEditable({
     [onChange],
   );
 
-  /** Paste as plain text — the model has no inline formatting to hold marks. */
   const handlePaste = useCallback((event: React.ClipboardEvent<HTMLDivElement>) => {
     event.preventDefault();
     const text = event.clipboardData.getData("text/plain");

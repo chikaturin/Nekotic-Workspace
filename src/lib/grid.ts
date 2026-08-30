@@ -1,4 +1,3 @@
-/** Pure row/column operations on a rectangular grid of text cells. */
 
 export type Grid = readonly (readonly string[])[];
 
@@ -9,7 +8,6 @@ export function gridColumnCount(rows: Grid): number {
   return rows.reduce((widest, row) => Math.max(widest, row.length), 0);
 }
 
-/** Pad every row to the widest one so the grid is always rectangular. */
 export function normalizeGrid(rows: Grid): Grid {
   const width = Math.max(MIN_COLUMNS, gridColumnCount(rows));
 
@@ -49,7 +47,6 @@ export function removeGridColumn(rows: Grid, columnIndex: number): Grid {
   return rows.map((row) => row.filter((_, index) => index !== columnIndex));
 }
 
-/** Spreadsheet column label: 0 → A, 25 → Z, 26 → AA. */
 export function columnLabel(index: number): string {
   let label = "";
   let remaining = index;
@@ -62,7 +59,6 @@ export function columnLabel(index: number): string {
   return label;
 }
 
-/** Drop the empty rows and columns at the end — what a save should store. */
 export function trimGrid(rows: Grid): Grid {
   const isBlank = (values: readonly string[]) => values.every((cell) => cell.trim() === "");
 

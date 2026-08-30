@@ -44,6 +44,7 @@ import { useGridStore } from "@/store/grid-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardRow, CellValue, StepNumbering, WorkspaceRole } from "@/types";
 import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
+import { boardFake } from "./msw/fake/board.fake";
 
 /**
  * Dynamic columns.
@@ -77,7 +78,6 @@ function signedInAs(role: WorkspaceRole) {
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-  boardService.reset();
   useGridStore.getState().reset();
   signedInAs("admin");
 });
@@ -201,7 +201,7 @@ describe("who may reshape a board", () => {
     await expect(boardService.deleteColumn(boardId, created.id)).rejects.toBeInstanceOf(
       ServiceError,
     );
-    await expect(boardService.reorderColumn(boardId, created.id, 0)).rejects.toBeInstanceOf(
+    await expect(boardFake.reorderColumn(boardId, created.id, 0)).rejects.toBeInstanceOf(
       ServiceError,
     );
     await expect(boardService.convertColumn(boardId, created.id, "date")).rejects.toBeInstanceOf(
@@ -594,7 +594,7 @@ describe("numbering the steps in a cell", () => {
    * the next line off the *result* rather than off a stale snapshot.
    */
   function pressEnter(text: string, caret: number, config: StepNumbering) {
-    const insertion = nextStepInsertion(lineAt(text, caret), config);
+    const insertion = nextStepInsertion(text, caret, config);
     const after = caret + spacesAfter(text, caret);
 
     return {
@@ -606,7 +606,7 @@ describe("numbering the steps in a cell", () => {
   test("out of the box a step is a plain number", () => {
     expect(DEFAULT_STEP_NUMBERING.prefix).toBe("");
     expect(stepToken(PLAIN, 1)).toBe("1: ");
-    expect(nextStepInsertion("1: open the page", PLAIN)).toBe("\n2: ");
+    expect(nextStepInsertion("1: open the page", "1: open the page".length, PLAIN)).toBe("\n2: ");
   });
 
   test("an empty cell opens on its first step, already numbered", () => {
@@ -632,12 +632,14 @@ describe("numbering the steps in a cell", () => {
     state = pressEnter(state.text, state.caret, C);
     expect(state.text).toBe("C1: open the page\nC2: ");
 
+    // C2 is still empty, so Enter holds there rather than opening C3 — the
+    // number only moves once a step has actually been written. Pressing Enter
+    // any number of times cannot outrun the writing.
     state = pressEnter(state.text, state.caret, C);
-    expect(state.text).toBe("C1: open the page\nC2: \nC3: ");
+    expect(state.text).toBe("C1: open the page\nC2: ");
 
-    // Three presses, three steps — never more.
     state = pressEnter(state.text, state.caret, C);
-    expect(state.text.match(/C\d+:/g)).toEqual(["C1:", "C2:", "C3:", "C4:"]);
+    expect(state.text.match(/C\d+:/g)).toEqual(["C1:", "C2:"]);
   });
 
   test("Enter part-way through a line opens the next step there, once", () => {
@@ -658,30 +660,32 @@ describe("numbering the steps in a cell", () => {
   });
 
   test("Enter opens the next step", () => {
-    expect(nextStepInsertion("B1: Open browser", B)).toBe("\nB2: ");
-    expect(nextStepInsertion("B2: Enter username", B)).toBe("\nB3: ");
+    expect(nextStepInsertion("B1: Open browser", "B1: Open browser".length, B)).toBe("\nB2: ");
+    expect(nextStepInsertion("B2: Enter username", "B2: Enter username".length, B)).toBe("\nB3: ");
   });
 
   test("the number is a number — B9 is followed by B10", () => {
-    expect(nextStepInsertion("B9:", B)).toBe("\nB10: ");
-    expect(nextStepInsertion("B99: last", B)).toBe("\nB100: ");
+    // Counted, not concatenated. Both lines carry content, which is what lets
+    // the number advance at all.
+    expect(nextStepInsertion("B9: ninth", "B9: ninth".length, B)).toBe("\nB10: ");
+    expect(nextStepInsertion("B99: last", "B99: last".length, B)).toBe("\nB100: ");
   });
 
   test("a different prefix carries through", () => {
-    expect(nextStepInsertion("T1: Create payment", T)).toBe("\nT2: ");
+    expect(nextStepInsertion("T1: Create payment", "T1: Create payment".length, T)).toBe("\nT2: ");
     // The line's own prefix wins over the column's, so a cell stays consistent.
-    expect(nextStepInsertion("T4: something", B)).toBe("\nT5: ");
+    expect(nextStepInsertion("T4: something", "T4: something".length, B)).toBe("\nT5: ");
   });
 
   test("Enter on a line that is not a step starts at the configured number", () => {
-    expect(nextStepInsertion("Preconditions", B)).toBe("\nB1: ");
-    expect(nextStepInsertion("Preconditions", { ...B, start: 0 })).toBe("\nB0: ");
+    expect(nextStepInsertion("Preconditions", "Preconditions".length, B)).toBe("\nB1: ");
+    expect(nextStepInsertion("Preconditions", "Preconditions".length, { ...B, start: 0 })).toBe("\nB0: ");
   });
 
   test("the line under the caret is the one that decides", () => {
     const text = "B1: first\nB7: seventh";
     expect(lineAt(text, text.length)).toBe("B7: seventh");
-    expect(nextStepInsertion(lineAt(text, text.length), B)).toBe("\nB8: ");
+    expect(nextStepInsertion(text, text.length, B)).toBe("\nB8: ");
   });
 
   test("pasting plain lines numbers them; pasting numbered ones does not", () => {

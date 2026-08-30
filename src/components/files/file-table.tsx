@@ -34,7 +34,6 @@ interface FileTableProps {
   readonly onTrash: (nodeId: string) => void;
 }
 
-/** File listing with the metadata contract: name, type, size, owner, created. */
 export function FileTable({
   files,
   capabilities,

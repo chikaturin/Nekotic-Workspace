@@ -9,13 +9,6 @@ import { formatCount } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ActivityEntry } from "@/types";
 
-/**
- * A record's history as a timeline (SY-ACT-40).
- *
- * The service records what changed — column, before, after — already rendered
- * the way the column renders it. This reads that: `16:20 · Thanh changed Status
- * · Doing → Done`. No serialised payload is ever put in front of a person.
- */
 export function ActivityTimeline({ boardId, rowId }: { boardId: string; rowId: string }) {
   const { state, days, total } = useRowActivity(boardId, rowId);
 
@@ -29,9 +22,6 @@ export function ActivityTimeline({ boardId, rowId }: { boardId: string; rowId: s
     );
   }
 
-  // A history that failed to load is not an empty history. Without this the
-  // panel would answer "nothing has happened yet" to a request that never
-  // came back — the same wrong answer twice over.
   if (state.status === "error") {
     return (
       <div className="flex flex-col items-center gap-2 px-5 py-10 text-center">

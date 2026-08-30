@@ -12,9 +12,7 @@ import type { BoardColumn, BoardColumnOf, SelectColor } from "@/types";
 interface GanttLaneProps {
   readonly row: GanttRow;
   readonly primaryColumnId: string;
-  /** Columns worth naming in the tooltip — the view's own visible ones. */
   readonly columns: readonly BoardColumn[];
-  /** The select column the board designates as meaning "finished". */
   readonly statusColumn: BoardColumnOf<"select"> | null;
   readonly context: CellContext;
   readonly dayWidth: number;
@@ -22,13 +20,6 @@ interface GanttLaneProps {
   readonly hasConflict: boolean;
 }
 
-/**
- * One record's lane on the chart.
- *
- * Like the task row beside it, it subscribes to its own record — so a date
- * edited in the table or the drawer repaints one lane rather than the whole
- * chart.
- */
 export const GanttLane = memo(function GanttLane({
   row,
   primaryColumnId,
@@ -48,10 +39,6 @@ export const GanttLane = memo(function GanttLane({
     return value && value.kind === "text" ? value.value : "";
   }, [record, primaryColumnId]);
 
-  /**
-   * The bar takes the colour of the record's own Status option, so the chart
-   * reads exactly like the board. No colour is decided here.
-   */
   const color = useMemo<SelectColor | null>(() => {
     if (!record || !statusColumn) return null;
 

@@ -11,24 +11,12 @@ import { formatBytes } from "@/lib/format";
 import type { CellAttachment } from "@/types";
 
 interface AttachmentViewerProps {
-  /** Everything on the record — the viewer opens exactly one of them. */
   readonly files: readonly CellAttachment[];
-  /** Attachment being viewed; null keeps the viewer closed. */
   readonly openId: string | null;
   readonly onOpenChange: (attachmentId: string | null) => void;
   readonly onDownload: (file: CellAttachment) => void;
 }
 
-/**
- * Opening an attachment.
- *
- * Clicking `payment-error.png` opens `payment-error.png` on the image canvas —
- * not a slideshow of everything else on the record. Anything else renders
- * through `AttachmentSurface`, which owns the per-type decisions.
- *
- * The full-resolution asset is what the viewer loads; thumbnails stay in the
- * cell and the drawer list, where they belong.
- */
 export function AttachmentViewer({
   files,
   openId,

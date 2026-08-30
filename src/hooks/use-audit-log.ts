@@ -5,13 +5,7 @@ import { useAsyncResource, type AsyncResource } from "@/hooks/use-async-resource
 import { usePermissions } from "@/hooks/use-permissions";
 import { auditService } from "@/services/audit-service";
 import type { AuditModule, AuditPage, AuditQuery, AuditSeverity } from "@/types";
-
-/**
- * The audit log, read-only (SY-AUD-41).
- *
- * The hook exposes filters and a reload and nothing else — there is no write
- * path here because there is none in the service either.
- */
+import { useWorkspaceStore } from "@/store/workspace-store";
 
 export interface AuditFilters {
   readonly module: AuditModule | "all";
@@ -28,11 +22,11 @@ export interface AuditLogController {
   readonly setFilter: <K extends keyof AuditFilters>(key: K, value: AuditFilters[K]) => void;
   readonly clearFilters: () => void;
   readonly isFiltered: boolean;
-  /** False when the role does not hold `workspace.audit.view`. */
   readonly canView: boolean;
 }
 
 export function useAuditLog(): AuditLogController {
+  const workspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const can = usePermissions();
   const canView = can("workspace.audit.view");
   const [filters, setFilters] = useState<AuditFilters>(INITIAL);
@@ -48,8 +42,8 @@ export function useAuditLog(): AuditLogController {
   );
 
   const loader = useCallback(
-    (signal: AbortSignal) => auditService.list(query, signal),
-    [query],
+    (signal: AbortSignal) => auditService.list(workspaceId, query, signal),
+    [workspaceId, query],
   );
 
   const resource = useAsyncResource(loader, { enabled: canView, keepPreviousData: true });

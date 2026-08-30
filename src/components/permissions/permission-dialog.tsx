@@ -33,14 +33,8 @@ const TABS: readonly { readonly id: TabId; readonly label: string }[] = [
   { id: "roles", label: "Roles" },
 ];
 
-/**
- * "My role" is the id the store spells as `null`, and it has to be a real
- * option value because a popover list has no equivalent of a native select's
- * empty `<option>`.
- */
 const SELF_VALUE = "self";
 
-/** The roles, each answering the "what would I lose?" the preview is asking. */
 const PREVIEW_ROLE_OPTIONS: readonly ListboxOption[] = WORKSPACE_ROLES.map((role) => ({
   value: role,
   label: ROLE_LABELS[role],
@@ -53,14 +47,6 @@ interface PermissionDialogProps {
   readonly onClose: () => void;
 }
 
-/**
- * Access on one item (SY-INH-43) beside the matrix it is drawn from
- * (SY-RBC-42).
- *
- * The two tabs answer different questions — "who can open this" and "what does
- * that role actually allow" — and both read the one catalogue, so the table on
- * screen cannot fall out of step with the app around it.
- */
 export function PermissionDialog({ node, isOpen, onClose }: PermissionDialogProps) {
   const [tab, setTab] = useState<TabId>("access");
   const workspace = useWorkspaceStore(selectActiveWorkspace);
@@ -80,8 +66,6 @@ export function PermissionDialog({ node, isOpen, onClose }: PermissionDialogProp
     return path[path.length - 2] ?? null;
   }, [tree, node]);
 
-  // Rebuilt only when the viewer's own role changes, because that is the only
-  // thing the leading row's label restates.
   const previewOptions = useMemo<readonly ListboxOption[]>(
     () => [
       {
@@ -160,9 +144,6 @@ export function PermissionDialog({ node, isOpen, onClose }: PermissionDialogProp
         </Tabs>
 
         <DialogFooter size="sm" align="start">
-          {/* A popover listbox is a div, so it cannot be the target of a real
-              <label>. The caption names it through `aria-labelledby` instead,
-              which is the association that actually survives. */}
           <span id="role-preview-label" className="text-ui text-muted-foreground">
             Preview as
           </span>
@@ -177,8 +158,6 @@ export function PermissionDialog({ node, isOpen, onClose }: PermissionDialogProp
             className="w-48"
           />
 
-          {/* Said here rather than in a doc nobody opens: this whole dialog is
-              about what the interface offers, not about what is enforced. */}
           <p className="ml-auto max-w-sm text-right text-body text-faint-foreground">
             Preview only narrows what you see. The server re-checks every one of
             these on its own.

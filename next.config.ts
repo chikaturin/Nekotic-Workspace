@@ -1,13 +1,11 @@
 import type { NextConfig } from "next";
-import { BASE_PATH } from "./src/config/base-path";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "export",
-  trailingSlash: true, // BẮT BUỘC: để Next.js export dạng /folder/index.html thay vì /folder.html
-  basePath: BASE_PATH,
+  trailingSlash: true,
   images: {
-    unoptimized: true, // BẮT BUỘC: GitHub Pages không chạy được Node.js Image Optimizer
+    unoptimized: true,
     remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }],
   },
 };

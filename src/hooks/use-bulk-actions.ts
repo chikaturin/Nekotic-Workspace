@@ -8,21 +8,11 @@ import { useBoardStore } from "@/store/board-store";
 import { selectSelectedRowIds, useGridStore } from "@/store/grid-store";
 import type { BoardColumnOf, CellValue } from "@/types";
 
-/**
- * The selection, and what may be done to it (SY-BLK-34).
- *
- * Every action here calls *one* endpoint with the whole list of ids. That is
- * not an optimisation — it is what makes partial success expressible: a loop of
- * single-row writes could only report the first failure.
- */
-
 export interface BulkActionsController {
   readonly selectedIds: readonly string[];
   readonly count: number;
-  /** How many of the selected records are frozen and will be skipped. */
   readonly archivedCount: number;
   readonly isRunning: boolean;
-  /** Columns the status and assignee actions write to, resolved by role. */
   readonly statusColumn: BoardColumnOf<"select"> | null;
   readonly assigneeColumn: BoardColumnOf<"user"> | null;
   readonly clear: () => void;
@@ -47,10 +37,6 @@ export function useBulkActions(model: BoardViewModel): BulkActionsController {
 
   const [isRunning, setIsRunning] = useState(false);
 
-  /**
-   * Ticks can outlive their records — a delete or a move leaves stale ids
-   * behind. They are filtered here so a stale id never reaches a write.
-   */
   const selectedIds = useMemo(
     () => Object.keys(selectedMap).filter((rowId) => rowsById[rowId] !== undefined),
     [selectedMap, rowsById],

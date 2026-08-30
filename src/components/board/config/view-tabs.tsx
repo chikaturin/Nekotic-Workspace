@@ -33,35 +33,8 @@ import type { BoardViewType, PermissionResolver, SavedView } from "@/types";
 
 const VIEW_TYPES: readonly BoardViewType[] = ["table", "kanban", "calendar", "gantt"];
 
-/**
- * The drag's own type, so the strip only accepts a tab from this strip.
- *
- * The same shape the column headers use: a private MIME type carrying the id,
- * which is what lets `dragover` decide whether to accept a drop *before* the
- * payload is readable — browsers hide the data until the drop itself.
- */
-const VIEW_MIME = "application/x-nexdrop-view";
+const VIEW_MIME = "application/x-nekotic-view";
 
-/**
- * Saved views as tabs.
- *
- * Switching a tab changes which configuration the shared query runs — it never
- * loads or copies a record. That is the whole point of keeping views separate
- * from the board.
- *
- * These are hand-built rather than `<Tabs>` because a tab here is not only a
- * tab: it turns into a text field on a double-click and it carries a menu that
- * renames, duplicates, retypes and deletes the view. `TabsTrigger` is a single
- * button and would have to lose one of those to fit. What the strip was
- * missing was the semantics, not the component — no `role`, so a screen reader
- * read a row of unrelated buttons and never said which view was open — and
- * those are spelled out below.
- */
-/**
- * Creating, renaming and deleting a saved view changes what the whole team
- * sees, so it takes `board.view.manage`. Reading a board through one — the
- * filter, sort and group controls below the tabs — takes nothing.
- */
 export function ViewTabs({ model, can }: { model: BoardViewModel; can: PermissionResolver }) {
   const { board, view } = model;
   const canManage = can("board.view.manage");
@@ -69,7 +42,6 @@ export function ViewTabs({ model, can }: { model: BoardViewModel; can: Permissio
   const createView = useBoardStore((state) => state.createView);
   const moveViewTo = useBoardStore((state) => state.moveViewTo);
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  /** The tab a drop would land on, so the strip can show where it would go. */
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   function handleDrop(event: DragEvent<HTMLDivElement>, toIndex: number) {
@@ -83,17 +55,6 @@ export function ViewTabs({ model, can }: { model: BoardViewModel; can: Permissio
 
   return (
     <div className="flex items-center gap-1 overflow-x-auto px-3">
-      {/*
-        A toolbar, not a tablist.
-        A tablist may own nothing but tabs, and every entry here carries an
-        options menu beside the tab, and a text field instead of it while a
-        rename is in flight — so the roles would announce a mixture of tabs,
-        buttons and a textbox as siblings, and the strip would momentarily
-        contain no selected tab at all. `role="toolbar"` with `aria-current`
-        on the active entry describes what this actually is: a row of controls
-        where one is the place you are. Nothing is lost — these were plain
-        buttons with no roles before.
-      */}
       <div role="toolbar" aria-label="Saved views" className="flex shrink-0 items-center gap-1">
         {board?.views.map((saved, index) => (
           <ViewTab
@@ -161,7 +122,6 @@ interface ViewTabProps {
   readonly onRenameEnd: () => void;
   readonly onDragStateChange: (viewId: string | null) => void;
   readonly onDrop: (event: DragEvent<HTMLDivElement>, index: number) => void;
-  /** Reorder without a pointer — what the menu's Move left/right call. */
   readonly onMove: (toIndex: number) => void;
 }
 
@@ -197,13 +157,7 @@ function ViewTab({
     .join(" · ");
 
   return (
-    // The box holds the switch control, the menu trigger, and — while a rename
-    // is in flight — a text field, so it is a group of controls rather than
-    // any one of them. It is also the drag handle: the whole tab moves, which
-    // is the target anybody is aiming at anyway.
     <div
-      // Never draggable while the field is open: a drag started on a text
-      // selection inside it would take the tab with it.
       draggable={canManage && !isRenaming}
       onDragStart={(event) => {
         if (isRenaming) {
@@ -219,10 +173,6 @@ function ViewTab({
         onDragStateChange(view.id);
       }}
       onDragLeave={(event) => {
-        // `dragleave` also fires on the way *into* a child — the label, the
-        // icon, the options button — so clearing it unconditionally makes the
-        // drop target blink off and on as the pointer crosses the tab it is
-        // hovering. Only a leave that lands outside the tab is a real one.
         if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
         onDragStateChange(null);
       }}
@@ -257,15 +207,9 @@ function ViewTab({
               onRenameEnd();
             }
           }}
-          // The 24px step is the tab's own height; the type step is the tab
-          // label's, so the name does not resize the moment you start editing it.
           className="w-28 text-ui"
         />
       ) : (
-        // Every tab keeps its own tab stop rather than a roving one. A roving
-        // tabindex needs arrow keys to reach the tabs it takes out of the
-        // order, and an arrow-key handler on this strip would swallow the
-        // cursor keys of the rename field living inside it.
         <button
           type="button"
           aria-current={isActive ? "page" : undefined}
@@ -285,9 +229,6 @@ function ViewTab({
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          {/* Sized below the control ladder on purpose: this is an affordance
-              inside a tab, not a control beside one, and the smallest rung
-              would be taller than the tab it sits in. */}
           <IconButton
             variant="ghost"
             aria-label={`${view.name} view options`}
@@ -323,8 +264,6 @@ function ViewTab({
                     key={type}
                     disabled={type === view.type}
                     onSelect={() => {
-                      // Selecting first means the type change lands on this view,
-                      // whichever tab was active when the menu opened.
                       useBoardStore.getState().setActiveView(view.id);
                       void setViewType(type);
                     }}
@@ -342,9 +281,6 @@ function ViewTab({
 
           <DropdownMenuSeparator />
 
-          {/* The same reorder the drag does, reachable without a pointer. A
-              tab strip whose only ordering gesture is drag-and-drop is a tab
-              strip somebody on a keyboard cannot reorder at all. */}
           <DropdownMenuItem disabled={!canManage || index === 0} onSelect={() => onMove(index - 1)}>
             <ChevronLeft />
             Move left
@@ -369,8 +305,6 @@ function ViewTab({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* A saved view is shared: deleting one takes it away from the team, not
-          just from this tab. The records themselves are untouched. */}
       <ConfirmDialog
         isOpen={isConfirmingDelete}
         title={`Delete the “${view.name}” view?`}

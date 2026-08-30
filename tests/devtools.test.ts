@@ -20,6 +20,8 @@ import { useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardColumnOf, DriveNode } from "@/types";
 
 import { testWorkspace } from "./helpers";
+import { devtoolsFake } from "./msw/fake/devtools.fake";
+import { boardFake } from "./msw/fake/board.fake";
 
 const WORKSPACE_ID = "ws_dev";
 
@@ -67,8 +69,6 @@ const ID = {
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-  boardService.reset();
-  devtoolsService.reset();
 
   useWorkspaceStore.setState({
     workspaces: [testWorkspace(WORKSPACE_ID)],
@@ -313,7 +313,7 @@ describe("secret documents", () => {
     const document = await devtoolsService.getSecrets(ID.secret);
     const entry = document.entries[0]!;
 
-    const value = await devtoolsService.revealSecret({
+    const value = await devtoolsFake.revealSecret({
       nodeId: ID.secret,
       secretId: entry.id,
       role: "admin",
@@ -333,7 +333,7 @@ describe("secret documents", () => {
     const entry = document.entries[0]!;
 
     await expect(
-      devtoolsService.revealSecret({
+      devtoolsFake.revealSecret({
         nodeId: ID.secret,
         secretId: entry.id,
         role: "member",
@@ -353,7 +353,7 @@ describe("secret documents", () => {
     const document = await devtoolsService.getSecrets(ID.secret);
     const entry = document.entries[1]!;
 
-    await devtoolsService.revealSecret({
+    await devtoolsFake.revealSecret({
       nodeId: ID.secret,
       secretId: entry.id,
       role: "admin",
@@ -363,7 +363,7 @@ describe("secret documents", () => {
     expect((await devtoolsService.listSecretAudit(ID.secret))[0]?.action).toBe("copy");
 
     await expect(
-      devtoolsService.revealSecret({
+      devtoolsFake.revealSecret({
         nodeId: ID.secret,
         secretId: entry.id,
         role: "viewer",
@@ -374,7 +374,7 @@ describe("secret documents", () => {
 
   test("an unknown secret is a not-found, not a leak", async () => {
     await expect(
-      devtoolsService.revealSecret({
+      devtoolsFake.revealSecret({
         nodeId: ID.secret,
         secretId: "nope",
         role: "admin",
@@ -394,12 +394,20 @@ describe("relations and backlinks", () => {
     expect(boards[0]?.boardId).toBe(`brd_${ID.api}`);
   });
 
-  test("a relation index resolves display ids across boards", async () => {
-    const targets = await boardService.relationIndex(`brd_${ID.task}`);
+  test("a relation index resolves the ids it is asked about, across boards", async () => {
+    // Endpoint GIẢI id, nó không liệt kê board — hỏi mà quên `ids` thì luôn
+    // nhận mảng rỗng, và mọi chip trên lưới hiện thành "[Deleted Item]".
+    const all = await boardService.searchRows(`brd_${ID.task}`, "");
+    const wanted = all.slice(0, 2).map((row) => row.id);
 
-    expect(targets).toHaveLength(4);
-    expect(targets[0]?.displayId).toBe("TASK-001");
+    const targets = await boardService.relationIndex(`brd_${ID.task}`, wanted);
+
+    expect(targets.map((target) => target.rowId).sort()).toEqual([...wanted].sort());
     expect(targets[0]?.boardName).toBe("Task Board");
+  });
+
+  test("hỏi với danh sách rỗng thì không gọi ra ngoài và trả rỗng", async () => {
+    expect(await boardService.relationIndex(`brd_${ID.task}`, [])).toEqual([]);
   });
 
   test("linking a row surfaces a backlink on the target", async () => {
@@ -416,7 +424,7 @@ describe("relations and backlinks", () => {
       ],
     });
 
-    const backlinks = await boardService.listBacklinks(target.id);
+    const backlinks = await boardFake.listBacklinks(target.id);
 
     expect(backlinks).toHaveLength(1);
     expect(backlinks[0]).toMatchObject({

@@ -16,24 +16,6 @@ import { findNodeById } from "@/lib/tree";
 import { nodeVisual } from "@/lib/node-visuals";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
 
-/**
- * Naming a node.
- *
- * Mounted once in the shell and driven by `renameRequestId`, so the same
- * surface serves both jobs: renaming something later, and naming something the
- * moment it is created. Creating a folder therefore opens here with the name
- * selected — one step, not "create, find it, open the menu, choose Rename".
- *
- * It replaced a `window.prompt`, which could not be styled, could not be
- * dismissed with Escape consistently, and was blocked outright in some
- * browsers.
- *
- * It is built from the dialog's own bands, and its Cancel is the same outline
- * button as the confirmation dialog's. The two surfaces are asked the same
- * question — commit or back out — and while each drew its own footer they
- * answered it in different colours, which teaches that ghost-Cancel and
- * outline-Cancel mean different things when they do not.
- */
 export function RenameDialog() {
   const nodeId = useWorkspaceStore((state) => state.renameRequestId);
   const clearRenameRequest = useWorkspaceStore((state) => state.clearRenameRequest);
@@ -43,17 +25,11 @@ export function RenameDialog() {
   const inputRef = useRef<HTMLInputElement>(null);
   const node = nodeId ? findNodeById(tree, nodeId) : null;
 
-  /**
-   * The draft is stored with the node it belongs to, so opening a different
-   * node falls back to that node's own name by derivation. Typing is never
-   * overwritten, and no effect has to reset anything.
-   */
   const [edited, setEdited] = useState<{ nodeId: string; value: string } | null>(null);
   const draft = edited && edited.nodeId === node?.id ? edited.value : (node?.name ?? "");
 
   useEffect(() => {
     if (!node) return;
-    // Select the whole name: the common case is replacing "Untitled folder".
     const frame = requestAnimationFrame(() => inputRef.current?.select());
     return () => cancelAnimationFrame(frame);
   }, [node?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- one focus per node

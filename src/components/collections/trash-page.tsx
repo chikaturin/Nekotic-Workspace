@@ -16,14 +16,6 @@ import { nodeVisual } from "@/lib/node-visuals";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import { cn } from "@/lib/utils";
 
-/**
- * Trash (SY-TRH-38).
- *
- * Deleted items are held whole — subtree and all — with where they came from,
- * who removed them and how long is left. Restore is the default action and it
- * says up front when the original folder is gone, because landing somewhere
- * unexpected without being told is how people lose things twice.
- */
 export function TrashPage() {
   const rows = useTrash();
   const restoreNode = useWorkspaceStore((state) => state.restoreNode);
@@ -125,10 +117,6 @@ export function TrashPage() {
   );
 }
 
-/**
- * One deleted item. Restore and permanent deletion are gated on the node's own
- * permissions, which is why the row is a component rather than markup in a map.
- */
 function TrashTableRow({
   row,
   onRestore,

@@ -13,23 +13,8 @@ interface GanttSetupProps {
   readonly endColumnId: string | null;
 }
 
-/**
- * The row that puts a picker back to "no column chosen".
- *
- * It stays an offered option rather than becoming the Select's clear button:
- * unsetting a date column is a normal thing to do here, and a row in the list
- * says so where a small × in the corner of the trigger only hints at it.
- */
 const NOT_SET_OPTION: ListboxOption = { value: "", label: "Not set" };
 
-/**
- * What the Gantt shows before it can show anything.
- *
- * A board's date columns are its own — there is no `startDate` field to assume —
- * so the chart asks which two to read rather than guessing, and the pickers are
- * here rather than behind a menu because choosing them *is* the next step.
- * They write to the same saved view the config bar's Dates menu does.
- */
 export function GanttSetup({ columns, startColumnId, endColumnId }: GanttSetupProps) {
   const setDateColumn = useBoardStore((state) => state.setDateColumn);
   const setEndDateColumn = useBoardStore((state) => state.setEndDateColumn);
@@ -56,10 +41,6 @@ export function GanttSetup({ columns, startColumnId, endColumnId }: GanttSetupPr
 
         {dateColumns.length > 0 && (
           <div className="mt-4 space-y-2 text-left">
-            {/* Each picker keeps its own `aria-label`. `FormField` gives the
-                caption an `htmlFor`, but a Select's trigger is a
-                `role="combobox"` div rather than a labelable element, so the
-                label alone would not name the control. */}
             <FormField label="Start date">
               {(field) => (
                 <Select

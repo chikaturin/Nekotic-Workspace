@@ -11,11 +11,9 @@ import type { MyWorkItem } from "@/types";
 interface WorkItemRowProps {
   readonly item: MyWorkItem;
   readonly onOpen: (item: MyWorkItem) => void;
-  /** Overdue rows carry a danger tint on their date. */
   readonly isOverdue?: boolean;
 }
 
-/** One record inside a My Work widget. Clicking it opens the record's drawer. */
 export function WorkItemRow({ item, onOpen, isOverdue = false }: WorkItemRowProps) {
   return (
     <button

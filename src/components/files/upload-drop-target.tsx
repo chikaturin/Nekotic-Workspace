@@ -13,10 +13,6 @@ interface UploadDropTargetProps {
   readonly children: ReactNode;
 }
 
-/**
- * Turns a whole region into a drop surface. Dropping anywhere on it hands the
- * files to the host, which is what opens the full-page uploader.
- */
 export function UploadDropTarget({ onFiles, label, className, children }: UploadDropTargetProps) {
   const [isOver, setIsOver] = useState(false);
 

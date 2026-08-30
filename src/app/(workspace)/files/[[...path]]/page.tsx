@@ -13,7 +13,6 @@ export async function generateMetadata({ params }: FilesPageProps): Promise<Meta
   return { title: current ? `Files · ${decodeURIComponent(current)}` : "Files" };
 }
 
-/** Static export needs every addressable path listed up front. */
 export function generateStaticParams() {
   return nodePathChains().map((path) => ({ path: [...path] }));
 }

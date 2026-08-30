@@ -79,29 +79,14 @@ export function SelectCellView({
 interface SelectEditorProps {
   readonly value: SelectValue;
   readonly column: BoardColumnOf<"select">;
-  /** The record being edited — what the option rules are evaluated against. */
   readonly rowId: string;
-  /** The whole schema, so a rule can test any other column of this record. */
   readonly columns: readonly BoardColumn[];
   readonly context: CellContext;
   readonly onCommit: (value: CellValue) => void;
   readonly onCancel: () => void;
-  /** Creating an option is a schema write, so the board store owns it. */
   readonly onCreateOption: (label: string) => Promise<SelectOption | null>;
 }
 
-/**
- * The Select editor.
- *
- * Which options are offered is *configuration*, resolved by
- * `lib/select-availability` against this record: an option switched off in
- * column settings, one whose conditions do not hold, or one a transition rule
- * cannot reach from where the record is now, is either greyed out with its
- * reason or hidden — whichever the column is set to.
- *
- * No business rule is written here. This component asks "may this record take
- * that option?" and renders the answer.
- */
 export function SelectCellEditor({
   value,
   column,
@@ -142,8 +127,6 @@ export function SelectCellEditor({
 
   function toggle(entry: OptionAvailability) {
     if (!entry.isAvailable) {
-      // Say why, in place. A disabled row that does nothing on click reads as
-      // a broken control rather than a rule.
       setBlocked(entry.option.id);
       return;
     }

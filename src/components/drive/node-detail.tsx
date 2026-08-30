@@ -11,10 +11,6 @@ import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import { isBoard, isFile, type DriveNode } from "@/types";
 
-/**
- * Leaf destination view. Boards get a summary card (the board surface itself
- * lives outside Drive Mode); files get their metadata plus a preview launcher.
- */
 export function NodeDetail({ node }: { node: DriveNode }) {
   const openPreview = useWorkspaceStore((state) => state.openPreview);
   const toggleFavorite = useWorkspaceStore((state) => state.toggleFavorite);

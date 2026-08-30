@@ -9,10 +9,6 @@ interface PdfPreviewProps {
   readonly onDownload: () => void;
 }
 
-/**
- * PDFs render through the browser's built-in viewer. The fallback matters:
- * some environments block embedded PDFs entirely.
- */
 export function PdfPreview({ url, fileName, onDownload }: PdfPreviewProps) {
   return (
     <div className="h-full w-full p-3">

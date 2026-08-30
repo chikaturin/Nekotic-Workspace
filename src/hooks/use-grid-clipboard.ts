@@ -7,13 +7,6 @@ import { useBoardStore } from "@/store/board-store";
 import { useGridStore } from "@/store/grid-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 
-/**
- * Excel-style clipboard for the grid.
- *
- * These are the browser's own `copy`/`cut`/`paste` events rather than the async
- * Clipboard API: no permission prompt, and the payload is TSV, so a range
- * round-trips through a real spreadsheet.
- */
 export function useGridClipboard(slice: GridSlice, isReadOnly = false) {
   const editCells = useBoardStore((state) => state.editCells);
   const pushFeedback = useWorkspaceStore((state) => state.pushFeedback);

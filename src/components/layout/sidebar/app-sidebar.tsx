@@ -50,12 +50,12 @@ const SMART_VIEW_ICONS: Record<SmartViewId, LucideIcon> = {
   trash: Trash2,
 };
 
-/** Collapsible primary rail: workspace, create, project tree, smart views. */
 export function AppSidebar() {
   const isCollapsed = useWorkspaceStore((state) => state.isSidebarCollapsed);
   const toggleSidebar = useWorkspaceStore((state) => state.toggleSidebar);
   const createFolder = useWorkspaceStore((state) => state.createFolder);
   const workspace = useWorkspaceStore(selectActiveWorkspace);
+  const hasWorkspace = useWorkspaceStore((state) => state.activeWorkspaceId !== "");
   const tree = useWorkspaceStore(selectTree);
   const { targetId, targetName } = useCurrentTarget();
   const { theme, toggleTheme } = useTheme();
@@ -78,8 +78,6 @@ export function AppSidebar() {
         <NewItemMenu isCollapsed={isCollapsed} targetId={targetId} targetName={targetName} />
       </div>
 
-      {/* The one part of the rail that flexes: everything above and below it
-          keeps its natural height, so this is what overflows and scrolls. */}
       <div
         className={cn(
           "no-scrollbar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-2 pb-3",
@@ -99,7 +97,8 @@ export function AppSidebar() {
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  onClick={() => createFolder(null, "Untitled project folder")}
+                  disabled={!hasWorkspace}
+                  onClick={() => void createFolder(null, "Untitled project folder")}
                   aria-label="New top-level folder"
                 >
                   <FolderPlus />
@@ -147,8 +146,6 @@ export function AppSidebar() {
             />
           ))}
 
-          {/* Hidden rather than disabled: a rail entry that always refuses is
-              an invitation to ask why. The page checks the same key again. */}
           {can("workspace.audit.view") && (
             <SidebarNavItem
               href="/audit"

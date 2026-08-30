@@ -5,6 +5,6 @@ export { documentService, summarize, type DocumentSummaryPatch } from "./documen
 export { fileService, type ListFilesInput, type UploadInput } from "./file-service";
 export { linkService, type LinkMetadata } from "./link-service";
 export { myWorkService, type MyWorkInput } from "./my-work-service";
-export { notificationService, type EmitInput } from "./notification-service";
+export { notificationService } from "./notification-service";
 export { searchService, type SearchInput } from "./search-service";
-export { watchService, type SetWatchInput } from "./watch-service";
+export { watchService } from "./watch-service";

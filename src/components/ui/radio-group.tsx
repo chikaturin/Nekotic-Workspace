@@ -5,7 +5,6 @@ import { createContext, useContext, useId, type ComponentProps, type ReactNode }
 import { cn } from "@/lib/utils";
 
 interface RadioGroupContextValue {
-  /** Shared `name`, which is what makes the platform treat these as one group. */
   readonly name: string;
   readonly value: string;
   readonly onValueChange: (value: string) => void;
@@ -14,12 +13,6 @@ interface RadioGroupContextValue {
 
 const RadioGroupContext = createContext<RadioGroupContextValue | null>(null);
 
-/**
- * Items read their name, checked state and handler from the group rather than
- * repeating them at every option — that repetition is exactly what drifts, and
- * a single mistyped `name` silently splits one group into two that can both be
- * selected at once.
- */
 function useRadioGroup(componentName: string): RadioGroupContextValue {
   const context = useContext(RadioGroupContext);
   if (context === null) {
@@ -32,28 +25,12 @@ export interface RadioGroupProps
   extends Omit<ComponentProps<"fieldset">, "onChange" | "defaultValue" | "value" | "name"> {
   readonly value: string;
   readonly onValueChange: (value: string) => void;
-  /** Rendered as the `<legend>`. Omit it only when a heading above already names the group. */
   readonly label?: ReactNode;
-  /** Only needed to keep two groups apart across a remount; otherwise generated. */
   readonly name?: string;
-  /**
-   * Layout for the options themselves. `className` styles the fieldset, which
-   * is the wrong box to make a grid out of — the legend would become a grid
-   * item. Pass `grid grid-cols-3 gap-2` here for a row of cards.
-   */
   readonly listClassName?: string;
-  /** Disables every option at once, for a group the viewer may read but not change. */
   readonly disabled?: boolean;
 }
 
-/**
- * A set of mutually exclusive options.
- *
- * Real `<input type="radio">` elements underneath, so roving focus, the arrow
- * keys and the "only one at a time" rule all come from the platform. Re-built
- * out of divs, every one of those has to be written by hand and one of them is
- * always missing.
- */
 export function RadioGroup({
   value,
   onValueChange,
@@ -65,16 +42,10 @@ export function RadioGroup({
   children,
   ...props
 }: RadioGroupProps) {
-  // A group with no explicit name still needs one the browser can group by,
-  // and two of these on the same screen must not collide.
   const generatedName = useId();
 
   return (
     <fieldset data-slot="radio-group" className={cn("min-w-0", className)} {...props}>
-      {/* The caption speaks in the same voice as `Label` in field.tsx. A radio
-          group and a form field stacked in one dialog were captioning
-          themselves in two registers — uppercase micro-caps against sentence
-          case — which reads as two products, not two controls. */}
       {label !== undefined && (
         <legend className="mb-1.5 text-body font-medium text-muted-foreground">
           {label}
@@ -101,13 +72,6 @@ interface RadioMarkProps extends Omit<ComponentProps<"input">, "type" | "checked
   readonly isChecked: boolean;
 }
 
-/**
- * The input itself, styled — same native-first shape as Checkbox, so a radio
- * and a checkbox sitting in one form are the same size and weight. The dot is
- * drawn over the input instead of by the platform because `accent-color`
- * cannot be given the border, hover and disabled treatment the rest of the
- * controls share.
- */
 function RadioMark({ isChecked, className, ...props }: RadioMarkProps) {
   return (
     <span className="relative inline-flex size-4 shrink-0 items-center justify-center">
@@ -139,11 +103,9 @@ export interface RadioGroupItemProps
   > {
   readonly value: string;
   readonly label: ReactNode;
-  /** The consequence of picking this one, when the label alone does not say it. */
   readonly description?: ReactNode;
 }
 
-/** One option in a list: the control, its label, and optionally what it does. */
 export function RadioGroupItem({
   value,
   label,
@@ -166,8 +128,6 @@ export function RadioGroupItem({
         className,
       )}
     >
-      {/* A 16px control against an 18px line box: one pixel down puts it on the
-          label's optical centre and keeps it there when a description wraps. */}
       <RadioMark
         isChecked={isChecked}
         name={group.name}
@@ -189,9 +149,6 @@ export function RadioGroupItem({
 }
 
 const radioCardVariants = cva(
-  // The ring lands on the card rather than on the control inside it, because in
-  // the stacked layout the control is visually hidden and the card is the only
-  // thing a keyboard user can see they have landed on.
   "relative rounded-lg border transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
   {
     variants: {
@@ -209,8 +166,6 @@ const radioCardVariants = cva(
       },
     },
     compoundVariants: [
-      // Only an option that can still be picked reacts to the pointer; a hover
-      // on a dead card promises something the click will not deliver.
       {
         isSelected: false,
         isDisabled: false,
@@ -229,22 +184,11 @@ export interface RadioCardProps
   readonly value: string;
   readonly label: ReactNode;
   readonly description?: ReactNode;
-  /** An icon element — it inherits the card's selected/unselected colour. */
   readonly icon?: ReactNode;
-  /** Trailing detail, such as the row count a format would write. */
   readonly meta?: ReactNode;
-  /** `row` for a list of choices, `stack` for a grid of icon-led cards. */
   readonly layout?: "row" | "stack";
 }
 
-/**
- * An option as a bordered, clickable card.
- *
- * `stack` hides the control and lets the card's own border carry the selection,
- * which is how the export-format cards already read. Hidden, not removed: it is
- * still the real radio, so it still takes focus and still moves with the arrow
- * keys — a card that only responds to a click strands anyone not using a mouse.
- */
 export function RadioCard({
   value,
   label,

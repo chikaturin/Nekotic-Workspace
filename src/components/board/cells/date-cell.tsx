@@ -39,23 +39,6 @@ interface DateEditorProps {
   readonly onCancel: () => void;
 }
 
-/**
- * The design system calendar, mounted straight into the cell.
- *
- * There is no trigger here on purpose. A cell that has been opened for editing
- * has already been clicked; putting a "Pick a date" button inside it would mean
- * a second click to reach the thing the first click asked for. The trigger form
- * — `DatePicker` — is for the places where the control sits at rest in a form.
- *
- * It is also why this is a bare `Calendar` rather than the picker: `DatePicker`
- * opens a portalled popover at `z-dropdown`, which would paint over the frozen
- * primary column. The editor surface sits *below* the frozen pane by design,
- * and `revealBeyondFrozen` scrolls the cell clear of it first.
- *
- * Choosing a day commits and closes — one click, no Apply. A column that also
- * carries a time is the one exception: the day is half the value there, so the
- * draft is held until both halves are in.
- */
 export function DateCellEditor({ value, column, onCommit, onCancel }: DateEditorProps) {
   const includesTime = column.config.includesTime;
   const stored = dayKeyOf(value.iso);
@@ -73,10 +56,6 @@ export function DateCellEditor({ value, column, onCommit, onCancel }: DateEditor
       return;
     }
 
-    // Date-only keeps whatever time the value already carried — a value that
-    // arrived from an import at 09:00 should not silently become midnight
-    // because somebody moved it a day. With a time field on screen, that field
-    // is the answer instead.
     onCommit({
       kind: "date",
       iso: includesTime ? `${day}T${time || "00:00"}:00.000Z` : withDayKey(value.iso, day),
@@ -109,8 +88,6 @@ export function DateCellEditor({ value, column, onCommit, onCancel }: DateEditor
                   setDraft((current) => ({ ...current, time: event.target.value }))
                 }
                 onKeyDown={(event) => {
-                  // The one field in this editor you type into, so it is the
-                  // one place Enter can mean "done" without ambiguity.
                   if (event.key === "Enter" && draft.day) {
                     event.preventDefault();
                     commit(draft.day, draft.time);
@@ -156,7 +133,6 @@ export function DateCellEditor({ value, column, onCommit, onCancel }: DateEditor
   );
 }
 
-/** `14:30` out of a stored instant, in the UTC the whole app reads dates in. */
 function timeOf(iso: string | null): string {
   if (!iso) return "";
   const at = Date.parse(iso);

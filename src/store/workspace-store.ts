@@ -12,7 +12,7 @@ import {
   removeNode,
   updateNode,
 } from "@/lib/tree";
-import { extractTrashed, restoreTargetFor, trashNodeFrom, untrash } from "@/lib/trash";
+import { restoreTargetFor, trashNodeFrom, untrash } from "@/lib/trash";
 import {
   moveVisibilityImpact,
   visibleTree,
@@ -20,7 +20,6 @@ import {
 } from "@/lib/permissions/visibility";
 import {
   isWorkspaceMember,
-  makeWorkspace,
   visibleWorkspaces,
   withMember,
   withoutMember,
@@ -28,12 +27,14 @@ import {
   type NewWorkspaceInput,
   type WorkspaceAccess,
 } from "@/lib/workspace-access";
-import { usePermissionStore } from "@/store/permission-store";
+import type { CompletedUpload } from "@/services/api/file.api";
+import { EMPTY_RULES, usePermissionStore } from "@/store/permission-store";
+import { workspaceApi } from "@/services/api/workspace.api";
+import { driveApi, type CreateNodeInput } from "@/services/api/drive.api";
+import { fetchTree, writeThrough } from "@/store/drive-sync";
 import type { DocumentSummaryPatch } from "@/services/document-service";
+import { toAppError } from "@/services/errors";
 import { createId, slugify, uniqueSlug } from "@/lib/utils";
-import { CURRENT_USER } from "@/mock/users";
-import { TREES_BY_WORKSPACE } from "@/mock/tree";
-import { DEFAULT_WORKSPACE_ID, WORKSPACES } from "@/mock/workspaces";
 import {
   childrenOf,
   isContainer,
@@ -43,60 +44,22 @@ import {
   type DocumentKind,
   type DocumentNode,
   type DriveNode,
-  type FileAsset,
   type FileNode,
-  type FolderNode,
   type SortState,
   type NodeAccessMode,
   type TrashEntry,
-  type UserSummary,
   type ViewMode,
   type Workspace,
   type WorkspaceRole,
+  type StorageQuota,
 } from "@/types";
-
-/**
- * Deleting detaches (SY-TRH-38): the subtree leaves the tree and lives in the
- * bin until it is restored or purged. Nodes the dataset ships as deleted are
- * moved across at start-up, so there is one representation of "deleted" rather
- * than two that can disagree.
- */
-function seedWorkspaces(): {
-  readonly trees: Record<string, readonly DriveNode[]>;
-  readonly bins: Record<string, readonly TrashEntry[]>;
-} {
-  const trees: Record<string, readonly DriveNode[]> = {};
-  const bins: Record<string, readonly TrashEntry[]> = {};
-
-  for (const [workspaceId, tree] of Object.entries(TREES_BY_WORKSPACE)) {
-    // The seed carries no deletion record, so the node's own last-touched time
-    // and owner stand in for it — never a clock read, which would desync SSR.
-    const result = extractTrashed(tree, (node) => ({
-      deletedAt: node.updatedAt,
-      deletedBy: node.owner,
-    }));
-
-    trees[workspaceId] = result.tree;
-    bins[workspaceId] = result.entries;
-  }
-
-  return { trees, bins };
-}
-
-const SEEDED = seedWorkspaces();
-
-const DOCUMENT_LABELS: Readonly<Record<DocumentKind, string>> = {
-  page: "page",
-  config: "config",
-  secret: "secret document",
-};
+import { currentUser, currentUserId } from "@/store/session-store";
 
 export type FeedbackTone = "info" | "success" | "error";
 
 export interface RowRequest {
   readonly nodeId: string;
   readonly rowId: string;
-  /** Bumped every time, so asking for the same row twice still fires. */
   readonly nonce: number;
 }
 
@@ -110,7 +73,6 @@ interface WorkspaceState {
   readonly workspaces: readonly Workspace[];
   readonly activeWorkspaceId: string;
   readonly treeByWorkspace: Readonly<Record<string, readonly DriveNode[]>>;
-  /** Soft-deleted subtrees, detached from the tree they came out of. */
   readonly trashByWorkspace: Readonly<Record<string, readonly TrashEntry[]>>;
 
   readonly expandedIds: readonly string[];
@@ -119,52 +81,36 @@ interface WorkspaceState {
   readonly sort: SortState;
 
   readonly previewNodeId: string | null;
-  /**
-   * A record the app has been asked to open, set when a notification, a search
-   * hit or a My Work item routes to a board. The board consumes it after it
-   * loads — the grid store is reset per board and cannot carry the intent.
-   */
   readonly rowRequest: RowRequest | null;
-  /**
-   * A node whose name the user should be editing right now — set the moment a
-   * folder or a board is created, so "create" lands the caret in the name
-   * rather than leaving an "Untitled folder" for someone to rename later.
-   */
   readonly renameRequestId: string | null;
-  /**
-   * A page whose title should take the caret as soon as it opens. Set when a
-   * page is created, so the first thing on screen is an editable title rather
-   * than the word "Untitled" waiting to be found.
-   */
   readonly titleFocusNodeId: string | null;
   readonly isSidebarCollapsed: boolean;
   readonly isSearchOpen: boolean;
   readonly feedback: Feedback | null;
 
-  /** Monotonic counter backing deterministic ids for created nodes. */
   readonly seed: number;
 }
 
 interface WorkspaceActions {
-  /**
-   * Switch tenants. Refused for a workspace the signed-in user is not in —
-   * a switcher can be bypassed, this cannot.
-   */
   setActiveWorkspace: (workspaceId: string) => boolean;
+  clear: () => void;
 
-  /* Workspace lifecycle. The creator is an admin from the first frame. */
-  createWorkspace: (input: NewWorkspaceInput, creator: UserSummary) => string;
+  createWorkspace: (input: NewWorkspaceInput) => Promise<string | null>;
   updateWorkspace: (workspaceId: string, patch: Partial<NewWorkspaceInput>) => void;
   deleteWorkspace: (workspaceId: string) => void;
 
-  /* Membership. Each is its own action — leaving is not being removed. */
-  addMember: (workspaceId: string, user: UserSummary, role: WorkspaceRole) => void;
-  setMemberRole: (workspaceId: string, userId: string, role: WorkspaceRole) => void;
-  removeMember: (workspaceId: string, userId: string) => void;
-  leaveWorkspace: (workspaceId: string, userId: string) => void;
+  createMemberAccount: (input: {
+    readonly email: string;
+    readonly name: string;
+    readonly password: string;
+    readonly role: WorkspaceRole;
+  }) => Promise<boolean>;
+  inviteMember: (email: string, role: WorkspaceRole) => Promise<boolean>;
+  setMemberRole: (workspaceId: string, userId: string, role: WorkspaceRole) => Promise<void>;
+  removeMember: (workspaceId: string, userId: string) => Promise<void>;
+  leaveWorkspace: (workspaceId: string, userId: string) => Promise<void>;
 
-  /** Who may see a node, as opposed to what they may do with it. */
-  setNodeAccessMode: (nodeId: string, mode: NodeAccessMode) => void;
+  setNodeAccessMode: (nodeId: string, mode: NodeAccessMode) => Promise<void>;
 
   toggleExpanded: (nodeId: string) => void;
   expandToNode: (nodeId: string) => void;
@@ -178,51 +124,50 @@ interface WorkspaceActions {
   setSort: (sort: SortState) => void;
 
   toggleFavorite: (nodeId: string) => void;
+  togglePinned: (nodeId: string) => void;
   renameNode: (nodeId: string, name: string) => void;
-  createFolder: (parentId: string | null, name: string) => void;
+  createFolder: (parentId: string | null, name: string) => Promise<void>;
   moveNode: (nodeId: string, targetParentId: string | null) => void;
-  /** Archive or restore a project, folder, board or page (SY-ARC-37). */
   setNodeArchived: (nodeId: string, isArchived: boolean) => void;
   trashNode: (nodeId: string) => void;
-  /** One state write for a multi-select delete, not one per item. */
   trashNodes: (nodeIds: readonly string[]) => void;
   restoreNode: (nodeId: string) => void;
   deleteForever: (nodeId: string) => void;
   emptyTrash: () => void;
-  /** Insert a file that the upload service has already stored. */
-  addUploadedAsset: (parentId: string | null, asset: FileAsset) => string;
-  /** Create an empty page and return the node so the caller can navigate. */
+  addUploadedAsset: (parentId: string | null, upload: CompletedUpload) => string;
+  applyStorageUsage: (storage: StorageQuota) => void;
+  forgetMissingNode: (nodeId: string) => void;
   createDocument: (
     parentId: string | null,
     name: string,
     icon: string,
     documentKind?: DocumentKind,
-  ) => DocumentNode | null;
-  /** Create a board from a template and return the node for navigation. */
-  createBoard: (parentId: string | null, name: string, templateId: string) => BoardNode | null;
-  /** Copy a node (and its subtree) next to the original. */
+  ) => Promise<DocumentNode | null>;
+  createBoard: (
+    parentId: string | null,
+    name: string,
+    templateId: string,
+  ) => Promise<BoardNode | null>;
   duplicateNode: (nodeId: string) => DriveNode | null;
-  /** Mirror document content changes onto the tree summary. */
   applyDocumentSummary: (nodeId: string, patch: DocumentSummaryPatch) => void;
-  /** Mirror a saved file edit onto the tree: new size, new version. */
   applyFileSave: (nodeId: string, sizeBytes: number) => void;
 
   openPreview: (nodeId: string) => void;
   closePreview: () => void;
 
-  /** Ask the board at `nodeId` to open `rowId` in its drawer once it is ready. */
   requestRow: (nodeId: string, rowId: string) => void;
   clearRowRequest: () => void;
 
-  /** Open the rename surface on a node — how "create" hands over to editing. */
   requestRename: (nodeId: string) => void;
   clearRenameRequest: () => void;
 
   requestTitleFocus: (nodeId: string) => void;
   clearTitleFocus: () => void;
 
+  hydrate: (workspaceId?: string) => Promise<boolean>;
+  hydrateWorkspaces: () => Promise<boolean>;
+
   toggleSidebar: () => void;
-  /** Set directly — the responsive rail drives this, not a click. */
   setSidebarCollapsed: (isCollapsed: boolean) => void;
   setSearchOpen: (open: boolean) => void;
   pushFeedback: (message: string, tone?: FeedbackTone) => void;
@@ -233,16 +178,13 @@ export type WorkspaceStore = WorkspaceState & WorkspaceActions;
 
 const INITIAL_SORT: SortState = { key: "name", direction: "asc" };
 
-/** Root project of the mock tree starts open so the drive is never empty. */
-const INITIAL_EXPANDED: readonly string[] = ["nd_development", "nd_development_backend"];
-
 export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
-  workspaces: WORKSPACES,
-  activeWorkspaceId: DEFAULT_WORKSPACE_ID,
-  treeByWorkspace: SEEDED.trees,
-  trashByWorkspace: SEEDED.bins,
+  workspaces: [],
+  activeWorkspaceId: "",
+  treeByWorkspace: {},
+  trashByWorkspace: {},
 
-  expandedIds: INITIAL_EXPANDED,
+  expandedIds: [],
   selectedIds: [],
   viewMode: "grid",
   sort: INITIAL_SORT,
@@ -256,21 +198,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   feedback: null,
   seed: 0,
 
-  /**
-   * Switching tenants clears everything scoped to the old one.
-   *
-   * Selection, expansion and the open preview all name nodes that do not exist
-   * in the workspace being switched to. Carrying them across would leave one
-   * workspace's ids briefly addressing another's tree, which is a data leak
-   * wearing the costume of a rendering glitch.
-   *
-   * Refused outright for a workspace the person is not in: the switcher only
-   * lists what they hold, but the switcher is not the only way in here.
-   */
   setActiveWorkspace: (workspaceId) => {
     const state = get();
     if (state.activeWorkspaceId === workspaceId) return true;
-    if (!isWorkspaceMember(state.workspaces.find((item) => item.id === workspaceId), CURRENT_USER.id)) {
+    if (!isWorkspaceMember(state.workspaces.find((item) => item.id === workspaceId), currentUser().id)) {
       return false;
     }
 
@@ -287,30 +218,49 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
     return true;
   },
 
-  createWorkspace: (input, creator) => {
-    const state = get();
-    const seed = state.seed + 1;
-
-    const workspace = makeWorkspace(input, creator, {
-      id: `ws_${seed.toString(36)}_${slugify(input.name).slice(0, 12) || "workspace"}`,
-      slugsTaken: state.workspaces.map((item) => item.slug),
-      joinedAt: MOCK_NOW,
-    });
-
+  clear: () => {
     set({
-      seed,
-      workspaces: [...state.workspaces, workspace],
-      // A new workspace has no tree and no bin. Seeding it with either would
-      // put somebody else's fixtures inside something a person just made.
-      treeByWorkspace: { ...state.treeByWorkspace, [workspace.id]: [] },
-      trashByWorkspace: { ...state.trashByWorkspace, [workspace.id]: [] },
-      activeWorkspaceId: workspace.id,
+      workspaces: [],
+      activeWorkspaceId: "",
+      treeByWorkspace: {},
+      trashByWorkspace: {},
       selectedIds: [],
       expandedIds: [],
       previewNodeId: null,
+      rowRequest: null,
+      renameRequestId: null,
+      titleFocusNodeId: null,
+      feedback: null,
     });
+  },
 
-    return workspace.id;
+  createWorkspace: async (input) => {
+    try {
+      const workspace = await workspaceApi.create({
+        name: input.name.trim(),
+        ...(input.description?.trim()
+          ? { description: input.description.trim() }
+          : {}),
+      });
+
+      set((state) => ({
+        workspaces: [...state.workspaces, workspace],
+        treeByWorkspace: { ...state.treeByWorkspace, [workspace.id]: [] },
+        trashByWorkspace: { ...state.trashByWorkspace, [workspace.id]: [] },
+        activeWorkspaceId: workspace.id,
+        selectedIds: [],
+        expandedIds: [],
+        previewNodeId: null,
+      }));
+
+      return workspace.id;
+    } catch (error) {
+      set((state) => ({
+        feedback: makeFeedback(state, toAppError(error).message, "error"),
+      }));
+
+      return null;
+    }
   },
 
   updateWorkspace: (workspaceId, patch) =>
@@ -330,11 +280,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       ),
     })),
 
-  /**
-   * Destroy a workspace and everything scoped to it. The active one falls back
-   * to another the person actually holds — never to whatever happens to be
-   * first in the list.
-   */
   deleteWorkspace: (workspaceId) =>
     set((state) => {
       const workspaces = state.workspaces.filter((workspace) => workspace.id !== workspaceId);
@@ -343,7 +288,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       delete trees[workspaceId];
       delete bins[workspaceId];
 
-      const mine = visibleWorkspaces(workspaces, CURRENT_USER.id);
+      const mine = visibleWorkspaces(workspaces, currentUser().id);
       const nextActive =
         state.activeWorkspaceId === workspaceId
           ? mine[0]?.id ?? ""
@@ -359,43 +304,95 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       };
     }),
 
-  addMember: (workspaceId, user, role) =>
-    set((state) => ({
-      workspaces: state.workspaces.map((workspace) =>
-        workspace.id === workspaceId ? withMember(workspace, user, role, MOCK_NOW) : workspace,
-      ),
-    })),
+  createMemberAccount: async (input) => {
+    const workspaceId = get().activeWorkspaceId;
+    if (workspaceId === "") return false;
 
-  setMemberRole: (workspaceId, userId, role) =>
-    set((state) => ({
-      workspaces: state.workspaces.map((workspace) =>
-        workspace.id === workspaceId
-          ? {
-              ...workspace,
-              members: workspace.members.map((member) =>
-                member.id === userId ? { ...member, role } : member,
-              ),
-            }
-          : workspace,
-      ),
-    })),
+    try {
+      const member = await workspaceApi.createMemberAccount(workspaceId, input);
 
-  /**
-   * Take somebody out. If it is the signed-in user losing the workspace they
-   * are standing in, the switch happens in the same write — so there is no
-   * frame in which the app is showing a tree they no longer hold.
-   */
-  removeMember: (workspaceId, userId) =>
+      set((state) => ({
+        workspaces: state.workspaces.map((workspace) =>
+          workspace.id === workspaceId
+            ? withMember(workspace, member, member.role, member.joinedAt)
+            : workspace,
+        ),
+      }));
+
+      return true;
+    } catch (error: unknown) {
+      get().pushFeedback(toAppError(error).message, "error");
+
+      return false;
+    }
+  },
+
+  inviteMember: async (email, role) => {
+    const workspaceId = get().activeWorkspaceId;
+    if (workspaceId === "") return false;
+
+    try {
+      await workspaceApi.invite(workspaceId, email, role);
+
+      return true;
+    } catch (error: unknown) {
+      get().pushFeedback(toAppError(error).message, "error");
+
+      return false;
+    }
+  },
+
+  setMemberRole: async (workspaceId, userId, role) => {
+    const previous = get()
+      .workspaces.find((workspace) => workspace.id === workspaceId)
+      ?.members.find((member) => member.id === userId)?.role;
+
+    const write = (next: WorkspaceRole) =>
+      set((state) => ({
+        workspaces: state.workspaces.map((workspace) =>
+          workspace.id === workspaceId
+            ? {
+                ...workspace,
+                members: workspace.members.map((member) =>
+                  member.id === userId ? { ...member, role: next } : member,
+                ),
+              }
+            : workspace,
+        ),
+      }));
+
+    write(role);
+
+    try {
+      await workspaceApi.changeRole(workspaceId, userId, role);
+    } catch (error: unknown) {
+      if (previous !== undefined) write(previous);
+      get().pushFeedback(toAppError(error).message, "error");
+    }
+  },
+
+  removeMember: async (workspaceId, userId) => {
+    const isSelf = userId === currentUserId();
+
+    try {
+      if (isSelf) await workspaceApi.leave(workspaceId);
+      else await workspaceApi.removeMember(workspaceId, userId);
+    } catch (error: unknown) {
+      get().pushFeedback(toAppError(error).message, "error");
+
+      return;
+    }
+
     set((state) => {
       const workspaces = state.workspaces.map((workspace) =>
         workspace.id === workspaceId ? withoutMember(workspace, userId) : workspace,
       );
 
-      if (userId !== CURRENT_USER.id || state.activeWorkspaceId !== workspaceId) {
+      if (!isSelf || state.activeWorkspaceId !== workspaceId) {
         return { workspaces };
       }
 
-      const mine = visibleWorkspaces(workspaces, CURRENT_USER.id);
+      const mine = visibleWorkspaces(workspaces, userId);
 
       return {
         workspaces,
@@ -405,17 +402,32 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         previewNodeId: null,
         rowRequest: null,
       };
-    }),
+    });
+  },
 
   leaveWorkspace: (workspaceId, userId) => get().removeMember(workspaceId, userId),
 
-  setNodeAccessMode: (nodeId, mode) =>
+  setNodeAccessMode: async (nodeId, mode) => {
+    const node = findNodeById(currentTree(get()), nodeId);
+
+    try {
+      await driveApi.setAccessMode(nodeId, mode);
+    } catch (error: unknown) {
+      get().pushFeedback(
+        `Could not change who can see “${node?.name ?? "this item"}” — ${toAppError(error).message}`,
+        "error",
+      );
+
+      return;
+    }
+
     set((state) => ({
       ...writeTree(
         state,
         updateNode(currentTree(state), nodeId, (item) => ({ ...item, accessMode: mode })),
       ),
-    })),
+    }));
+  },
 
   toggleExpanded: (nodeId) =>
     set((state) => ({
@@ -451,10 +463,49 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   setViewMode: (mode) => set({ viewMode: mode }),
   setSort: (sort) => set({ sort }),
 
+  /**
+   * Ghim khác Favorites: ghim là trạng thái CHUNG của node, ai trong workspace
+   * cũng thấy nó trên thanh bên, nên nó đòi quyền sửa chứ không phải quyền xem.
+   */
+  togglePinned: (nodeId) =>
+    set((state) => {
+      const node = findNodeById(currentTree(state), nodeId);
+      if (!node) return state;
+
+      syncNodeChange(
+        () => driveApi.pin(nodeId, !node.isPinned),
+        nodeId,
+        node,
+        `Could not update “${node.name}”`,
+      );
+
+      return {
+        ...writeTree(
+          state,
+          updateNode(currentTree(state), nodeId, (item) => ({
+            ...item,
+            isPinned: !item.isPinned,
+          })),
+        ),
+        feedback: makeFeedback(
+          state,
+          node.isPinned ? `Unpinned “${node.name}”` : `Pinned “${node.name}”`,
+          "info",
+        ),
+      };
+    }),
+
   toggleFavorite: (nodeId) =>
     set((state) => {
       const node = findNodeById(currentTree(state), nodeId);
       if (!node) return state;
+
+      syncNodeChange(
+        () => driveApi.favorite(nodeId, !node.isFavorite),
+        nodeId,
+        node,
+        `Could not update “${node.name}”`,
+      );
 
       return {
         ...writeTree(state, updateNode(currentTree(state), nodeId, (item) => ({
@@ -469,22 +520,23 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       };
     }),
 
-  /**
-   * Rename, and give the node a slug no sibling already holds.
-   *
-   * The slug is what the URL addresses, so two siblings sharing one is not a
-   * cosmetic clash: `resolvePath` walks the chain and takes the first match, so
-   * the loser becomes unreachable and every link to it silently opens the
-   * other. Creating deduped and renaming did not, which left the collision one
-   * rename away — and reachable the moment a document could be renamed from its
-   * own page.
-   */
   renameNode: (nodeId, name) =>
     set((state) => {
       const trimmed = name.trim();
       if (trimmed.length === 0) return state;
 
       const tree = currentTree(state);
+      const previous = findNodeById(tree, nodeId);
+
+      if (previous !== null) {
+        syncNodeChange(
+          () => driveApi.update(nodeId, { name: trimmed }),
+          nodeId,
+          previous,
+          `Could not rename “${previous.name}”`,
+        );
+      }
+
       const parentId = parentIdOf(tree, nodeId);
       const taken = siblingsOf(tree, parentId)
         .filter((sibling) => sibling.id !== nodeId)
@@ -513,38 +565,20 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       ),
     ),
 
-  createFolder: (parentId, name) =>
-    set((state) => {
-      const tree = currentTree(state);
-      const siblings = siblingsOf(tree, parentId);
-      const slug = uniqueSlug(slugify(name), siblings.map((node) => node.slug));
-      const nextSeed = state.seed + 1;
+  createFolder: async (parentId, name) => {
+    const created = await createRemoteNode(get(), set, {
+      kind: "folder",
+      name: name.trim() || "Untitled folder",
+      parentId,
+    });
 
-      const folder: FolderNode = {
-        id: createId("new", nextSeed),
-        name: name.trim() || "Untitled folder",
-        slug,
-        parentId,
-        workspaceId: state.activeWorkspaceId,
-        owner: CURRENT_USER,
-        createdAt: MOCK_NOW,
-        updatedAt: MOCK_NOW,
-        isFavorite: false,
-        isTrashed: false,
-        isShared: false,
-        type: "folder",
-        children: [],
-      };
+    if (created === null) return;
 
-      // A new folder opens straight into its name — creating one and having
-      // to hunt for "Rename" afterwards is two steps where one will do.
-      return {
-        ...writeTree(state, insertNode(tree, parentId, folder)),
-        seed: nextSeed,
-        renameRequestId: folder.id,
-        feedback: makeFeedback(state, `Created folder “${folder.name}”`, "success"),
-      };
-    }),
+    set((state) => ({
+      renameRequestId: created.id,
+      feedback: makeFeedback(state, `Created folder “${created.name}”`, "success"),
+    }));
+  },
 
   moveNode: (nodeId, targetParentId) =>
     set((state) => {
@@ -560,13 +594,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
         ? (findNodeById(tree, targetParentId)?.name ?? "workspace root")
         : "workspace root";
 
-      /**
-       * Moving something is a permission change wearing the costume of a drag.
-       * A board dropped into a restricted folder becomes invisible to everybody
-       * that folder is not shared with, and nothing about the board changed —
-       * so the move says who it just took it away from rather than letting them
-       * discover it as an item that quietly stopped existing.
-       */
       const moved = result.moved;
       const impact = moved
         ? moveVisibilityImpact(visibilityInputFor(state), moved, targetParentId)
@@ -619,7 +646,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       for (const nodeId of nodeIds) {
         const result = trashNodeFrom(tree, nodeId, {
           deletedAt: MOCK_NOW,
-          deletedBy: CURRENT_USER,
+          deletedBy: currentUser(),
         });
 
         tree = result.tree;
@@ -630,6 +657,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
 
       const removed = new Set(added.map((entry) => entry.id));
       const first = added[0]!;
+
+      syncTrashChanges(
+        added.map((entry) => () => driveApi.trash(entry.node.id)),
+        added.length === 1
+          ? `Could not move “${first.node.name}” to Trash`
+          : `Could not move ${added.length} items to Trash`,
+      );
 
       return {
         ...writeTree(state, tree),
@@ -645,11 +679,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       };
     }),
 
-  /**
-   * Put a deleted item back. Its original folder may itself have been purged
-   * in the meantime — restoring then walks up to the deepest surviving
-   * ancestor and *says so*, rather than dropping the item somewhere silently.
-   */
   restoreNode: (nodeId) =>
     set((state) => {
       const bin = currentTrash(state);
@@ -659,6 +688,11 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       const tree = currentTree(state);
       const { parentId, isRelocated } = restoreTargetFor(tree, entry);
       const restored = untrash(entry.node, parentId);
+
+      syncTrashChange(
+        () => driveApi.restoreTrash(entry.id),
+        `Could not restore “${restored.name}”`,
+      );
       const location = parentId ? (findNodeById(tree, parentId)?.name ?? "Workspace") : "Workspace";
 
       return {
@@ -677,13 +711,17 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       };
     }),
 
-  /** Permanent, whether the item is in the bin or still in the tree. */
   deleteForever: (nodeId) =>
     set((state) => {
       const bin = currentTrash(state);
       const entry = bin.find((candidate) => candidate.id === nodeId);
 
       if (entry) {
+        syncTrashChange(
+          () => driveApi.purgeTrash(entry.id),
+          `Could not delete “${entry.node.name}” permanently`,
+        );
+
         return {
           ...writeTrash(
             state,
@@ -696,6 +734,11 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       const { tree, removed } = removeNode(currentTree(state), nodeId);
       if (!removed) return state;
 
+      syncTrashChange(
+        () => driveApi.trash(nodeId),
+        `Could not delete “${removed.name}” permanently`,
+      );
+
       return {
         ...writeTree(state, tree),
         feedback: makeFeedback(state, `Deleted “${removed.name}” permanently`, "error"),
@@ -707,19 +750,59 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       const count = currentTrash(state).length;
       if (count === 0) return state;
 
+      syncTrashChange(
+        () => driveApi.emptyTrash(state.activeWorkspaceId),
+        "Could not empty the Trash",
+      );
+
       return {
         ...writeTrash(state, []),
         feedback: makeFeedback(state, `Deleted ${count} items permanently`, "error"),
       };
     }),
 
-  addUploadedAsset: (parentId, asset) => {
+  /**
+   * Bỏ khỏi cây một mục mà server bảo là không còn/không được xem.
+   *
+   * Thanh điều hướng vẽ từ bản sao cây trong máy. Khi một mục bị xoá hoặc bị
+   * khoá quyền ở nơi khác — phiên khác, người khác — bản sao này không tự biết:
+   * tên vẫn nằm đó, bấm vào thì server trả 404, và người dùng nhìn thấy một
+   * danh sách nói dối mình. Xoá nó ngay lúc phát hiện là cách rẻ nhất để thanh
+   * điều hướng thôi hứa những thứ nó không mở được.
+   */
+  forgetMissingNode: (nodeId) => {
+    const state = get();
+    const tree = currentTree(state);
+
+    if (findNodeById(tree, nodeId) === null) return;
+
+    set(writeTree(state, removeNode(tree, nodeId).tree));
+  },
+
+  /**
+   * Cập nhật hạn mức mà KHÔNG thêm gì vào cây.
+   *
+   * Dùng cho tệp nằm bên trong một ô, một khối hay một bình luận: nó vẫn ăn
+   * dung lượng của workspace, nhưng không phải một mục trong Drive.
+   */
+  applyStorageUsage: (storage) => {
+    const state = get();
+
+    set({
+      workspaces: state.workspaces.map((workspace) =>
+        workspace.id === state.activeWorkspaceId ? { ...workspace, storage } : workspace,
+      ),
+    });
+  },
+
+  addUploadedAsset: (parentId, upload) => {
     const state = get();
     const tree = currentTree(state);
     const taken = siblingsOf(tree, parentId).map((node) => node.slug);
+    const { asset } = upload;
 
     const node: FileNode = {
-      id: asset.id,
+      id: upload.node?.id ?? asset.id,
       name: asset.name,
       slug: uniqueSlug(slugify(asset.name), taken),
       parentId,
@@ -728,6 +811,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       createdAt: asset.createdAt,
       updatedAt: asset.updatedAt,
       isFavorite: false,
+      isPinned: false,
       isTrashed: false,
       isShared: false,
       type: "file",
@@ -735,106 +819,70 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
       extension: asset.extension,
       mimeType: asset.mimeType,
       sizeBytes: asset.sizeBytes,
+      ...(asset.thumbnailUrl ? { thumbnailUrl: asset.thumbnailUrl } : {}),
+      ...(asset.previewUrl ? { previewUrl: asset.previewUrl } : {}),
       version: 1,
     };
 
-    set(writeTree(state, insertNode(tree, parentId, node)));
+    set({
+      ...writeTree(state, insertNode(tree, parentId, node)),
+      workspaces: state.workspaces.map((workspace) =>
+        workspace.id === state.activeWorkspaceId
+          ? { ...workspace, storage: upload.storage }
+          : workspace,
+      ),
+    });
+
     return node.id;
   },
 
-  createDocument: (parentId, name, icon, documentKind = "page") => {
-    const state = get();
-    const tree = currentTree(state);
-
-    if (parentId !== null) {
-      const parent = findNodeById(tree, parentId);
-      if (!parent || !isContainer(parent)) {
-        set({ feedback: makeFeedback(state, "Pages can only live inside folders", "error") });
-        return null;
-      }
+  createDocument: async (parentId, name, icon, documentKind = "page") => {
+    if (!assertContainer(get(), set, parentId, "Pages can only live inside folders")) {
+      return null;
     }
 
-    const taken = siblingsOf(tree, parentId).map((node) => node.slug);
-    const nextSeed = state.seed + 1;
-    const title = name.trim().length > 0 ? name.trim() : "Untitled";
-
-    const node: DocumentNode = {
-      id: createId("page", nextSeed),
-      name: title,
-      slug: uniqueSlug(slugify(title), taken),
+    const created = await createRemoteNode(get(), set, {
+      kind: "document",
+      name: name.trim().length > 0 ? name.trim() : "Untitled",
       parentId,
-      workspaceId: state.activeWorkspaceId,
-      owner: CURRENT_USER,
-      createdAt: MOCK_NOW,
-      updatedAt: MOCK_NOW,
-      isFavorite: false,
-      isTrashed: false,
-      isShared: false,
-      type: "document",
-      ...(documentKind === "page" ? {} : { documentKind }),
-      icon,
-      blockCount: 1,
-      excerpt: "",
-      isPinned: false,
-      isLocked: false,
-      isArchived: false,
-    };
-
-    set({
-      ...writeTree(state, insertNode(tree, parentId, node)),
-      seed: nextSeed,
-      feedback: makeFeedback(state, `Created ${DOCUMENT_LABELS[documentKind]} “${node.name}”`, "success"),
+      documentKind,
     });
+
+    if (created === null || created.type !== "document") return null;
+
+    const node: DocumentNode = { ...created, icon };
+
+    set((state) => ({
+      ...writeTree(
+        state,
+        updateNode(currentTree(state), created.id, () => node),
+      ),
+      feedback: makeFeedback(state, `Created “${node.name}”`, "success"),
+    }));
 
     return node;
   },
 
-  /**
-   * Boards are generated from a template. The template only supplies the
-   * schema — the board owns its columns from the moment it exists.
-   */
-  createBoard: (parentId, name, templateId) => {
-    const state = get();
-    const tree = currentTree(state);
-
-    if (parentId !== null) {
-      const parent = findNodeById(tree, parentId);
-      if (!parent || !isContainer(parent)) {
-        set({ feedback: makeFeedback(state, "Boards can only live inside folders", "error") });
-        return null;
-      }
+  createBoard: async (parentId, name, templateId) => {
+    if (!assertContainer(get(), set, parentId, "Boards can only live inside folders")) {
+      return null;
     }
 
-    const taken = siblingsOf(tree, parentId).map((node) => node.slug);
-    const nextSeed = state.seed + 1;
-    const title = name.trim().length > 0 ? name.trim() : "Untitled board";
-
-    const node: BoardNode = {
-      id: createId("brd", nextSeed),
-      name: title,
-      slug: uniqueSlug(slugify(title), taken),
+    const created = await createRemoteNode(get(), set, {
+      kind: "board",
+      name: name.trim().length > 0 ? name.trim() : "Untitled board",
       parentId,
-      workspaceId: state.activeWorkspaceId,
-      owner: CURRENT_USER,
-      createdAt: MOCK_NOW,
-      updatedAt: MOCK_NOW,
-      isFavorite: false,
-      isTrashed: false,
-      isShared: false,
-      type: "board",
       boardKind: "table",
       templateId,
-      itemCount: 0,
-      openCount: 0,
-    };
-
-    set({
-      ...writeTree(state, insertNode(tree, parentId, node)),
-      seed: nextSeed,
-      feedback: makeFeedback(state, `Created board “${node.name}”`, "success"),
     });
 
-    return node;
+    if (created === null || created.type !== "board") return null;
+
+    set((state) => ({
+      feedback: makeFeedback(state, `Created board “${created.name}”`, "success"),
+    }));
+
+    return created;
   },
 
   duplicateNode: (nodeId) => {
@@ -880,8 +928,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
             ? {
                 ...current,
                 name: patch.name,
-                // The slug is the routing key and is minted once, at creation:
-                // renaming a page the user is standing on must not break its URL.
                 icon: patch.icon,
                 blockCount: patch.blockCount,
                 excerpt: patch.excerpt,
@@ -911,6 +957,46 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   requestTitleFocus: (nodeId) => set({ titleFocusNodeId: nodeId }),
   clearTitleFocus: () => set({ titleFocusNodeId: null }),
 
+  hydrateWorkspaces: async () => {
+    try {
+      const workspaces = await workspaceApi.list();
+
+      set((state) => ({
+        workspaces,
+        activeWorkspaceId: workspaces.some(
+          (item) => item.id === state.activeWorkspaceId,
+        )
+          ? state.activeWorkspaceId
+          : (workspaces[0]?.id ?? state.activeWorkspaceId),
+      }));
+
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  hydrate: async (workspaceId) => {
+    const targetId = workspaceId ?? get().activeWorkspaceId;
+
+    // Thùng rác đọc CÙNG LÚC với cây. Chỉ đọc cây thì sau mỗi lần F5, trang
+    // Trash trống trơn dù server vẫn giữ nguyên các mục — và "Empty trash"
+    // trên một danh sách rỗng thì chẳng xoá được gì.
+    const [tree, bin] = await Promise.all([
+      fetchTree(targetId),
+      driveApi.listTrash(targetId).catch(() => null),
+    ]);
+
+    if (tree === null) return false;
+
+    set((state) => ({
+      treeByWorkspace: { ...state.treeByWorkspace, [targetId]: tree },
+      ...(bin === null ? {} : { trashByWorkspace: { ...state.trashByWorkspace, [targetId]: bin } }),
+    }));
+
+    return true;
+  },
+
   toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
 
   setSidebarCollapsed: (isCollapsed) => set({ isSidebarCollapsed: isCollapsed }),
@@ -922,26 +1008,147 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   dismissFeedback: () => set({ feedback: null }),
 }));
 
-/* ----------------------------------------------------------------- helpers */
+async function createRemoteNode(
+  state: WorkspaceStore,
+  set: (partial: Partial<WorkspaceStore> | ((state: WorkspaceStore) => Partial<WorkspaceStore>)) => void,
+  input: CreateNodeInput,
+): Promise<DriveNode | null> {
+  if (state.activeWorkspaceId === "") {
+    set((current) => ({
+      feedback: makeFeedback(
+        current,
+        "Tạo một workspace trước đã — mọi thứ đều nằm trong một workspace.",
+        "error",
+      ),
+    }));
 
-function currentTree(state: WorkspaceState): readonly DriveNode[] {
-  return state.treeByWorkspace[state.activeWorkspaceId] ?? [];
+    return null;
+  }
+
+  try {
+    const created = await driveApi.create(state.activeWorkspaceId, input);
+
+    set((current) => ({
+      ...writeTree(
+        current,
+        insertNode(currentTree(current), input.parentId, created),
+      ),
+    }));
+
+    return created;
+  } catch (error: unknown) {
+    const appError = toAppError(error);
+
+    set((current) => ({
+      feedback: makeFeedback(
+        current,
+        `Could not create “${input.name}”: ${appError.message}`,
+        "error",
+      ),
+    }));
+
+    return null;
+  }
 }
 
-/** Everything the visibility engine needs, read off the store's own state. */
+function assertContainer(
+  state: WorkspaceStore,
+  set: (partial: Partial<WorkspaceStore>) => void,
+  parentId: string | null,
+  message: string,
+): boolean {
+  if (parentId === null) return true;
+
+  const parent = findNodeById(currentTree(state), parentId);
+
+  if (parent !== null && isContainer(parent)) return true;
+
+  set({ feedback: makeFeedback(state, message, "error") });
+
+  return false;
+}
+
+const EMPTY_NODES: readonly DriveNode[] = Object.freeze([]);
+const EMPTY_TRASH: readonly TrashEntry[] = Object.freeze([]);
+const EMPTY_MEMBERS: Workspace["members"] = Object.freeze([]);
+
+function currentTree(state: WorkspaceState): readonly DriveNode[] {
+  return state.treeByWorkspace[state.activeWorkspaceId] ?? EMPTY_NODES;
+}
+
 function visibilityInputFor(state: WorkspaceState): VisibilityInput {
   const workspace =
     state.workspaces.find((candidate) => candidate.id === state.activeWorkspaceId) ?? null;
 
   return {
     tree: currentTree(state),
-    rules: usePermissionStore.getState().rulesByWorkspace[state.activeWorkspaceId] ?? {},
-    members: workspace?.members ?? [],
-    isMember: isWorkspaceMember(workspace, CURRENT_USER.id),
+    rules:
+      usePermissionStore.getState().rulesByWorkspace[state.activeWorkspaceId] ??
+      EMPTY_RULES,
+    members: workspace?.members ?? EMPTY_MEMBERS,
+    isMember: isWorkspaceMember(workspace, currentUserId()),
   };
 }
 
-/** Replace the active workspace tree without touching the other workspaces. */
+/**
+ * Bắn một thay đổi thùng rác lên server, và tải lại cây nếu nó hỏng.
+ *
+ * Xoá là thao tác PHÁ HUỶ, nên không thể chỉ đổi trong bộ nhớ rồi coi như xong:
+ * người dùng bấm xoá, thấy nó biến mất, F5 và nó quay lại — mất niềm tin vào
+ * mọi thứ khác trên màn hình. Ở đây không hoàn tác cục bộ mà đọc lại từ server,
+ * vì dựng lại một nhánh cây đã gỡ đi chỉ đẻ thêm một phiên bản sự thật thứ hai.
+ */
+function syncTrashChange(call: () => Promise<unknown>, failureMessage: string): void {
+  void writeThrough(call, {
+    onRevert: (error) => {
+      useWorkspaceStore.getState().pushFeedback(`${failureMessage} — ${error.message}`, "error");
+      void useWorkspaceStore.getState().hydrate();
+    },
+  });
+}
+
+function syncTrashChanges(
+  calls: readonly (() => Promise<unknown>)[],
+  failureMessage: string,
+): void {
+  syncTrashChange(async () => {
+    for (const call of calls) await call();
+  }, failureMessage);
+}
+
+function syncNodeChange(
+  call: () => Promise<DriveNode | void>,
+  nodeId: string,
+  previous: DriveNode,
+  failureMessage: string,
+): void {
+  void writeThrough(call, {
+    onSettled: (saved) => {
+      if (saved === undefined) return;
+
+      useWorkspaceStore.setState((state) => ({
+        ...writeTree(
+          state,
+          updateNode(currentTree(state), nodeId, (node) => ({
+            ...node,
+            ...saved,
+            ...("children" in node ? { children: childrenOf(node) } : {}),
+          })),
+        ),
+      }));
+    },
+    onRevert: (error) => {
+      useWorkspaceStore.setState((state) => ({
+        ...writeTree(
+          state,
+          updateNode(currentTree(state), nodeId, () => previous),
+        ),
+        feedback: makeFeedback(state, `${failureMessage}: ${error.message}`, "error"),
+      }));
+    },
+  });
+}
+
 function writeTree(state: WorkspaceState, tree: readonly DriveNode[]) {
   return {
     treeByWorkspace: { ...state.treeByWorkspace, [state.activeWorkspaceId]: tree },
@@ -949,7 +1156,7 @@ function writeTree(state: WorkspaceState, tree: readonly DriveNode[]) {
 }
 
 function currentTrash(state: WorkspaceState): readonly TrashEntry[] {
-  return state.trashByWorkspace[state.activeWorkspaceId] ?? [];
+  return state.trashByWorkspace[state.activeWorkspaceId] ?? EMPTY_TRASH;
 }
 
 function writeTrash(state: WorkspaceState, entries: readonly TrashEntry[]) {
@@ -958,7 +1165,6 @@ function writeTrash(state: WorkspaceState, entries: readonly TrashEntry[]) {
   };
 }
 
-/** The container a node sits in, or null when it sits at the root. */
 function parentIdOf(tree: readonly DriveNode[], nodeId: string): string | null {
   const path = findPathToId(tree, nodeId);
   return path[path.length - 2]?.id ?? null;
@@ -987,8 +1193,6 @@ function rejectionMessage(rejection: NonNullable<ReturnType<typeof moveNodeInTre
   }
 }
 
-/* --------------------------------------------------------------- selectors */
-
 const NO_WORKSPACE: Workspace = {
   id: "",
   name: "No workspace",
@@ -1000,47 +1204,21 @@ const NO_WORKSPACE: Workspace = {
   storage: { usedBytes: 0, totalBytes: 0 },
 };
 
-/**
- * The workspace in context.
- *
- * It no longer falls back to "whatever is first" — a person who holds nothing
- * gets an empty placeholder, and the guard above them renders the first-run
- * screen. Falling back put somebody inside a workspace they were never in.
- */
 export const selectActiveWorkspace = (state: WorkspaceStore): Workspace =>
   state.workspaces.find((workspace) => workspace.id === state.activeWorkspaceId) ?? NO_WORKSPACE;
 
-/** The workspaces the signed-in user is actually in — what the switcher lists. */
 export const selectMyWorkspaces = (state: WorkspaceStore): readonly Workspace[] =>
-  visibleWorkspaces(state.workspaces, CURRENT_USER.id);
+  visibleWorkspaces(state.workspaces, currentUserId());
 
-/** Whether the workspace in the URL is one the signed-in user may open. */
 export const selectWorkspaceAccess = (state: WorkspaceStore): WorkspaceAccess =>
-  workspaceAccess(state.workspaces, state.activeWorkspaceId, CURRENT_USER.id);
+  workspaceAccess(state.workspaces, state.activeWorkspaceId, currentUserId());
 
-/**
- * The stored tree, unfiltered.
- *
- * Only two kinds of caller want this: the store's own writes, and the admin
- * recovery console, which exists precisely to reach a folder its user cannot
- * see. Everything else wants `selectTree`.
- */
 export const selectFullTree = (state: WorkspaceStore): readonly DriveNode[] =>
-  state.treeByWorkspace[state.activeWorkspaceId] ?? [];
+  state.treeByWorkspace[state.activeWorkspaceId] ?? EMPTY_NODES;
 
-/**
- * The tree as the signed-in user is allowed to know it.
- *
- * Filtering here rather than in each surface is the whole design: search,
- * favourites, recent, breadcrumbs, relation pickers and the drive grid all read
- * this, so none of them has to remember to ask — and none of them can forget.
- *
- * Memoised on identity, because a selector that rebuilds its result on every
- * call re-renders every subscriber forever.
- */
 export const selectTree = (state: WorkspaceStore): readonly DriveNode[] =>
   visibleTreeFor(
-    state.treeByWorkspace[state.activeWorkspaceId] ?? [],
+    state.treeByWorkspace[state.activeWorkspaceId] ?? EMPTY_NODES,
     selectActiveWorkspace(state),
   );
 
@@ -1053,18 +1231,11 @@ interface TreeCacheKey {
 
 let treeCache: TreeCacheKey | null = null;
 
-/**
- * Prune once per (tree, rules, membership) triple.
- *
- * Rules live in a different store, so this cannot be a plain zustand selector
- * over one of them. `useVisibleTree` subscribes to both and is what components
- * should use; this exists so the imperative readers below get the same answer.
- */
 export function visibleTreeFor(
   tree: readonly DriveNode[],
   workspace: Workspace,
 ): readonly DriveNode[] {
-  const rules = usePermissionStore.getState().rulesByWorkspace[workspace.id] ?? {};
+  const rules = usePermissionStore.getState().rulesByWorkspace[workspace.id] ?? EMPTY_RULES;
 
   if (
     treeCache &&
@@ -1079,33 +1250,24 @@ export function visibleTreeFor(
     tree,
     rules,
     members: workspace.members,
-    isMember: isWorkspaceMember(workspace, CURRENT_USER.id),
+    isMember: isWorkspaceMember(workspace, currentUserId()),
   };
 
-  const value = visibleTree(input, { kind: "user", userId: CURRENT_USER.id });
+  const value = visibleTree(input, { kind: "user", userId: currentUserId() });
   treeCache = { tree, rules, members: workspace.members, value };
   return value;
 }
 
 export const selectTrash = (state: WorkspaceStore): readonly TrashEntry[] =>
-  state.trashByWorkspace[state.activeWorkspaceId] ?? [];
+  state.trashByWorkspace[state.activeWorkspaceId] ?? EMPTY_TRASH;
 
-/** Badge count for the sidebar — a scalar, so it never re-renders the tree. */
 export const selectTrashCount = (state: WorkspaceStore): number =>
-  (state.trashByWorkspace[state.activeWorkspaceId] ?? []).length;
+  (state.trashByWorkspace[state.activeWorkspaceId] ?? EMPTY_TRASH).length;
 
-/**
- * Tree of the active workspace, readable outside React — already filtered.
- *
- * Every service reads the drive through this one function, which is why
- * pruning here covers search, files, boards and documents at once. A service
- * that wanted the unfiltered tree would have to say so, and none of them does.
- */
 export function getActiveTree(): readonly DriveNode[] {
   return selectTree(useWorkspaceStore.getState());
 }
 
-/** The unfiltered tree, for the store's own writes and for admin recovery. */
 export function getFullTree(): readonly DriveNode[] {
   return selectFullTree(useWorkspaceStore.getState());
 }

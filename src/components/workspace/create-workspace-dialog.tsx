@@ -23,7 +23,6 @@ import {
   WORKSPACE_DESCRIPTION_MAX,
   WORKSPACE_NAME_MAX,
 } from "@/lib/workspace-access";
-import { CURRENT_USER } from "@/mock/users";
 import { useWorkspaceStore } from "@/store/workspace-store";
 
 interface CreateWorkspaceDialogProps {
@@ -31,17 +30,6 @@ interface CreateWorkspaceDialogProps {
   readonly onClose: () => void;
 }
 
-/**
- * Making a workspace.
- *
- * Two fields, because two is what it takes — a workspace with a name is a
- * workspace, and everything else is settings that can be changed later by
- * somebody who now has somewhere to change them from.
- *
- * The creator is an admin from the first frame, not from a second write: a
- * workspace that exists before anybody can administer it is a workspace that
- * can be stranded by a failure in between.
- */
 export function CreateWorkspaceDialog({ isOpen, onClose }: CreateWorkspaceDialogProps) {
   const router = useRouter();
   const createWorkspace = useWorkspaceStore((state) => state.createWorkspace);
@@ -58,14 +46,16 @@ export function CreateWorkspaceDialog({ isOpen, onClose }: CreateWorkspaceDialog
     onClose();
   }
 
-  function submit() {
+  async function submit() {
     const problem = validateWorkspaceName(name);
     if (problem) {
       setError(problem);
       return;
     }
 
-    createWorkspace({ name, description }, CURRENT_USER);
+    const created = await createWorkspace({ name, description });
+    if (created === null) return;
+
     pushFeedback(`${name.trim()} is ready — you are its admin`, "success");
     close();
     router.push(DRIVE_ROOT_PATH);
@@ -82,22 +72,14 @@ export function CreateWorkspaceDialog({ isOpen, onClose }: CreateWorkspaceDialog
           </DialogDescription>
         </DialogHeader>
 
-        {/* The form wraps the action row as well as the fields, because the
-            submit button is in the footer: pressing Enter in the name field
-            has always created the workspace, and a footer outside the form
-            would quietly turn that into a no-op. */}
         <form
           className="flex min-h-0 flex-1 flex-col"
           onSubmit={(event) => {
             event.preventDefault();
-            submit();
+            void submit();
           }}
         >
           <DialogBody className="space-y-3">
-            {/* The only thing that can fail validation is the name, so the
-                refusal is rendered against that field rather than as a loose
-                sentence at the bottom — which is also what puts the field
-                itself into its invalid state. */}
             <FormField label="Workspace name" error={error} isRequired>
               {(field) => (
                 <Input
@@ -105,7 +87,7 @@ export function CreateWorkspaceDialog({ isOpen, onClose }: CreateWorkspaceDialog
                   value={name}
                   autoFocus
                   maxLength={WORKSPACE_NAME_MAX}
-                  placeholder="NexDrop Development"
+                  placeholder="Nekotic Development"
                   onChange={(event) => {
                     setName(event.target.value);
                     setError(null);
@@ -122,7 +104,7 @@ export function CreateWorkspaceDialog({ isOpen, onClose }: CreateWorkspaceDialog
                   rows={3}
                   maxLength={WORKSPACE_DESCRIPTION_MAX}
                   showCount
-                  placeholder="Development workspace for NexDrop products."
+                  placeholder="Development workspace for Nekotic products."
                   onChange={(event) => setDescription(event.target.value)}
                 />
               )}

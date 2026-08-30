@@ -1,5 +1,4 @@
 import { describe, expect, test } from "vitest";
-import { BASE_PATH } from "@/config/base-path";
 import {
   chainFromSearch,
   chainOf,
@@ -30,8 +29,8 @@ describe("reading a route", () => {
     });
   });
 
-  test("tolerates the deployment base path the browser reports", () => {
-    expect(chainOf(`${BASE_PATH}/drive/development/`)).toEqual({
+  test("a trailing slash reads the same as none", () => {
+    expect(chainOf("/drive/development/")).toEqual({
       root: "/drive",
       chain: ["development"],
     });

@@ -29,10 +29,6 @@ interface DocumentPageProps {
   readonly node: DocumentNode;
 }
 
-/**
- * Page surface for a document node: header, read-only banner, insert toolbar
- * and the block editor, wrapped in the async states of the document service.
- */
 export function DocumentPage({ node }: DocumentPageProps) {
   const controller = useDocument(node.id, node);
   const baseCapabilities = useCapabilities(node);
@@ -68,7 +64,6 @@ export function DocumentPage({ node }: DocumentPageProps) {
     <div
       className={cn(
         "flex h-full flex-col bg-background",
-        // Focus mode lifts the page out of the shell and over the whole viewport.
         isFullScreen && "fixed inset-0 z-modal h-dvh animate-in fade-in-0",
       )}
     >
@@ -134,7 +129,6 @@ export function DocumentPage({ node }: DocumentPageProps) {
                     />
                   )}
 
-                  {/* Commenting is not editing: a locked page still takes one. */}
                   <div className="border-t border-border pt-4">
                     <CommentPanel
                       target={target}

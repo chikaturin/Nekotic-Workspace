@@ -7,6 +7,7 @@ import { CellOverflowCount } from "@/components/board/cells/cell-frame";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import type { AttachmentField } from "@/hooks/use-attachment-field";
+import { useAttachmentLinks } from "@/hooks/use-attachment-links";
 import { attachmentKind, isImageAttachment, isReachable } from "@/lib/attachments";
 import { CELL_CHIP_LIMIT, splitForCell } from "@/lib/cell-overflow";
 import { hasExternalFiles, readDroppedFiles } from "@/lib/dnd";
@@ -22,20 +23,11 @@ interface AttachmentGalleryProps {
   readonly field: AttachmentField;
   readonly maxFiles: number;
   readonly canEdit: boolean;
-  /** `compact` is the popover in the grid; `full` is the drawer section. */
   readonly density?: "compact" | "full";
   readonly label: string;
-  /** Open straight onto this file's preview — a thumbnail in the cell was clicked. */
   readonly initialOpenId?: string | null;
 }
 
-/**
- * The attachment surface, used verbatim by the table cell and the drawer.
- *
- * Both are handed the same `AttachmentField`, which reads and writes the one
- * attachment cell on the board record — so a file dropped here appears there
- * on the next frame, with no second copy of the list to keep in step.
- */
 export function AttachmentGallery({
   field,
   maxFiles,
@@ -49,7 +41,9 @@ export function AttachmentGallery({
   const [openId, setOpenId] = useState<string | null>(initialOpenId);
   const pushFeedback = useWorkspaceStore((state) => state.pushFeedback);
 
-  const { files, uploads } = field;
+  // Giá trị ô chỉ mang id; link mở và link xem trước phải hỏi server.
+  const files = useAttachmentLinks(field.files);
+  const { uploads } = field;
   const failed = uploads.tasks.filter((task) => task.status === "error");
   const active = uploads.tasks.filter(isTaskActive);
 
@@ -67,8 +61,6 @@ export function AttachmentGallery({
       pushFeedback(`“${file.name}” is not available in this session`, "error");
       return;
     }
-    // The service hands out the URL for the stored asset — a signed one in
-    // production. Nothing here builds a storage path of its own.
     triggerDownload(file.url, file.name);
   }
 
@@ -83,7 +75,9 @@ export function AttachmentGallery({
       onDragLeave={() => setIsOver(false)}
       onDrop={handleDrop}
       className={cn(
-        "space-y-2 rounded-md transition-colors",
+        // Đây là bảng điều khiển, không phải đoạn văn: bôi đen nó không để làm
+        // gì, mà cú bấm đúp mở ô lại bôi trúng nó.
+        "select-none space-y-2 rounded-md transition-colors",
         density === "compact" ? "p-2" : "p-0",
         isOver && "bg-accent-soft ring-1 ring-accent",
       )}
@@ -252,15 +246,6 @@ function Thumbnail({ file }: { file: CellAttachment }) {
   );
 }
 
-/**
- * Compact read-only strip — what a table cell shows when it is not open.
- *
- * `isInteractive` marks each thumbnail as the thing a click in the grid should
- * open, carrying the file's own id so the editor lands on its preview. The
- * markers are inert data attributes rather than handlers: the strip is drawn
- * for every visible row, and giving each file a closure would put a callback
- * per attachment on a path built to stay cheap.
- */
 export function AttachmentStrip({
   files,
   limit = CELL_CHIP_LIMIT,
@@ -270,7 +255,8 @@ export function AttachmentStrip({
   readonly limit?: number;
   readonly isInteractive?: boolean;
 }) {
-  const { shown, overflow } = splitForCell(files, limit);
+  const linked = useAttachmentLinks(files);
+  const { shown, overflow } = splitForCell(linked, limit);
   const marks = isInteractive
     ? (file: CellAttachment) => ({ "data-cell-expand": "", "data-cell-focus-id": file.id })
     : () => ({});

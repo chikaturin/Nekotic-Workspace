@@ -10,7 +10,6 @@ import {
 import { parseDelimited, toDelimited } from "@/lib/csv";
 import { buildPdf } from "@/lib/pdf";
 import { buildXlsx, parseXlsx, safeSheetName } from "@/lib/xlsx";
-import { boardService } from "@/services/board-service";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { DIRECTORY } from "@/mock/users";
 import { useBoardStore } from "@/store/board-store";
@@ -57,7 +56,6 @@ const row = (id: string, displayId: string, cells: Record<string, string>): Boar
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-  boardService.reset();
 
   useWorkspaceStore.setState({
     workspaces: [TEST_WORKSPACE],

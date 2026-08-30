@@ -18,22 +18,11 @@ interface SecretListProps {
   readonly canReveal: boolean;
 }
 
-/**
- * The document, read.
- *
- * Every value is a mask until somebody asks for one, and asking is a
- * permission-checked, audited call rather than a client-side toggle over data
- * the page already had. Selecting rows is the other half: it exists so that
- * taking several secrets somewhere else does not require putting any of them
- * on the screen first.
- */
 export function SecretList({ document, controller, canReveal }: SecretListProps) {
   const [selected, setSelected] = useState<readonly string[]>([]);
 
   const chosen = useMemo(() => new Set(selected), [selected]);
 
-  // Rows come and go as the document is edited; a selection holding an id that
-  // no longer exists would copy nothing and say it copied something.
   const live = useMemo(
     () => selected.filter((id) => document.entries.some((entry) => entry.id === id)),
     [selected, document.entries],
@@ -95,15 +84,6 @@ interface SelectionBarProps {
   readonly onCopyAll: () => void;
 }
 
-/**
- * Copy all, or copy the ones ticked.
- *
- * Both are one call to the same audited endpoint, and neither reveals
- * anything: the clipboard gets `KEY=value` lines while the screen stays
- * masked. Without the reveal permission both are refused here *and* at the
- * service, and the bar says which permission is missing rather than simply
- * being inert.
- */
 function SelectionBar({
   selectedCount,
   totalCount,

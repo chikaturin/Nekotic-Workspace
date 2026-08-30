@@ -15,7 +15,6 @@ interface TextBlockProps {
   readonly menu?: { readonly listboxId: string; readonly activeOptionId: string | null };
 }
 
-/** Headings, paragraphs and quotes — same mechanics, different typography. */
 export function TextBlock({
   block,
   onChange,

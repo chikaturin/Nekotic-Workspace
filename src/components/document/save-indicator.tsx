@@ -10,11 +10,9 @@ import type { SaveState } from "@/types";
 interface SaveIndicatorProps {
   readonly state: SaveState;
   readonly onRetry: () => void;
-  /** Locked or read-only pages report why nothing is being saved. */
   readonly isReadOnly?: boolean;
 }
 
-/** Saving… / Saved / Error — the three states the spec asks the user to see. */
 export function SaveIndicator({ state, onRetry, isReadOnly = false }: SaveIndicatorProps) {
   if (isReadOnly) {
     return (

@@ -7,17 +7,6 @@ import type {
   RealtimeTransport,
 } from "@/types";
 
-/**
- * Realtime client.
- *
- * Its one job beyond forwarding frames is **exactly-once delivery**: every
- * event carries an id and an id already delivered is dropped. Combined with
- * id-keyed upserts in the stores, a redelivered frame — a reconnect replay, a
- * server echo of a write this tab already applied optimistically — can never
- * duplicate cached state.
- */
-
-/** How many delivered ids to remember. Well past any reconnect replay window. */
 const SEEN_LIMIT = 512;
 
 let sequence = 0;
@@ -30,12 +19,10 @@ function nextEventId(): string {
 export interface RealtimeClient {
   readonly transportName: string;
   readonly status: RealtimeStatus;
-  /** Frames dropped as duplicates — surfaced in diagnostics and asserted in tests. */
   readonly duplicatesDropped: number;
   connect: () => void;
   close: () => void;
   subscribe: (handler: RealtimeHandler) => () => void;
-  /** Publish a payload produced by this tab. Returns the frame that was sent. */
   emit: (payload: RealtimePayload) => RealtimeEvent;
   reset: () => void;
 }
@@ -48,7 +35,6 @@ export function createRealtimeClient(transport: RealtimeTransport): RealtimeClie
   let duplicatesDropped = 0;
   let unsubscribe: (() => void) | null = null;
 
-  /** True the first time an id is seen; false — and remembered — afterwards. */
   function admit(eventId: string): boolean {
     if (seen.has(eventId)) {
       duplicatesDropped += 1;
@@ -111,8 +97,6 @@ export function createRealtimeClient(transport: RealtimeTransport): RealtimeClie
         payload,
       };
 
-      // Publish through the transport rather than calling handlers directly, so
-      // a local write and a remote one travel the identical code path.
       transport.publish(event);
       return event;
     },
@@ -126,7 +110,6 @@ export function createRealtimeClient(transport: RealtimeTransport): RealtimeClie
   };
 }
 
-/** The client every store and service shares. Connected on first import. */
 export const realtime: RealtimeClient = createRealtimeClient(createTransport());
 
 realtime.connect();

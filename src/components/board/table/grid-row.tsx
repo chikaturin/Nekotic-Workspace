@@ -17,13 +17,7 @@ interface GridRowProps {
   readonly rowId: string;
   readonly rowIndex: number;
   readonly shared: GridShared;
-  /**
-   * This row's height. Usually the view's, but a row holding a wrapped or
-   * fully-shown cell is as tall as its content — computed by the grid, which
-   * has to know it before the row is mounted for the virtualiser to place it.
-   */
   readonly height?: number;
-  /** Hierarchy depth — 0 for a top-level record, 1 for a subtask, and so on. */
   readonly depth?: number;
   readonly hasChildren?: boolean;
   readonly childCount?: number;
@@ -31,17 +25,8 @@ interface GridRowProps {
   readonly onToggleChildren?: () => void;
 }
 
-/** Indent per level. Applied to the primary cell only, so widths stay honest. */
 const INDENT_PER_LEVEL = 18;
 
-/**
- * One record.
- *
- * The row subscribes to its own record and to two booleans — "is my drawer
- * open", "am I ticked" — so editing a cell in row 12 re-renders row 12 and
- * leaves the other 4.999 untouched. That is the whole reason the store is
- * normalised and the bulk selection is a map rather than an array.
- */
 export const GridRow = memo(function GridRow({
   rowId,
   rowIndex,
@@ -64,8 +49,6 @@ export const GridRow = memo(function GridRow({
   const isChild = isSubtask(row);
 
   function handleTick(event: MouseEvent<HTMLInputElement>) {
-    // Shift-click ticks the run between the last click and this one, in the
-    // order the view is showing — not the order the board stores.
     if (event.shiftKey) event.preventDefault();
     shared.onToggleRow(rowId, event.shiftKey);
   }

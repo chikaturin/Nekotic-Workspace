@@ -10,22 +10,20 @@ import { getActiveTree } from "@/store/workspace-store";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
-/**
- * DV-REL-24 — the other half of a relation.
- *
- * Nothing is stored for a backlink: it is derived by asking which rows point
- * here, so the two directions can never disagree.
- */
-export function BacklinksPanel({ rowId }: { rowId: string }) {
+export function BacklinksPanel({
+  boardId,
+  rowId,
+}: {
+  boardId: string;
+  rowId: string;
+}) {
   const loader = useCallback(
-    (signal: AbortSignal) => boardService.listBacklinks(rowId, signal),
-    [rowId],
+    (signal: AbortSignal) => boardService.listBacklinks(boardId, rowId, signal),
+    [boardId, rowId],
   );
 
   const { state } = useAsyncResource<readonly Backlink[]>(loader, { keepPreviousData: true });
   const links = state.status === "success" ? state.data : [];
-  // "Nothing links here" and "the lookup failed" are different facts, and only
-  // one of them is about the record.
   const failure = state.status === "error" ? state.error : null;
 
   return (

@@ -14,7 +14,6 @@ interface UnsupportedPreviewProps {
   readonly canDownload: boolean;
 }
 
-/** Files with no inline renderer still show their full metadata and download. */
 export function UnsupportedPreview({
   node,
   reason,

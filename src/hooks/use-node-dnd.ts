@@ -14,8 +14,6 @@ import { useUploadStore } from "@/store/upload-store";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
 import { isContainer, type DriveNode } from "@/types";
 
-/* ------------------------------------------------------------- drag source */
-
 export interface DragSourceProps {
   readonly draggable: true;
   readonly onDragStart: (event: DragEvent<HTMLElement>) => void;
@@ -44,10 +42,7 @@ export function useDragSource(node: DriveNode): {
   };
 }
 
-/* ------------------------------------------------------------- drop target */
-
 interface DropTargetOptions {
-  /** Container receiving the drop; `null` means the workspace root. */
   readonly targetId: string | null;
   readonly disabled?: boolean;
 }
@@ -59,11 +54,6 @@ export interface DropTargetProps {
   readonly onDrop: (event: DragEvent<HTMLElement>) => void;
 }
 
-/**
- * Wire a container as a drop zone for internal nodes and OS files.
- * `isOver` only turns on for drops the target can actually accept, so invalid
- * destinations never light up.
- */
 export function useDropTarget({ targetId, disabled = false }: DropTargetOptions): {
   dropProps: DropTargetProps;
   isOver: boolean;
@@ -75,7 +65,6 @@ export function useDropTarget({ targetId, disabled = false }: DropTargetOptions)
   const endDrag = useDndStore((state) => state.endDrag);
 
   const [isOver, setIsOver] = useState(false);
-  /** dragenter/dragleave fire for descendants too — count them out. */
   const depth = useRef(0);
 
   const canAccept = useCallback(

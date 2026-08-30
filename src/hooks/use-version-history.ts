@@ -9,24 +9,14 @@ import type { AsyncState, VersionEntry } from "@/types";
 const NO_ENTRIES: readonly VersionEntry[] = [];
 
 export interface VersionSource {
-  /** Where the history comes from — one call, already projected to entries. */
   readonly load: (signal: AbortSignal) => Promise<readonly VersionEntry[]>;
-  /** Null when the subject cannot be restored (a secret has no snapshot). */
   readonly restore: ((versionId: string) => Promise<void>) | null;
-  /** The content on screen now, as lines — the right-hand side of a compare. */
   readonly currentLines: readonly string[];
   readonly currentVersion: number;
   readonly canRestore: boolean;
 }
 
 export interface VersionHistoryOptions {
-  /**
-   * Only load while the history is on screen.
-   *
-   * A version list read at mount is stale by the time somebody opens it — the
-   * page has been edited since. Tying the fetch to the dialog being open means
-   * what is shown is what the service holds *now*.
-   */
   readonly enabled: boolean;
 }
 
@@ -41,13 +31,6 @@ export interface VersionHistory {
   readonly reload: () => void;
 }
 
-/**
- * One history controller for pages, config files and secrets (SY-VER-39).
- *
- * Restoring writes a *new* version rather than rewinding, so the record of what
- * happened stays complete — which also means the list has to reload afterwards
- * rather than assume the entry it restored is now the top one.
- */
 export function useVersionHistory(
   source: VersionSource,
   { enabled }: VersionHistoryOptions,

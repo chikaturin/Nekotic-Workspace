@@ -1,15 +1,6 @@
 import { cellText, emptyCellFor, isCellEmpty, type CellContext } from "@/lib/cell-values";
 import type { BoardColumn, BoardRow, CellValue, ConversionPreview } from "@/types";
 
-/**
- * Column type conversion.
- *
- * Every conversion goes through the cell's plain-text projection: the old value
- * is rendered to text, then parsed into the target type. Anything the target
- * cannot parse is *kept* on the new value as `text`, so a bad conversion never
- * destroys data — the cell renders the original string with a warning instead.
- */
-
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/;
 const DAY_FIRST = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/;
 const YEAR_FIRST = /^(\d{4})[/.](\d{1,2})[/.](\d{1,2})$/;
@@ -17,11 +8,9 @@ const MAX_SAMPLES = 5;
 
 export interface ParseResult {
   readonly value: CellValue;
-  /** False when the text had to be preserved instead of parsed. */
   readonly ok: boolean;
 }
 
-/** Turn free text into a value for `column`. The inverse of `cellText`. */
 export function parseTextIntoCell(
   text: string,
   column: BoardColumn,
@@ -65,7 +54,6 @@ export function parseTextIntoCell(
     }
 
     case "attachment":
-      // Files cannot be recreated from their names; keep the text as evidence.
       return { value: { kind: "attachment", attachments: [], text: trimmed }, ok: false };
 
     case "relation": {
@@ -81,7 +69,6 @@ export function parseTextIntoCell(
   }
 }
 
-/** Convert one stored value to `target`, preserving whatever will not parse. */
 export function convertCell(
   value: CellValue,
   source: BoardColumn,
@@ -91,7 +78,6 @@ export function convertCell(
   if (source.type === target.type) return { value, ok: true };
   if (isCellEmpty(value)) return { value: emptyCellFor(target.type), ok: true };
 
-  // Attachments survive a round trip through a column that also holds files.
   if (value.kind === "attachment" && target.type === "attachment") {
     return { value, ok: true };
   }
@@ -99,7 +85,6 @@ export function convertCell(
   return parseTextIntoCell(cellText(value, source, context), target, context);
 }
 
-/** What converting `columnId` would do, without touching any record. */
 export function previewConversion(
   rows: readonly BoardRow[],
   source: BoardColumn,
@@ -126,8 +111,6 @@ export function previewConversion(
 
   return { total: converted + preserved, converted, preserved, samples };
 }
-
-/* ----------------------------------------------------------------- parsing */
 
 function splitList(text: string, isMulti: boolean): readonly string[] {
   if (!isMulti) return [text];
@@ -168,11 +151,6 @@ function findRelationId(label: string, context: CellContext): string | null {
   return null;
 }
 
-/**
- * Accepts ISO, `DD/MM/YYYY`, `YYYY/MM/DD` and anything `Date` itself
- * understands. Day-first is checked before the engine so `03/04/2026` reads as
- * 3 April, matching the locale this workspace is written for.
- */
 export function parseDate(text: string): string | null {
   const iso = ISO_DATE.exec(text);
   if (iso) {
@@ -200,7 +178,6 @@ function buildIso(year: number, month: number, day: number, hour: number, minute
   if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null;
 
   const date = new Date(Date.UTC(year, month - 1, day, hour, minute));
-  // Rejects 31 February and friends, which `Date.UTC` would roll over.
   if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
 
   return date.toISOString();

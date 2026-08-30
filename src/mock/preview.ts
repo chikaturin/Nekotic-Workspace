@@ -1,9 +1,4 @@
-/**
- * Offline preview assets. Images are generated as SVG data URIs so the quick
- * preview modal works with no network and no binary fixtures in the repo.
- */
 
-/** Cool, workspace-blue artwork so mock previews sit inside the palette. */
 const PALETTES: readonly (readonly [string, string])[] = [
   ["#3b82f6", "#1e3a8a"],
   ["#0ea5e9", "#0c4a6e"],
@@ -13,7 +8,6 @@ const PALETTES: readonly (readonly [string, string])[] = [
   ["#64748b", "#1e293b"],
 ] as const;
 
-/** Stable hash so a given file always renders the same artwork. */
 function hash(seed: string): number {
   let value = 0;
   for (let index = 0; index < seed.length; index += 1) {

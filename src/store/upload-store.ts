@@ -11,13 +11,13 @@ import {
   uploadQueueReducer,
   type UploadEvent,
 } from "@/lib/upload-queue";
-import { CURRENT_USER } from "@/mock/users";
+import type { UploadReference } from "@/services/api/file.api";
 import { fileService } from "@/services/file-service";
 import { isCancellation, toAppError } from "@/services/errors";
 import { getActiveTree, selectActiveWorkspace, useWorkspaceStore } from "@/store/workspace-store";
 import type { FileAsset, UploadSummary, UploadTask } from "@/types";
+import { currentUser } from "@/store/session-store";
 
-/** Abort handles live outside the store — they are not renderable state. */
 const controllers = new Map<string, AbortController>();
 
 let taskSequence = 0;
@@ -29,24 +29,32 @@ function nextTaskId(): string {
 
 interface UploadState {
   readonly tasks: readonly UploadTask[];
-  /** Panel opens itself whenever an upload starts. */
   readonly isPanelOpen: boolean;
 }
 
 interface UploadActions {
-  /** Validate, queue and run uploads. Returns the assets that landed. */
   startUploads: (
     files: readonly File[],
     folderId: string | null,
-    options?: { readonly tag?: string; readonly openPanel?: boolean },
+    options?: UploadOptions,
   ) => Promise<readonly FileAsset[]>;
-  /** Upload a single file and resolve with its asset — used by editor blocks. */
-  uploadOne: (file: File, folderId: string | null) => Promise<FileAsset | null>;
+  uploadOne: (
+    file: File,
+    folderId: string | null,
+    reference?: UploadReference,
+  ) => Promise<FileAsset | null>;
   cancelUpload: (taskId: string) => void;
   retryUpload: (taskId: string) => void;
   removeTask: (taskId: string) => void;
   clearFinished: () => void;
   setPanelOpen: (isOpen: boolean) => void;
+}
+
+export interface UploadOptions {
+  readonly tag?: string;
+  readonly openPanel?: boolean;
+  /** Chỗ tệp thuộc về — xem `UploadReference`. Bỏ trống là tải vào Drive. */
+  readonly reference?: UploadReference;
 }
 
 export type UploadStore = UploadState & UploadActions;
@@ -55,27 +63,39 @@ export const useUploadStore = create<UploadStore>()((set, get) => {
   const dispatch = (event: UploadEvent) =>
     set((state) => ({ tasks: uploadQueueReducer(state.tasks, event) }));
 
-  /** Files are kept so a failed task can be retried without re-picking them. */
-  const retryPayloads = new Map<string, { file: File; folderId: string | null }>();
+  const retryPayloads = new Map<
+    string,
+    { file: File; folderId: string | null; reference?: UploadReference }
+  >();
 
-  /** Run one queued task to completion, reporting progress as it goes. */
-  async function run(task: UploadTask, file: File, folderId: string | null): Promise<FileAsset | null> {
+  async function run(
+    task: UploadTask,
+    file: File,
+    folderId: string | null,
+    reference?: UploadReference,
+  ): Promise<FileAsset | null> {
     const controller = new AbortController();
     controllers.set(task.id, controller);
     dispatch({ type: "start", id: task.id });
 
     try {
-      const asset = await fileService.upload({
+      const completed = await fileService.upload({
         file,
         folderId,
-        owner: CURRENT_USER,
+        ...(reference === undefined ? {} : { reference }),
         onProgress: (progress) => dispatch({ type: "progress", id: task.id, progress }),
         signal: controller.signal,
       });
 
-      useWorkspaceStore.getState().addUploadedAsset(folderId, asset);
-      dispatch({ type: "success", id: task.id, assetId: asset.id });
-      return asset;
+      // `node === null` nghĩa là tệp nằm bên trong một ô, một khối hay một bình
+      // luận. Nhét nó vào cây là dựng lại đúng thứ server vừa từ chối tạo.
+      if (completed.node) {
+        useWorkspaceStore.getState().addUploadedAsset(folderId, completed);
+      } else {
+        useWorkspaceStore.getState().applyStorageUsage(completed.storage);
+      }
+      dispatch({ type: "success", id: task.id, assetId: completed.asset.id });
+      return completed.asset;
     } catch (error) {
       const appError = toAppError(error);
       if (isCancellation(appError)) {
@@ -86,7 +106,11 @@ export const useUploadStore = create<UploadStore>()((set, get) => {
       return null;
     } finally {
       controllers.delete(task.id);
-      retryPayloads.set(task.id, { file, folderId });
+      retryPayloads.set(task.id, {
+        file,
+        folderId,
+        ...(reference === undefined ? {} : { reference }),
+      });
     }
   }
 
@@ -99,8 +123,6 @@ export const useUploadStore = create<UploadStore>()((set, get) => {
 
       const workspace = useWorkspaceStore.getState();
 
-      // Every upload path — dropzone, toolbar, drag onto a folder, editor block
-      // — funnels through here, so the permission check belongs here too.
       if (!canUploadTo(folderId)) {
         workspace.pushFeedback("You do not have permission to upload here", "error");
         return [];
@@ -114,10 +136,17 @@ export const useUploadStore = create<UploadStore>()((set, get) => {
 
       if (accepted.length === 0) return [];
 
+      const reference = options.reference;
       const tasks = accepted.map((file) => createUploadTask(nextTaskId(), file, folderId, options.tag));
       tasks.forEach((task, index) => {
         const file = accepted[index];
-        if (file) retryPayloads.set(task.id, { file, folderId });
+        if (file) {
+          retryPayloads.set(task.id, {
+            file,
+            folderId,
+            ...(reference === undefined ? {} : { reference }),
+          });
+        }
       });
 
       dispatch({ type: "enqueue", tasks });
@@ -126,7 +155,7 @@ export const useUploadStore = create<UploadStore>()((set, get) => {
       const results = await Promise.all(
         tasks.map((task, index) => {
           const file = accepted[index];
-          return file ? run(task, file, folderId) : Promise.resolve(null);
+          return file ? run(task, file, folderId, reference) : Promise.resolve(null);
         }),
       );
 
@@ -141,8 +170,10 @@ export const useUploadStore = create<UploadStore>()((set, get) => {
       return assets;
     },
 
-    uploadOne: async (file, folderId) => {
-      const [asset] = await get().startUploads([file], folderId);
+    uploadOne: async (file, folderId, reference) => {
+      const [asset] = await get().startUploads([file], folderId, {
+        ...(reference === undefined ? {} : { reference }),
+      });
       return asset ?? null;
     },
 
@@ -157,7 +188,12 @@ export const useUploadStore = create<UploadStore>()((set, get) => {
       if (!payload || !task) return;
 
       dispatch({ type: "retry", id: taskId });
-      void run({ ...task, status: "queued", progress: 0 }, payload.file, payload.folderId);
+      void run(
+        { ...task, status: "queued", progress: 0 },
+        payload.file,
+        payload.folderId,
+        payload.reference,
+      );
     },
 
     removeTask: (taskId) => {
@@ -167,7 +203,6 @@ export const useUploadStore = create<UploadStore>()((set, get) => {
     },
 
     clearFinished: () => {
-      // Drop the File handles of everything that is leaving the queue.
       for (const task of get().tasks) {
         if (!isTaskActive(task)) retryPayloads.delete(task.id);
       }
@@ -178,15 +213,14 @@ export const useUploadStore = create<UploadStore>()((set, get) => {
   };
 });
 
-/** Whether the signed-in user may upload into a folder (null = workspace root). */
 function canUploadTo(folderId: string | null): boolean {
   const state = useWorkspaceStore.getState();
   const workspace = selectActiveWorkspace(state);
-  const role = workspace.members.find((member) => member.id === CURRENT_USER.id)?.role ?? "viewer";
+  const role = workspace.members.find((member) => member.id === currentUser().id)?.role ?? "viewer";
   const node = folderId ? findNodeById(getActiveTree(), folderId) : null;
 
   if (folderId && !node) return false;
-  return capabilitiesFor({ role, user: CURRENT_USER, node }).upload;
+  return capabilitiesFor({ role, user: currentUser(), node }).upload;
 }
 
 export const selectUploadSummary = (state: UploadStore): UploadSummary =>

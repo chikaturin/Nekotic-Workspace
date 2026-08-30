@@ -37,7 +37,6 @@ import type { Block, BlockType } from "@/types";
 interface BlockRowProps {
   readonly block: Block;
   readonly index: number;
-  /** 1-based position inside the current run of numbered items. */
   readonly ordinal: number;
   readonly isEditable: boolean;
   readonly api: BlockEditorApi;
@@ -45,14 +44,9 @@ interface BlockRowProps {
   readonly dnd: BlockDnd;
   readonly indicator: BlockDropIndicator | null;
   readonly isDragging: boolean;
-  /** Folder that block uploads are filed into. */
   readonly folderId: string | null;
 }
 
-/**
- * One row of the editor: gutter controls, the block itself, and every keyboard
- * rule that turns a list of blocks into something that feels like a document.
- */
 export function BlockRow({
   block,
   index,
@@ -82,11 +76,6 @@ export function BlockRow({
       }
     : undefined;
 
-  /**
-   * Blocks without an editable line (code, table, image…) have no caret to
-   * receive a focus request, so the row takes the focus instead — otherwise
-   * deleting a paragraph above a table would drop focus to the body.
-   */
   const focusNonce = api.focusRequest?.nonce ?? 0;
   const isFocusTarget = api.focusRequest?.blockId === block.id;
 
@@ -102,7 +91,6 @@ export function BlockRow({
 
   const handleTextChange = useCallback(
     (value: string) => {
-      // "/" on an empty block opens the command menu; the query tracks the text.
       if (value.startsWith("/") && isTextualBlock(block)) {
         if (!isMenuOpen) slashMenu.open(block.id);
         slashMenu.setQuery(value.slice(1));
@@ -213,8 +201,6 @@ export function BlockRow({
       {showIndicatorBefore && <DropLine position="top" />}
       {showIndicatorAfter && <DropLine position="bottom" />}
 
-      {/* Read-only pages drop the controls entirely — a disabled-but-focusable
-          gutter would put dead tab stops between every block. */}
       {!isEditable && <span className="w-[4.5rem] shrink-0" aria-hidden />}
 
       {isEditable && (
@@ -233,8 +219,6 @@ export function BlockRow({
           <Plus />
         </Button>
 
-        {/* The grip must not be a Radix trigger: the trigger cancels pointerdown,
-            which also cancels the browser's native drag. */}
         <Button
           size="icon-sm"
           variant="ghost"

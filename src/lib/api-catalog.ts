@@ -2,14 +2,6 @@ import { cellOf, cellText, type CellContext } from "@/lib/cell-values";
 import type { RowMap } from "@/lib/board-records";
 import type { Board, BoardColumn } from "@/types";
 
-/**
- * DV-API-20 — the one rule an endpoint catalogue has to enforce: the same
- * endpoint and method must not be documented twice.
- *
- * Detection is pure so the warning can be recomputed on every edit without
- * touching a record.
- */
-
 export interface DuplicateGroup {
   readonly key: string;
   readonly endpoint: string;
@@ -19,13 +11,11 @@ export interface DuplicateGroup {
 
 export interface DuplicateReport {
   readonly groups: readonly DuplicateGroup[];
-  /** Every row that takes part in a duplicate, for the row marker. */
   readonly rowIds: ReadonlySet<string>;
 }
 
 export const EMPTY_DUPLICATE_REPORT: DuplicateReport = { groups: [], rowIds: new Set() };
 
-/** The endpoint and method columns of an API board, or null for other boards. */
 export function apiColumns(
   board: Board | null,
   columns: readonly BoardColumn[],
@@ -56,7 +46,6 @@ export function findDuplicateEndpoints(
     const path = cellText(cellOf(row, endpoint), endpoint, context).trim();
     const verb = cellText(cellOf(row, method), method, context).trim();
 
-    // A row that has not named both yet is incomplete, not a duplicate.
     if (path.length === 0 || verb.length === 0) continue;
 
     const key = `${verb.toUpperCase()} ${path.toLowerCase()}`;

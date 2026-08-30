@@ -23,7 +23,6 @@ export interface DocumentController {
   readonly draft: DocumentDraft | null;
   readonly saveState: SaveState;
   readonly capabilities: CapabilitySet;
-  /** True when the editor should accept input at all. */
   readonly isEditable: boolean;
   readonly setBlocks: (blocks: readonly Block[]) => void;
   readonly setTitle: (title: string) => void;
@@ -31,9 +30,7 @@ export interface DocumentController {
   readonly reload: () => void;
   readonly flush: () => void;
   readonly retrySave: () => void;
-  /** Applied after an action mutates the document outside the editor. */
   readonly applyDocument: (document: WorkspaceDocument) => void;
-  /** Fold in a document whose *content* changed — a restored version. */
   readonly applyRestoredDocument: (document: WorkspaceDocument) => void;
 }
 
@@ -41,11 +38,6 @@ function toDraft(document: WorkspaceDocument): DocumentDraft {
   return { title: document.title, icon: document.icon, blocks: document.blocks };
 }
 
-/**
- * Loads a page, keeps the local draft, and drives the debounced autosave.
- * The draft is derived rather than mirrored into state by an effect, so it can
- * never get out of sync with the document that is actually loaded.
- */
 export function useDocument(nodeId: string, node: DriveNode | null): DocumentController {
   const baseCapabilities = useCapabilities(node);
   const applyDocumentSummary = useWorkspaceStore((state) => state.applyDocumentSummary);
@@ -76,7 +68,9 @@ export function useDocument(nodeId: string, node: DriveNode | null): DocumentCon
 
   const persist = useCallback(
     async (pending: DocumentDraft, signal: AbortSignal) => {
-      const saved = await documentService.save(nodeId, pending, signal);
+      void signal;
+
+      const saved = await documentService.save(nodeId, pending);
       resource.setData(saved);
       applyDocumentSummary(nodeId, summarize(saved));
     },
@@ -100,11 +94,6 @@ export function useDocument(nodeId: string, node: DriveNode | null): DocumentCon
     [draft, isEditable, nodeId, autosave],
   );
 
-  /**
-   * Fold a document returned by a page action (pin, lock, archive…) back in.
-   * Those actions never touch content, so a local draft that has not been saved
-   * yet wins — otherwise toggling Pin would silently revert what was typed.
-   */
   const applyDocument = useCallback(
     (updated: WorkspaceDocument) => {
       resource.setData(updated);
@@ -118,11 +107,6 @@ export function useDocument(nodeId: string, node: DriveNode | null): DocumentCon
     [resource, nodeId, applyDocumentSummary],
   );
 
-  /**
-   * Restoring a version is different from pinning one: the content *is* what
-   * changed, so the draft is replaced rather than protected. Anything unsaved
-   * would otherwise sit on top of the version that was just brought back.
-   */
   const applyRestoredDocument = useCallback(
     (updated: WorkspaceDocument) => {
       resource.setData(updated);

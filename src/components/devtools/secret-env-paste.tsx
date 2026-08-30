@@ -12,22 +12,6 @@ interface SecretEnvPasteProps {
   readonly onApply: (entries: readonly EnvEntry[], mode: PasteMode) => void;
 }
 
-/**
- * Paste an `.env` file, see what it parsed to, then apply it.
- *
- * The preview is the whole point. A paste is the one moment a whole credential
- * file arrives at once, and it is exactly when a silent misread — a value
- * truncated at its second `=`, a duplicate key quietly winning — becomes a
- * production incident. So the parse is shown before anything is changed:
- * how many keys, which ones repeat, which lines made no sense.
- *
- * Two ways to apply it, because the difference between them is whatever the
- * paste left *out*. Merge updates and adds. Replace is the whole-file case and
- * deletes what is missing, which is never something to infer from a gesture.
- *
- * The pasted text lives in this component's state and is dropped when it
- * unmounts. It is never stored, and nothing here logs it.
- */
 export function SecretEnvPaste({ onApply }: SecretEnvPasteProps) {
   const [text, setText] = useState("");
   const parsed = useMemo(() => parseEnv(text), [text]);

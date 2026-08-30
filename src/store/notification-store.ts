@@ -3,19 +3,10 @@
 import { create } from "zustand";
 import { countUnread, markRead as markReadLocally, upsertNotification } from "@/lib/notifications";
 import { realtime } from "@/lib/realtime/client";
-import { CURRENT_USER } from "@/mock/users";
 import { notificationService } from "@/services/notification-service";
 import { isCancellation, toAppError } from "@/services/errors";
 import type { AppError, AppNotification, NotificationTab, RealtimeEvent } from "@/types";
-
-/**
- * Notification inbox (CO-NOT-29).
- *
- * Realtime frames land here through `ingest`, which upserts by id. That is the
- * guarantee against double-counting: a notification this tab created
- * optimistically, echoed back by the transport, replaces itself instead of
- * appearing twice — and the unread badge is derived, never incremented.
- */
+import { currentUser } from "@/store/session-store";
 
 type Status = "idle" | "loading" | "ready" | "error";
 
@@ -28,14 +19,12 @@ interface NotificationState {
 }
 
 interface NotificationActions {
-  /** Loads once; later callers are no-ops until `refresh` asks for a re-read. */
   load: () => Promise<void>;
   refresh: () => Promise<void>;
   setTab: (tab: NotificationTab) => void;
   setPanelOpen: (open: boolean) => void;
   markRead: (id: string) => Promise<void>;
   markAllRead: () => Promise<void>;
-  /** Apply one realtime frame. Idempotent by construction. */
   ingest: (event: RealtimeEvent) => void;
 }
 
@@ -61,7 +50,7 @@ export const useNotificationStore = create<NotificationStore>()((set, get) => ({
     set({ status: "loading", error: null });
 
     try {
-      const notifications = await notificationService.list(CURRENT_USER.id);
+      const notifications = await notificationService.list();
       set({ status: "ready", notifications, error: null });
     } catch (error) {
       const appError = toAppError(error);
@@ -77,11 +66,11 @@ export const useNotificationStore = create<NotificationStore>()((set, get) => ({
     const before = get().notifications;
     if (before.find((item) => item.id === id)?.isRead !== false) return;
 
-    // Optimistic: the badge drops on click, not on the round trip.
     set({ notifications: markReadLocally(before, [id]) });
 
     try {
-      set({ notifications: await notificationService.markRead([id], CURRENT_USER.id) });
+      await notificationService.markRead([id]);
+      set({ notifications: await notificationService.list() });
     } catch {
       set({ notifications: before });
     }
@@ -99,7 +88,8 @@ export const useNotificationStore = create<NotificationStore>()((set, get) => ({
     });
 
     try {
-      set({ notifications: await notificationService.markAllRead(CURRENT_USER.id) });
+      await notificationService.markAllRead();
+      set({ notifications: await notificationService.list() });
     } catch {
       set({ notifications: before });
     }
@@ -109,10 +99,9 @@ export const useNotificationStore = create<NotificationStore>()((set, get) => ({
     const { payload } = event;
 
     if (payload.type === "notification.created") {
-      if (payload.notification.recipientId !== CURRENT_USER.id) return;
+      if (payload.notification.recipientId !== currentUser().id) return;
       set((state) => ({
         notifications: upsertNotification(state.notifications, payload.notification),
-        // A frame that arrives before the first load still populates the inbox.
         status: state.status === "idle" ? "ready" : state.status,
       }));
       return;
@@ -126,17 +115,8 @@ export const useNotificationStore = create<NotificationStore>()((set, get) => ({
   },
 }));
 
-// One subscription for the whole app; the client drops repeated event ids.
 realtime.subscribe((event) => useNotificationStore.getState().ingest(event));
 
-/* -------------------------------------------------------------- selectors */
-
-/**
- * Only scalar and stored-reference selectors live here. Anything derived that
- * allocates — the per-tab list, the per-tab counts — is memoised in the hook,
- * because a selector that returns a fresh array on every read would make
- * `useSyncExternalStore` re-render forever.
- */
 export const selectUnreadCount = (state: NotificationStore): number =>
   countUnread(state.notifications);
 

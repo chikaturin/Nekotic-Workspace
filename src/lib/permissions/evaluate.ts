@@ -13,26 +13,12 @@ import {
   type WorkspaceRole,
 } from "@/types";
 
-/**
- * Deciding one permission (SY-RBC-42).
- *
- * `can` is the only function that answers "may I". Components call it with a
- * key; they never look at a role, and they never re-derive a rule. Every layer
- * below the role matrix can only *narrow* the answer — a lock, an archive or a
- * trashed parent takes permissions away, it never hands one out.
- *
- * None of this is security. It decides what the UI offers; the backend decides
- * what actually happens, and must re-check every one of these keys.
- */
-
-/** Keys that read rather than write. A frozen or locked node still allows them. */
 const READ_ONLY_KEYS: ReadonlySet<PermissionKey> = new Set<PermissionKey>([
   "board.export",
   "workspace.audit.view",
   "secret.reveal",
 ]);
 
-/** Writes that put *content* into a node, which is what a lock stops. */
 const CONTENT_WRITE_KEYS: ReadonlySet<PermissionKey> = new Set<PermissionKey>([
   "row.create",
   "row.update",
@@ -49,18 +35,10 @@ const CONTENT_WRITE_KEYS: ReadonlySet<PermissionKey> = new Set<PermissionKey>([
 ]);
 
 export interface PermissionContext {
-  /** Effective role on this node, already resolved through inheritance. */
   readonly role: WorkspaceRole;
   readonly user: UserSummary;
-  /** Node being acted on; omit for workspace-level checks. */
   readonly node?: DriveNode | null;
-  /**
-   * An archived *ancestor* holds this node frozen. The node's own archive flag
-   * is deliberately not read here: a surface must keep offering Restore on the
-   * thing you are standing on.
-   */
   readonly isFrozen?: boolean;
-  /** Document lock — stops content writes, never the unlock itself. */
   readonly isLocked?: boolean;
 }
 
@@ -76,8 +54,6 @@ export function can(key: PermissionKey, context: PermissionContext): boolean {
   if (!roleHas(role, key) && !isEscalated) return false;
   if (!isWrite(key)) return true;
 
-  // A trashed node accepts nothing but the calls that get it out of the bin
-  // again, or end it for good.
   if (node?.isTrashed) return key === "node.delete";
 
   if (isFrozen) return false;
@@ -86,25 +62,14 @@ export function can(key: PermissionKey, context: PermissionContext): boolean {
   return true;
 }
 
-/** Bind a context once and hand components the question, not the answer. */
 export function resolverFor(context: PermissionContext): PermissionResolver {
   return (key: PermissionKey) => can(key, context);
 }
 
-/**
- * Close every write on an existing resolver, for the surface of a node that is
- * archived in its own right. Reads — export above all — stay open, and so does
- * the Restore the surface still has to offer.
- */
 export function frozenResolver(resolve: PermissionResolver): PermissionResolver {
   return (key: PermissionKey) => (isWrite(key) ? false : resolve(key));
 }
 
-/**
- * Which key the coarse `edit` flag means for this node. Editing a board is
- * editing its records; editing a page is writing blocks — the same word, two
- * different permissions, and the projection keeps them apart.
- */
 function editKeyFor(node: DriveNode | null | undefined): PermissionKey {
   if (!node) return "row.update";
   if (isDocument(node)) return "document.update";
@@ -113,11 +78,6 @@ function editKeyFor(node: DriveNode | null | undefined): PermissionKey {
   return "node.rename";
 }
 
-/**
- * The coarse flags older surfaces branch on, derived from the catalogue rather
- * than declared beside it — so `capabilities.edit` and `can("row.update")` can
- * never disagree.
- */
 export function capabilitiesFor(context: PermissionContext): CapabilitySet {
   const resolve = resolverFor(context);
 
@@ -131,7 +91,6 @@ export function capabilitiesFor(context: PermissionContext): CapabilitySet {
   };
 }
 
-/** Locking and archiving narrow an existing capability set — never widen it. */
 export function documentCapabilities(
   base: CapabilitySet,
   document: Pick<WorkspaceDocument, "isLocked" | "isArchived">,
@@ -140,10 +99,6 @@ export function documentCapabilities(
   return { ...base, edit: false, upload: false };
 }
 
-/**
- * Who may take the lock off again: whoever holds the key, and the document's
- * owner. It lives here rather than in the page so the rule stays in one place.
- */
 export function canToggleLock(
   resolve: PermissionResolver,
   document: Pick<WorkspaceDocument, "owner">,
@@ -152,13 +107,6 @@ export function canToggleLock(
   return resolve("document.lock") || document.owner.id === user.id;
 }
 
-/**
- * Reason shown on the permission-denied screen.
- *
- * It deliberately names nothing. A refusal that reads "Finance is restricted"
- * hands the name of a private folder to the one person who was told they may
- * not have it — the screen says only that access is needed, and who to ask.
- */
 export const DENIED_REASON =
   "You do not have access to this item. Ask somebody who does to share it with you.";
 
@@ -166,10 +114,6 @@ export function deniedReason(): string {
   return DENIED_REASON;
 }
 
-/**
- * Why an action is unavailable, for a tooltip on the control that is off.
- * Names the role that would hold it — never the raw key.
- */
 export function requirementFor(key: PermissionKey): string {
   const role = minimumRoleFor(key);
   return role ? `Needs the ${ROLE_LABELS[role]} role or above` : "Not available on this workspace";

@@ -8,17 +8,12 @@ import type {
   SelectOption,
 } from "@/types";
 
-/** Lookups a cell needs to render or serialise itself. */
 export interface CellContext {
   readonly people?: ReadonlyMap<string, DirectoryUser>;
-  /** Display label per related row id, filled in by the relation resolver. */
   readonly relationLabels?: ReadonlyMap<string, string>;
-  /** True once every relation target has been looked up. Until then an id that
-   * is missing from the map is unknown, not deleted. */
   readonly relationResolved?: boolean;
 }
 
-/** Shown when a relation points at a row that no longer exists. */
 export const DELETED_LABEL = "[Deleted Item]";
 
 const EMPTY_BY_TYPE: { readonly [T in ColumnType]: () => CellValue } = {
@@ -35,11 +30,6 @@ export function emptyCellFor(type: ColumnType): CellValue {
   return EMPTY_BY_TYPE[type]();
 }
 
-/**
- * The value stored for a column, or an empty one. A stored value whose kind no
- * longer matches the column (a schema change that raced an edit) is treated as
- * empty rather than rendered by the wrong editor.
- */
 export function cellOf(row: BoardRow, column: BoardColumn): CellValue {
   const value = row.cells[column.id];
   return value && value.kind === column.type ? value : emptyCellFor(column.type);
@@ -63,7 +53,6 @@ export function isCellEmpty(value: CellValue): boolean {
   }
 }
 
-/** True when a cell holds text the column could not parse — rendered with a warning. */
 export function hasUnparsedText(value: CellValue): boolean {
   return (
     (value.kind === "select" || value.kind === "date" || value.kind === "user" ||
@@ -80,10 +69,6 @@ export function optionById(
   return options.find((option) => option.id === optionId);
 }
 
-/**
- * Plain-text projection of a cell — the single representation used by copy,
- * export, search, sorting and every column conversion.
- */
 export function cellText(value: CellValue, column: BoardColumn, context: CellContext = {}): string {
   switch (value.kind) {
     case "text":
@@ -130,10 +115,6 @@ export function formatDateTime(iso: string): string {
   return `${formatDate(iso)} ${date.toISOString().slice(11, 16)}`;
 }
 
-/**
- * Sort key for a cell. Empty values always land last, whatever the direction,
- * so the caller compares `[isEmpty, key]` pairs.
- */
 export function cellSortKey(
   value: CellValue,
   column: BoardColumn,
@@ -146,7 +127,6 @@ export function cellSortKey(
   }
 
   if (value.kind === "select" && column.type === "select") {
-    // Select sorts by option order, which is the meaningful one for statuses.
     const first = value.optionIds[0];
     const index = column.config.options.findIndex((option) => option.id === first);
     return { isEmpty: false, key: index < 0 ? Number.MAX_SAFE_INTEGER : index };
@@ -159,11 +139,6 @@ function sameList(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((item, index) => item === b[index]);
 }
 
-/**
- * Structural equality for cell values. Optimistic rollback compares what it
- * wrote against what is on screen now, so this has to be exact rather than
- * reference-based.
- */
 export function cellEquals(a: CellValue | undefined, b: CellValue | undefined): boolean {
   if (a === b) return true;
   if (!a || !b || a.kind !== b.kind) return false;

@@ -2,7 +2,6 @@
 
 import { useCallback, useRef } from "react";
 
-/** Monotonic block-id factory, stable for the lifetime of an editor instance. */
 export function useBlockIds(prefix = "blk"): () => string {
   const counter = useRef(0);
 

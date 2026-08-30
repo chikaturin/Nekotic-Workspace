@@ -15,14 +15,12 @@ import type { BoardColumn, BoardColumnOf, BoardRow } from "@/types";
 export interface SubtaskEntry {
   readonly row: BoardRow;
   readonly isCompleted: boolean;
-  /** How many subtasks this subtask owns — the hierarchy is not depth-capped. */
   readonly childCount: number;
 }
 
 export interface SubtaskView {
   readonly entries: readonly SubtaskEntry[];
   readonly progress: SubtaskProgress;
-  /** Select column whose configured options mean "finished", if any. */
   readonly completionColumn: BoardColumnOf<"select"> | null;
 }
 
@@ -32,13 +30,6 @@ const EMPTY: SubtaskView = {
   completionColumn: null,
 };
 
-/**
- * One parent's children, read straight off the board.
- *
- * There is no subtask collection anywhere — the drawer, the table and the
- * Kanban badge all derive this from the same normalised records, which is why
- * editing a subtask anywhere updates every one of them on the next frame.
- */
 export function useSubtasks(parentRowId: string | null, columns: readonly BoardColumn[]): SubtaskView {
   const rowsById = useBoardStore((state) => state.rowsById);
   const rowOrder = useBoardStore((state) => state.rowOrder);

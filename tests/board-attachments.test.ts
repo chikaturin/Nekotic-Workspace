@@ -10,7 +10,6 @@ import {
   isReachable,
   NON_RENDERABLE_TYPES,
 } from "@/lib/attachments";
-import { boardService } from "@/services/board-service";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useBoardStore } from "@/store/board-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
@@ -103,7 +102,6 @@ describe("one field, two surfaces", () => {
   beforeEach(async () => {
     resetSimulation();
     setSimulation({ latency: "fast" });
-    boardService.reset();
 
     useWorkspaceStore.setState({
       workspaces: [TEST_WORKSPACE],

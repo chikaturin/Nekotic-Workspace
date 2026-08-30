@@ -65,3 +65,31 @@ export const ID = {
   spec: "t_development_backend_payment_spec_pdf",
   roadmap: "t_development_backend_roadmap",
 } as const;
+
+/**
+ * Một file CSV thật, để gọi được đường import đúng như người dùng đi.
+ *
+ * Import nhận FILE, không nhận row đã dựng: server đọc bảng tính, dựng cột và
+ * ghi record trong một transaction. Test nào muốn tạo nhiều bản ghi cùng lúc thì
+ * phải đi qua đúng cửa đó — nếu không nó lại chứng minh một hình dạng mà backend
+ * không nhận, đúng chuyện đã xảy ra.
+ */
+export function csvFile(
+  name: string,
+  rows: readonly (readonly string[])[],
+): File {
+  const escape = (cell: string) =>
+    /[",\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell;
+
+  const text = rows.map((row) => row.map(escape).join(",")).join("\n");
+
+  return new File([text], name, { type: "text/csv" });
+}
+
+/** Ánh xạ cột thứ `index` của file vào một cột đang có trên board. */
+export function mapToColumns(columnIds: readonly string[]) {
+  return columnIds.map((columnId, sourceIndex) => ({
+    sourceIndex,
+    target: { kind: "existing" as const, columnId },
+  }));
+}

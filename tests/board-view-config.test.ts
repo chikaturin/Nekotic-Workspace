@@ -12,13 +12,13 @@ import { matchesFilter, reorderViews } from "@/lib/board-view";
 import { makeColumn } from "@/lib/board-schema";
 import { MEMBERS } from "@/mock/users";
 import { ServiceError } from "@/services/errors";
-import { boardService } from "@/services/board-service";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useBoardStore, selectActiveView } from "@/store/board-store";
 import { selectCollapsedGroups, useGridStore } from "@/store/grid-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { BoardColumnOf, BoardRow, SavedView, WorkspaceRole } from "@/types";
 import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
+import { boardFake } from "./msw/fake/board.fake";
 
 const WORKSPACE_ID = "ws_test";
 
@@ -38,7 +38,6 @@ function activeView() {
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-  boardService.reset();
   useGridStore.getState().reset();
 
   useWorkspaceStore.setState({
@@ -358,10 +357,10 @@ describe("moving a view along the strip", () => {
     const last = board.views.at(-1)!.id;
 
     signedInAs("member");
-    await expect(boardService.reorderView(board.id, last, 0)).rejects.toBeInstanceOf(ServiceError);
+    await expect(boardFake.reorderView(board.id, last, 0)).rejects.toBeInstanceOf(ServiceError);
 
     signedInAs("manager");
-    await expect(boardService.reorderView(board.id, last, 0)).resolves.toBeDefined();
+    await expect(boardFake.reorderView(board.id, last, 0)).resolves.toBeDefined();
   });
 
   test("a drop back on the same tab writes nothing at all", async () => {

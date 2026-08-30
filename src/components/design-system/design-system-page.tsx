@@ -37,20 +37,6 @@ import { SELECT_COLORS } from "@/lib/board-schema";
 import { EmptyState } from "@/components/drive/empty-state";
 import { ErrorState } from "@/components/shared/state-panels";
 
-/**
- * The design system, on one page.
- *
- * It exists to answer one question before a component is written: *does this
- * already exist*. The audit that produced this system found a complete, correct
- * cmdk wrapper with a single consumer sitting beside four surfaces that had
- * each hand-rolled the same search-and-pick interaction — not because anyone
- * decided to, but because there was nowhere to look.
- *
- * Every entry shows its states together on purpose. Five different disabled
- * treatments survived in this app for a long time, and the reason is that
- * nobody was ever looking at two of them at the same time.
- */
-
 const STATUS_OPTIONS: readonly ListboxOption[] = [
   { value: "todo", label: "Todo", color: "gray" },
   { value: "doing", label: "Doing", color: "blue" },
@@ -119,7 +105,6 @@ export function DesignSystemPage() {
           </p>
         </header>
 
-        {/* ------------------------------------------------------------ type */}
         <Section
           id="typography"
           title="Typography"
@@ -145,7 +130,6 @@ export function DesignSystemPage() {
           </div>
         </Section>
 
-        {/* ---------------------------------------------------------- colour */}
         <Section
           id="colour"
           title="Colour"
@@ -170,7 +154,6 @@ export function DesignSystemPage() {
           </TokenGrid>
         </Section>
 
-        {/* -------------------------------------------------------- layering */}
         <Section
           id="layering"
           title="Layering and elevation"
@@ -198,7 +181,6 @@ export function DesignSystemPage() {
           </Row>
         </Section>
 
-        {/* --------------------------------------------------------- buttons */}
         <Section
           id="button"
           title="Button"
@@ -253,7 +235,6 @@ export function DesignSystemPage() {
           </Row>
         </Section>
 
-        {/* ----------------------------------------------------------- input */}
         <Section
           id="input"
           title="Text input"
@@ -284,7 +265,7 @@ export function DesignSystemPage() {
                 <Input
                   {...field}
                   value={name}
-                  placeholder="NexDrop Development"
+                  placeholder="Nekotic Development"
                   onChange={(event) => setName(event.target.value)}
                 />
               )}
@@ -295,7 +276,6 @@ export function DesignSystemPage() {
           </Row>
         </Section>
 
-        {/* ---------------------------------------------------------- select */}
         <Section
           id="select"
           title="Select"
@@ -357,7 +337,6 @@ export function DesignSystemPage() {
           </Row>
         </Section>
 
-        {/* ---------------------------------------------------- date picker */}
         <Section
           id="date"
           title="Date picker"
@@ -413,7 +392,6 @@ export function DesignSystemPage() {
           </Row>
         </Section>
 
-        {/* -------------------------------------------------------- toggles */}
         <Section
           id="toggles"
           title="Checkbox, switch, radio and segments"
@@ -473,7 +451,6 @@ export function DesignSystemPage() {
           </Row>
         </Section>
 
-        {/* --------------------------------------------------------- display */}
         <Section
           id="display"
           title="Badge, chip and avatar"
@@ -508,7 +485,6 @@ export function DesignSystemPage() {
           </Row>
         </Section>
 
-        {/* --------------------------------------------------------- overlay */}
         <Section
           id="overlay"
           title="Dialog, tabs and tooltip"
@@ -547,7 +523,6 @@ export function DesignSystemPage() {
           </Row>
         </Section>
 
-        {/* ---------------------------------------------------------- states */}
         <Section
           id="states"
           title="Loading, empty and error"
@@ -588,7 +563,7 @@ export function DesignSystemPage() {
             </DialogHeader>
             <DialogBody className="space-y-3">
               <FormField label="Workspace name" isRequired>
-                {(field) => <Input {...field} placeholder="NexDrop Development" />}
+                {(field) => <Input {...field} placeholder="Nekotic Development" />}
               </FormField>
               <FormField label="Description">
                 {(field) => <Textarea {...field} rows={3} placeholder="What it is for" />}
@@ -607,10 +582,6 @@ export function DesignSystemPage() {
   );
 }
 
-/**
- * A sample business rule for the gallery — the kind of predicate a screen
- * passes in. The picker itself never knows what a weekend is.
- */
 function isWeekendDay(day: string): boolean {
   const weekday = new Date(`${day}T00:00:00.000Z`).getUTCDay();
   return weekday === 0 || weekday === 6;

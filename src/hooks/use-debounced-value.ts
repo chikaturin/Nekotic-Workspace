@@ -2,12 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-/**
- * Trailing-edge debounce.
- *
- * Search reaches services that scan every board, so a keystroke must not start
- * a scan — only a pause does.
- */
 export function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [settled, setSettled] = useState(value);
 

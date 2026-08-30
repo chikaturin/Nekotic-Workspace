@@ -1,2 +1,12 @@
+# Script cài đặt của dependency: CHỌN TƯỜNG MINH, không để pnpm hỏi.
+#
+# pnpm 11 coi "có script chờ duyệt" là lỗi cài đặt, nên bỏ lửng mục này sẽ làm
+# `pnpm install --frozen-lockfile` trong CI fail — chỉ là cảnh báo khi chạy tay.
+#
+# `msw: true` — script `postinstall` của nó ghi `public/mockServiceWorker.js`,
+# thứ CHỈ cần cho mock trong trình duyệt. Test chạy ở Node dùng `setupServer` và
+# không đọc file đó, nhưng cho phép script chạy vẫn rẻ hơn việc phải nhớ chạy
+# `msw init` bằng tay nếu có ngày cần mock ngay trên trình duyệt.
 allowBuilds:
+  msw: true
   unrs-resolver: true

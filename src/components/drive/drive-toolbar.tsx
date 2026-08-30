@@ -17,6 +17,11 @@ import {
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CreateMenuItems } from "@/components/shared/create-menu-items";
+import { DriveItemMenu } from "@/components/drive/drive-item-menu";
+import {
+  CreateNameDialog,
+  type PendingCreate,
+} from "@/components/shared/create-name-dialog";
 import { UploadDialog } from "@/components/files/upload-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,7 +36,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCapabilities } from "@/hooks/use-permissions";
-import { findNodeById } from "@/lib/tree";
+import { findNodeById, hrefForNode } from "@/lib/tree";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
 import type { SortKey, ViewMode } from "@/types";
 
@@ -57,13 +62,12 @@ interface DriveToolbarProps {
   readonly title: string;
   readonly subtitle: string;
   readonly targetId: string | null;
-  /** Route of the file-manager view for the folder on screen. */
   readonly filesHref: string;
 }
 
-/** View controls, sorting, create/upload and the bulk-selection bar. */
 export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveToolbarProps) {
   const [isUploaderOpen, setUploaderOpen] = useState(false);
+  const [pending, setPending] = useState<PendingCreate | null>(null);
 
   const tree = useWorkspaceStore(selectTree);
   const targetNode = useMemo(
@@ -104,7 +108,6 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
           <IconButton
             variant="ghost"
             aria-label="Trash selected"
-            // One state write for the whole selection, not one per item.
             onClick={() => trashNodes(selectedIds)}
           >
             <Trash2 />
@@ -163,10 +166,6 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
         </IconButton>
 
         <DropdownMenu>
-          {/* The tooltip stays wrapped around the menu trigger rather than
-              moving inside `IconButton`: `DropdownMenuTrigger asChild` has to
-              clone a DOM element, and `IconButton`'s own tooltip would hand it
-              a Tooltip root instead. */}
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
@@ -179,10 +178,12 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
           </Tooltip>
 
           <DropdownMenuContent align="end" className="w-60">
-            {/* The folder button sits right beside this menu, so the shared
-                list drops its own Folder entry here rather than offering the
-                same action twice in a row. */}
-            <CreateMenuItems targetId={targetId} targetName={title} includeFolder={false} />
+            <CreateMenuItems
+              targetId={targetId}
+              targetName={title}
+              includeFolder={false}
+              onAskName={setPending}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -191,7 +192,7 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
           variant="outline"
           aria-label="New folder"
           tooltip="New folder here"
-          onClick={() => createFolder(targetId, "Untitled folder")}
+          onClick={() => void createFolder(targetId, "Untitled folder")}
         >
           <FolderPlus />
         </IconButton>
@@ -200,6 +201,16 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
           <Upload />
           <span className="hidden sm:inline">Upload</span>
         </Button>
+
+        {targetNode && (
+          <DriveItemMenu
+            node={targetNode}
+            href={hrefForNode(tree, targetNode.id)}
+            trigger="toolbar"
+          />
+        )}
+
+        <CreateNameDialog pending={pending} onClose={() => setPending(null)} />
 
         <UploadDialog
           open={isUploaderOpen}
@@ -213,11 +224,6 @@ export function DriveToolbar({ title, subtitle, targetId, filesHref }: DriveTool
   );
 }
 
-/**
- * A segmented control hands back a plain string, so this is where one becomes
- * a view mode again — without a cast, and without a value the store has never
- * heard of reaching it.
- */
 function isViewMode(value: string): value is ViewMode {
   return VIEW_MODES.some((option) => option.value === value);
 }

@@ -21,15 +21,6 @@ import { CONFIG_FORMAT_LABELS } from "@/lib/syntax";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { ConfigFormat, DocumentNode } from "@/types";
 
-/**
- * DV-CFG-22 — a config document, in whatever language it is actually written
- * in: syntax colour, a formatter where a real parser exists, and a version
- * history that can be restored from.
- *
- * The language is a property of the document rather than of its file name, so
- * it is picked in the header and travels with the content. Changing it recolours
- * and re-offers the formatter; it never rewrites a byte.
- */
 export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
   const capabilities = useCapabilities(node);
   const can = usePermissions(node);
@@ -41,14 +32,6 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
 
   useHotkey("mod+s", () => controller.save(), { enableInInputs: true });
 
-  /**
-   * Reformat, or say why not — and on a refusal leave the source exactly as it
-   * was. A formatter that half-rewrites an unparseable file is data loss with a
-   * friendly icon.
-   *
-   * Asynchronous because the parser for this language is fetched the first time
-   * it is needed; the button reports that rather than looking dead for a beat.
-   */
   async function reformat(format: ConfigFormat) {
     setIsFormatting(true);
     try {
@@ -69,8 +52,6 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
               <span className="text-xl">{node.icon}</span>
 
               <div className="min-w-0 flex-1">
-                {/* The name is edited here, on the surface the document is
-                    open on — not only from the tree it happens to live in. */}
                 <NodeTitleInput
                   node={node}
                   canRename={can("node.rename")}
@@ -104,9 +85,6 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
                   isReadOnly={!canEdit}
                 />
 
-                {/* Shown for every language, disabled where there is no real
-                    parser behind it, and saying so. Hiding it instead would
-                    leave the reader wondering whether they had missed a menu. */}
                 {canEdit && (
                   <Button
                     size="sm"
@@ -133,9 +111,6 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
                   History
                 </Button>
 
-                {/* Autosave carries the edit; this is the "now, please" that
-                    ⌘S also does, and the thing to reach for before closing a
-                    laptop mid-sentence. */}
                 <Button
                   size="sm"
                   variant="default"
@@ -192,13 +167,6 @@ export function ConfigDocumentPage({ node }: { node: DocumentNode }) {
   );
 }
 
-/**
- * Why the Format button is off, in the words of the reason it is off.
- *
- * A disabled control that explains nothing reads as broken; one that explains
- * the wrong thing is worse. There are two different reasons, and saying
- * "Reformat this JSON document" while refusing to is neither of them.
- */
 function formatHint(format: ConfigFormat, hasProblem: boolean): string {
   if (!canFormat(format)) return NO_FORMATTER_HINT;
   if (hasProblem) return "Fix the error above before formatting.";

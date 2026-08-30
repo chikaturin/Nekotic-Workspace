@@ -5,7 +5,6 @@ import { describeDiff, diffLines, summarizeDiff } from "@/lib/diff";
 import {
   compareToCurrent,
   configVersionEntry,
-  documentVersionEntry,
   secretRotationEntries,
 } from "@/lib/versions";
 import { devtoolsService } from "@/services/devtools-service";
@@ -13,7 +12,7 @@ import { documentService } from "@/services/document-service";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import { TREES_BY_WORKSPACE } from "@/mock/tree";
-import { DEFAULT_WORKSPACE_ID } from "@/mock/workspaces";
+import { DEFAULT_WORKSPACE_ID, WORKSPACES } from "@/mock/workspaces";
 import { flattenTree } from "@/lib/tree";
 import { isDocument, type Block, type DocumentNode } from "@/types";
 
@@ -53,10 +52,12 @@ const paragraph = (id: string, text: string): Block => ({ id, type: "paragraph",
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-  documentService.reset();
-  devtoolsService.reset();
 
+  // `workspaces` là BẮT BUỘC: cây chỉ hiện bên trong một workspace người dùng
+  // là thành viên. Trước đây store mặc định mang sẵn danh sách từ dữ liệu mẫu,
+  // nên test này chạy được nhờ một mặc định chứ không nhờ điều nó khai.
   useWorkspaceStore.setState({
+    workspaces: WORKSPACES,
     activeWorkspaceId: DEFAULT_WORKSPACE_ID,
     treeByWorkspace: TREES_BY_WORKSPACE,
     feedback: null,
@@ -183,7 +184,7 @@ describe("page history", () => {
     });
 
     const versions = await documentService.listVersions(node.id);
-    await documentService.setLocked(node.id, true, original.owner);
+    await documentService.setLocked(node.id, true);
 
     await expect(documentService.restoreVersion(node.id, versions.at(-1)!.id)).rejects.toThrow(
       /locked/i,
@@ -194,12 +195,13 @@ describe("page history", () => {
 describe("projecting three subjects onto one history", () => {
   test("a page version carries its blocks as lines", async () => {
     const node = documentNodes()[0]!;
-    const [version] = await documentService.listVersions(node.id);
-    const entry = documentVersionEntry(version!);
+    // API trả thẳng `VersionEntry`; không còn bước map từ bản đầy đủ, vì lịch
+    // sử không mang `blocks` qua wire nữa.
+    const [entry] = await documentService.listVersions(node.id);
 
-    expect(entry.hasSnapshot).toBe(true);
-    expect(entry.lines.length).toBeGreaterThan(0);
-    expect(entry.version).toBe(1);
+    expect(entry?.hasSnapshot).toBe(true);
+    expect(entry!.lines.length).toBeGreaterThan(0);
+    expect(entry!.version).toBe(1);
   });
 
   test("a config version carries its file, and compares against the draft", async () => {

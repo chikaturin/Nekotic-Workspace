@@ -25,14 +25,6 @@ import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { EntityRef, SearchResult } from "@/types";
 
-/**
- * Global search (CO-SCH-31) — ⌘K on macOS, Ctrl+K elsewhere.
- *
- * Results arrive already grouped and permission-filtered from the search
- * service; this component decides only how they read and where a selection
- * goes. With an empty query it shows the recent list instead, which is the
- * fastest path back to what you were doing.
- */
 export function GlobalSearchDialog() {
   const router = useRouter();
   const isOpen = useWorkspaceStore((state) => state.isSearchOpen);
@@ -48,11 +40,6 @@ export function GlobalSearchDialog() {
   const hasQuery = query.trim().length > 0;
   const isSearching =
     hasQuery && (search.isTyping || search.state.status === "loading");
-  /**
-   * A failed search is not an empty one. Without this branch the dialog
-   * answers "nothing matches" when the request never came back — the quietest
-   * kind of wrong answer a search box can give.
-   */
   const failure = search.state.status === "error" ? search.state.error : null;
 
   function close() {
@@ -140,7 +127,7 @@ export function GlobalSearchDialog() {
                   <CommandItem
                     value="new-folder"
                     onSelect={() => {
-                      createFolder(targetId, "Untitled folder");
+                      void createFolder(targetId, "Untitled folder");
                       close();
                     }}
                   >

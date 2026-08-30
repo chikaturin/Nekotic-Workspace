@@ -16,24 +16,11 @@ import { findNodeById, pathLabel } from "@/lib/tree";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
 import type { EntityRef } from "@/types";
 
-/**
- * Recent (CO-REC-33).
- *
- * A least-recently-used list of the last {@link RECENT_LIMIT} places visited,
- * kept in this browser. Entries are resolved against the live tree on render,
- * so something deleted since the visit says so instead of routing nowhere.
- */
 export function RecentPage() {
   const tree = useWorkspaceStore(selectTree);
   const { entries: stored, isHydrated, remove, clear } = useRecent();
   const openEntity = useOpenEntity();
 
-  /**
-   * History is kept in this browser and carries the name of everything in it,
-   * so it has to be re-checked against the tree rather than trusted. An entry
-   * whose node this person can no longer see is dropped outright — rendering
-   * it as "no longer available" would still be printing the name.
-   */
   const entries = useMemo(
     () => keepVisibleRefs(stored, tree, (entry) => entry.ref.nodeId),
     [stored, tree],

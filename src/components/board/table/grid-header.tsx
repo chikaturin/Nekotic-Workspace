@@ -3,6 +3,7 @@
 import { Plus } from "lucide-react";
 import { memo, useState, type DragEvent, type PointerEvent } from "react";
 import { ColumnMenu } from "@/components/board/table/column-menu";
+import { RelationColumnDialog } from "@/components/board/config/relation-column-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GUTTER_WIDTH, widthStyle } from "@/components/board/table/grid-shared";
 import { Input } from "@/components/ui/input";
@@ -15,36 +16,29 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { clampColumnWidth, COLUMN_TYPE_LABELS } from "@/lib/board-schema";
 import { columnVisual } from "@/lib/board-visuals";
+import { useBoardFolderId } from "@/hooks/use-folder-boards";
 import { useBoardStore } from "@/store/board-store";
 import { selectIsRenaming, useGridStore } from "@/store/grid-store";
 import { cn } from "@/lib/utils";
 import type { BoardColumn, CellDisplayMode, ColumnType, PermissionResolver } from "@/types";
 
-const COLUMN_MIME = "application/x-nexdrop-column";
+const COLUMN_MIME = "application/x-nekotic-column";
 
-/** How much of the current view is ticked — what the header box shows. */
 export type SelectionState = "none" | "some" | "all";
 
 interface GridHeaderProps {
   readonly columns: readonly BoardColumn[];
   readonly selectionState: SelectionState;
   readonly onToggleAll: () => void;
-  /** Bound permission resolver — the header gates each column action on its own key. */
   readonly can: PermissionResolver;
   readonly onConvert: (column: BoardColumn, type: ColumnType) => void;
   readonly onResizePreview: (columnId: string, width: number) => void;
   readonly onResizeCommit: (columnId: string, width: number) => void;
-  /** Per-view display mode, and the action that changes it. */
   readonly displayModes: Readonly<Record<string, CellDisplayMode>>;
   readonly onSetDisplayMode: (columnId: string, mode: CellDisplayMode) => void;
   readonly onAutoFitWidth: (columnId: string) => void;
 }
 
-/**
- * Sticky header: rename in place, drag to reorder, drag the edge to resize.
- * Resizing writes a CSS variable straight to the DOM while the pointer is
- * down, so a drag never re-renders a single row.
- */
 export const GridHeader = memo(function GridHeader({
   columns,
   selectionState,
@@ -59,7 +53,11 @@ export const GridHeader = memo(function GridHeader({
 }: GridHeaderProps) {
   const moveColumnTo = useBoardStore((state) => state.moveColumnTo);
   const addColumn = useBoardStore((state) => state.addColumn);
+  const nodeId = useBoardStore((state) => state.nodeId);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [isPickingBoard, setIsPickingBoard] = useState(false);
+
+  const folderId = useBoardFolderId();
 
   function handleDrop(event: DragEvent<HTMLDivElement>, targetIndex: number) {
     const columnId = event.dataTransfer.getData(COLUMN_MIME);
@@ -70,8 +68,12 @@ export const GridHeader = memo(function GridHeader({
     void moveColumnTo(columnId, targetIndex);
   }
 
-  /** A column added from anywhere opens ready to be named. */
   async function createColumn(type: ColumnType) {
+    if (type === "relation") {
+      setIsPickingBoard(true);
+      return;
+    }
+
     const created = await addColumn(type, COLUMN_TYPE_LABELS[type]);
     if (created) useGridStore.getState().beginColumnRename(created.id);
   }
@@ -80,10 +82,6 @@ export const GridHeader = memo(function GridHeader({
     <div
       role="row"
       aria-rowindex={1}
-      // A rung above the frozen column and the row gutter, which are `z-sticky`
-      // and come later in the DOM: on the same rung the rows won the tie and
-      // painted straight over the first two header cells, so scrolling looked
-      // like the header's own left edge was being carried away with them.
       className="sticky top-0 z-sticky-header flex w-max border-b border-border bg-elevated"
     >
       <div
@@ -142,13 +140,25 @@ export const GridHeader = memo(function GridHeader({
           })}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <RelationColumnDialog
+        key={isPickingBoard ? "open" : "closed"}
+        isOpen={isPickingBoard}
+        column={null}
+        folderId={folderId}
+        currentNodeId={nodeId ?? ""}
+        onClose={() => setIsPickingBoard(false)}
+        onSave={({ name, config }) => {
+          setIsPickingBoard(false);
+          void addColumn("relation", name, undefined, config);
+        }}
+      />
     </div>
   );
 });
 
 interface HeaderCellProps {
   readonly column: BoardColumn;
-  /** The whole schema — a select option rule can test any of it. */
   readonly columns: readonly BoardColumn[];
   readonly index: number;
   readonly can: PermissionResolver;
@@ -180,21 +190,8 @@ function HeaderCell({
 }: HeaderCellProps) {
   const renameColumn = useBoardStore((state) => state.renameColumn);
 
-  /**
-   * Whether *this* header is being renamed is board state, addressed by column
-   * id: inserting a column has to be able to open the new column's field, and
-   * it has no way to reach into a particular header's own `useState`.
-   */
   const isRenaming = useGridStore(selectIsRenaming(column.id));
 
-  /**
-   * The typed name, stored with the column it was typed against.
-   *
-   * Derived rather than seeded by an effect: with nothing edited the field
-   * simply shows `column.name`, so opening a rename always starts from what
-   * the column is actually called and a name changed elsewhere is never
-   * overwritten by a draft left behind.
-   */
   const [edited, setEdited] = useState<{ columnId: string; value: string } | null>(null);
   const draftName = edited?.columnId === column.id ? edited.value : column.name;
 
@@ -205,14 +202,6 @@ function HeaderCell({
     if (canEditColumn) useGridStore.getState().beginColumnRename(column.id);
   }
 
-  /**
-   * Commit once, whether the field was left by Enter, by Tab or by clicking
-   * away — the store's own rename flag is what makes the second call a no-op,
-   * so there is no separate "did I already save" bookkeeping to get wrong.
-   *
-   * An empty or whitespace-only name is not a rename: the column keeps the name
-   * it had, which is an answer the user can simply type over.
-   */
   function commit() {
     const grid = useGridStore.getState();
     if (grid.renamingColumnId !== column.id) return;
@@ -261,8 +250,6 @@ function HeaderCell({
     <div
       role="columnheader"
       aria-colindex={index + 1}
-      // Never draggable while the field is open: a drag started on a text
-      // selection inside it would take the column with it.
       draggable={!isRenaming && canEditColumn}
       onDragStart={(event) => {
         if (isRenaming) {
@@ -279,9 +266,6 @@ function HeaderCell({
       }}
       onDragLeave={() => onDragStateChange(null)}
       onDrop={(event) => onDrop(event, index)}
-      // Double-click anywhere on the header renames it. The two controls that
-      // mean something else — the menu and the resize grip — stop the event
-      // before it gets here, so this can never fire alongside one of them.
       onDoubleClick={() => {
         if (!isRenaming) beginRename();
       }}
@@ -303,10 +287,6 @@ function HeaderCell({
           onFocus={(event) => event.currentTarget.select()}
           onChange={(event) => setEdited({ columnId: column.id, value: event.target.value })}
           onBlur={commit}
-          // Nothing typed here is the grid's business. The container above
-          // runs the spreadsheet keyboard model, and without this every
-          // letter opened a cell editor somewhere else and took the focus
-          // with it — which is what made renaming look impossible.
           onKeyDown={(event) => {
             event.stopPropagation();
 
@@ -345,9 +325,6 @@ function HeaderCell({
         onAutoFitWidth={() => onAutoFitWidth(column.id)}
       />
 
-      {/* Drag to resize, double-click to fit — the spreadsheet gesture, in the
-          spreadsheet's place. It stops the event because the header behind it
-          renames on double-click, and the edge is not the title. */}
       <button
         type="button"
         aria-label={`Resize ${column.name} — double-click to fit its content`}

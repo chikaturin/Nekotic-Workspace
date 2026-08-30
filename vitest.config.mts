@@ -8,6 +8,9 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    // Backend giả bật cho MỌI test: một service gọi ra mạng mà không có handler
+    // sẽ fail ngay tại chỗ, thay vì im lặng chạm vào backend thật trên máy.
+    setupFiles: ["tests/msw/setup.ts"],
     coverage: {
       provider: "v8",
       include: ["src/lib/**", "src/store/**", "src/services/**", "src/mock/factory.ts"],

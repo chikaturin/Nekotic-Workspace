@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo } from "react";
 import { attachmentFromAsset, attachmentsOf } from "@/lib/attachments";
-import { fileService } from "@/services/file-service";
 import { selectRow, useBoardStore } from "@/store/board-store";
 import { useUploadStore } from "@/store/upload-store";
 import { useUploads, type UploadsView } from "@/hooks/use-uploads";
@@ -11,7 +10,6 @@ import type { CellAttachment } from "@/types";
 
 export interface AttachmentField {
   readonly files: readonly CellAttachment[];
-  /** Upload tasks for this field only — progress, failures and retries. */
   readonly uploads: UploadsView;
   readonly canAddMore: boolean;
   readonly remaining: number;
@@ -21,19 +19,6 @@ export interface AttachmentField {
   readonly dismiss: (taskId: string) => void;
 }
 
-/**
- * One attachment column of one record, as a live field.
- *
- * Both surfaces that show attachments — the table cell and the drawer section —
- * call this hook with the same row and column, so they read the same
- * `CellValue` and write through the same `editCells`. Uploading from the cell
- * is visible in the drawer, and the other way round, because there is only one
- * place the data lives.
- *
- * Uploads run through the shared upload store and are tagged per field, so a
- * transfer keeps its progress and its retry even if the drawer is closed and
- * reopened mid-flight.
- */
 export function useAttachmentField(
   rowId: string,
   columnId: string,
@@ -64,8 +49,6 @@ export function useAttachmentField(
     async (picked: readonly File[]) => {
       if (picked.length === 0) return;
 
-      // Read the current value at call time: two drops in quick succession must
-      // not both start from the same stale list and lose one another's files.
       const current = attachmentsOf(useBoardStore.getState().rowsById[rowId], columnId);
       const room = Math.max(0, maxFiles - current.length);
 
@@ -81,13 +64,19 @@ export function useAttachmentField(
       const assets = await startUploads(picked.slice(0, room), folderId, {
         tag,
         openPanel: false,
+        // Tệp thuộc về ô này, không phải Drive: khai chỗ ở thì server không tạo
+        // mục trong cây, và thư mục của người dùng không đầy ảnh đính kèm.
+        reference: { kind: "cell", rowId, columnId },
       });
       if (assets.length === 0) return;
 
-      const added = assets.map((asset) => {
-        const url = fileService.getAssetUrl(asset.id);
-        return attachmentFromAsset(asset, url, asset.kind === "image" ? url : null);
-      });
+      const added = assets.map((asset) =>
+        attachmentFromAsset(
+          asset,
+          asset.previewUrl ?? null,
+          asset.thumbnailUrl ?? null,
+        ),
+      );
 
       const latest = attachmentsOf(useBoardStore.getState().rowsById[rowId], columnId);
       commit([...latest, ...added]);

@@ -521,7 +521,6 @@ describe("the chart writes through the board", () => {
   beforeEach(async () => {
     resetSimulation();
     setSimulation({ latency: "fast" });
-    boardService.reset();
 
     useWorkspaceStore.setState({
       workspaces: [TEST_WORKSPACE],

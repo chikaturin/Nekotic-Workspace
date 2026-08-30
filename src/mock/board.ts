@@ -12,22 +12,8 @@ import type {
   SavedView,
 } from "@/types";
 
-/**
- * Board fixtures, generated from the template catalogue.
- *
- * Everything is derived from the node id and the row index, so the dataset is
- * identical on every reload and in every test.
- */
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/**
- * Date columns that open a range; every other date column closes one.
- *
- * The templates pair these as a Gantt view's start and end — `col_start` with
- * `col_due`, `col_found` with `col_target`, and so on — so generating them as
- * a pair is what keeps the fixtures schedulable.
- */
 const RANGE_START_COLUMNS: ReadonlySet<string> = new Set([
   "col_start",
   "col_found",
@@ -35,7 +21,6 @@ const RANGE_START_COLUMNS: ReadonlySet<string> = new Set([
   "col_documented",
 ]);
 
-/** Relation columns that point at another record on the same board. */
 const BLOCKING_COLUMNS: ReadonlySet<string> = new Set(["col_blocks"]);
 
 function hash(seed: string): number {
@@ -51,9 +36,6 @@ function pick<T>(items: readonly T[], seed: number): T {
   return items[seed % items.length] ?? items[0]!;
 }
 
-/* -------------------------------------------------------------- templates */
-
-/** A board declares its template; older fixtures infer one from their name. */
 export function templateForBoard(name: string, templateId?: string): BoardTemplate {
   const declared = templateById(templateId);
   if (declared) return declared;
@@ -95,14 +77,11 @@ function viewsFor(
     endDateColumnId: definition.endDateColumnId ?? null,
   }));
 
-  // The node's own kind decides which saved view opens first.
   const lead = views.findIndex((view) => view.type === primaryKind);
   if (lead <= 0) return views;
 
   return [views[lead]!, ...views.filter((_, index) => index !== lead)];
 }
-
-/* ------------------------------------------------------------------- rows */
 
 const TITLE_VERBS = [
   "Fix",
@@ -141,11 +120,6 @@ const QA_CASES = [
   "Upload evidence larger than 25 MB",
 ];
 
-/**
- * Endpoint catalogue for the API documentation board. Two entries repeat the
- * same endpoint and method on purpose, so the duplicate warning has something
- * real to find.
- */
 const ENDPOINTS: readonly (readonly [string, number])[] = [
   ["/auth/login", 1],
   ["/auth/refresh", 1],
@@ -177,16 +151,9 @@ const DESCRIPTIONS = [
 interface RowContext {
   readonly boardId: string;
   readonly template: BoardTemplate;
-  /** Row-level hash — drives the title, the author and the timestamps. */
   readonly seed: number;
   readonly index: number;
   readonly base: number;
-  /**
-   * Per-column hash. Deriving every cell from the row hash alone correlates
-   * the columns: with a 7-person directory and a 7-way test on any other
-   * field, the records assigned to one person were exactly the records that
-   * failed it.
-   */
   readonly cellSeed: number;
 }
 
@@ -215,7 +182,6 @@ function cellFor(column: BoardColumn, context: RowContext): CellValue {
       const { options } = column.config;
       if (options.length === 0) return { kind: "select", optionIds: [] };
 
-      // The API board's method comes from the endpoint catalogue, not the hash.
       if (template.id === "apiDocs" && column.id === "col_method") {
         const methodIndex = ENDPOINTS[index % ENDPOINTS.length]?.[1] ?? 0;
         return { kind: "select", optionIds: [options[methodIndex]?.id ?? options[0]!.id] };
@@ -231,21 +197,11 @@ function cellFor(column: BoardColumn, context: RowContext): CellValue {
       };
 
     case "date": {
-      /**
-       * Both ends of a range are always generated, and the end is measured
-       * *from* the start rather than hashed on its own. Two independent days
-       * produced records whose start fell after their end, and records with
-       * only one of the two — neither of which is a duration, so the Gantt
-       * could place neither, and a chart of a full board came up mostly empty.
-       */
       const start = -((cellSeed % 25) + 2);
       if (RANGE_START_COLUMNS.has(column.id)) {
         return { kind: "date", iso: new Date(base + start * DAY_MS).toISOString() };
       }
 
-      // Every ninth deadline lands on the reference day, so "Due today" and
-      // the calendar both have something real to show. It is still after the
-      // start, which is always at least two days in the past.
       const offset = cellSeed % 9 === 0 ? 0 : start + (cellSeed % 14) + 1;
 
       return { kind: "date", iso: new Date(base + offset * DAY_MS).toISOString() };
@@ -255,15 +211,6 @@ function cellFor(column: BoardColumn, context: RowContext): CellValue {
       return { kind: "attachment", attachments: [] };
 
     case "relation": {
-      /**
-       * "Blocked by" is the one relation that points inside the same board, so
-       * it is the only one seeded. The others name a record on another board,
-       * whose ids this generator has no business inventing.
-       *
-       * Every fourth record is blocked by one a little ahead of it, which gives
-       * the Gantt real connectors to draw and its conflict warning something to
-       * find — an empty relation column made the dependency toggle look broken.
-       */
       if (!BLOCKING_COLUMNS.has(column.id) || cellSeed % 4 !== 0) {
         return { kind: "relation", rowIds: [] };
       }
@@ -276,14 +223,6 @@ function cellFor(column: BoardColumn, context: RowContext): CellValue {
   }
 }
 
-/**
- * Which fixture rows are subtasks, and of what.
- *
- * A repeating shape — one parent followed by three children, every seventh
- * record — so the dataset always contains a hierarchy to look at, identically
- * on every reload. Only work boards get one: an endpoint catalogue has no
- * notion of a subtask.
- */
 const HIERARCHY_TEMPLATES = new Set<BoardTemplate["id"]>(["task", "bug"]);
 const HIERARCHY_PERIOD = 7;
 
@@ -291,7 +230,6 @@ function parentIndexFor(template: BoardTemplate, index: number): number | null {
   if (!HIERARCHY_TEMPLATES.has(template.id)) return null;
 
   const slot = index % HIERARCHY_PERIOD;
-  // Slot 1 is a parent; slots 2–4 are its children.
   return slot >= 2 && slot <= 4 ? index - (slot - 1) : null;
 }
 
@@ -327,7 +265,6 @@ export function buildRows(
       updatedAt: new Date(base - (seed % 20) * DAY_MS).toISOString(),
       createdBy: person.id,
       revision: 1,
-      // The child points at the parent; the parent stores nothing about it.
       ...(parentIndex !== null && parentIndex < index
         ? { parentRowId: `${boardId}_row_${parentIndex + 1}` }
         : {}),
@@ -336,8 +273,6 @@ export function buildRows(
 
   return rows;
 }
-
-/* ------------------------------------------------------------------ board */
 
 export interface BoardSeed {
   readonly nodeId: string;

@@ -10,14 +10,13 @@ import {
   rowRef,
 } from "@/lib/entity-ref";
 import { dropEntry, touchEntry } from "@/lib/lru";
-import { mentionToken } from "@/lib/mentions";
 import { lensesFor, isDone, DONE_LABELS } from "@/lib/my-work";
 import { findNodeById } from "@/lib/tree";
 import { CURRENT_USER, directoryAt } from "@/mock/users";
-import { boardIdFor, boardService } from "@/services/board-service";
+import { boardService } from "@/services/board-service";
+import { boardIdFor } from "./msw/fake/board.fake";
 import { commentService } from "@/services/comment-service";
-import { myWorkService } from "@/services/my-work-service";
-import { notificationService } from "@/services/notification-service";
+import { myWorkFake } from "./msw/fake/my-work.fake";
 import { watchService } from "@/services/watch-service";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useRecentStore } from "@/store/recent-store";
@@ -25,6 +24,7 @@ import { useWatchStore } from "@/store/watch-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { EntityRef, MyWorkWidget, MyWorkWidgetId, RecentEntry } from "@/types";
 import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
+import { collabFake } from "./msw/fake/collab.fake";
 
 const WORKSPACE_ID = "ws_test";
 const YESTERDAY = "2026-08-25T09:30:00.000Z";
@@ -53,11 +53,6 @@ const rowIdsIn = (target: MyWorkWidget) => target.items.map((item) => item.ref.r
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-
-  boardService.reset();
-  commentService.reset();
-  notificationService.reset();
-  watchService.reset();
   useRecentStore.setState({ entries: [], isHydrated: true });
   useWatchStore.setState({ entries: [], watching: {}, isLoaded: false, pending: {} });
 
@@ -151,33 +146,43 @@ describe("watching", () => {
   test("a target can be followed and dropped again", async () => {
     const target = ref(1);
 
-    await watchService.setWatching({ ref: target, userId: CURRENT_USER.id, isWatching: true });
-    expect(watchService.watchersOf(refKey(target))).toContain(CURRENT_USER.id);
+    const follows = (entries: readonly { targetKey: string }[]) =>
+      entries.some((entry) => entry.targetKey === refKey(target));
 
-    const entries = await watchService.list(CURRENT_USER.id);
-    expect(entries.some((entry) => entry.targetKey === refKey(target))).toBe(true);
+    // `setWatching` chỉ nhận `ref`: người theo dõi luôn là phiên đang gọi.
+    expect(follows(await watchService.setWatching(target, true))).toBe(true);
+    expect(follows(await watchService.list())).toBe(true);
 
-    await watchService.setWatching({ ref: target, userId: CURRENT_USER.id, isWatching: false });
-    expect(watchService.watchersOf(refKey(target))).not.toContain(CURRENT_USER.id);
+    expect(follows(await watchService.setWatching(target, false))).toBe(false);
   });
 
   test("the author is excluded from their own fan-out", async () => {
     const target = ref(1);
     const other = directoryAt(2);
 
-    await watchService.setWatching({ ref: target, userId: CURRENT_USER.id, isWatching: true });
-    await watchService.setWatching({ ref: target, userId: other.id, isWatching: true });
+    await watchService.setWatching(target, true);
+    // Người thứ hai theo dõi được dựng ở phía SERVER: API không có đường để một
+    // người bật theo dõi hộ người khác, và đó là điều đúng.
+    collabFake.setWatch(target, other.id, true);
 
-    expect(watchService.watchersOf(refKey(target), CURRENT_USER.id)).toEqual([other.id]);
+    // Hộp thư đã có sẵn thông báo mẫu, nên phép đo là TRƯỚC/SAU chứ không phải
+    // một con số tuyệt đối.
+    const mineBefore = collabFake.notifications(CURRENT_USER.id).length;
+    const theirsBefore = collabFake.notifications(other.id).length;
+
+    await commentService.add({ target, body: "shipping today" });
+
+    // Tác giả KHÔNG nhận thông báo về bài của chính mình; người kia thì có.
+    expect(collabFake.notifications(CURRENT_USER.id)).toHaveLength(mineBefore);
+    expect(collabFake.notifications(other.id)).toHaveLength(theirsBefore + 1);
   });
 
   test("a folder cannot be watched", async () => {
     await expect(
-      watchService.setWatching({
-        ref: { kind: "folder", nodeId: ID.payment, label: "Payment" },
-        userId: CURRENT_USER.id,
-        isWatching: true,
-      }),
+      watchService.setWatching(
+        { kind: "folder", nodeId: ID.payment, label: "Payment" },
+        true,
+      ),
     ).rejects.toThrow();
   });
 });
@@ -216,21 +221,31 @@ describe("my work", () => {
     return snapshot;
   }
 
-  test("the five widgets read one record set", async () => {
+  test("the four widgets read one record set", async () => {
     await prepareBoard();
-    const widgets = await myWorkService.load({ userId: CURRENT_USER.id, nowIso: MOCK_NOW });
+    const widgets = await myWorkFake.load({ userId: CURRENT_USER.id, nowIso: MOCK_NOW });
 
+    // Đúng bốn widget server trả về, đúng thứ tự đó.
     expect(widgets.map((entry) => entry.id)).toEqual([
-      "assigned",
-      "mentioned",
-      "dueToday",
       "overdue",
-      "recentlyUpdated",
+      "dueToday",
+      "dueThisWeek",
+      "unscheduled",
     ]);
 
-    expect(rowIdsIn(widget(widgets, "assigned"))).toEqual([rowIdAt(2), rowIdAt(1)]);
     expect(rowIdsIn(widget(widgets, "dueToday"))).toEqual([rowIdAt(1)]);
     expect(rowIdsIn(widget(widgets, "overdue"))).toEqual([rowIdAt(2)]);
+  });
+
+  test("a record stands in exactly one widget", async () => {
+    // Bốn widget là một PHÂN HOẠCH theo hạn, không phải bốn bộ lọc chồng nhau:
+    // một việc quá hạn không được đếm thêm lần nữa ở "tuần này".
+    await prepareBoard();
+    const widgets = await myWorkFake.load({ userId: CURRENT_USER.id, nowIso: MOCK_NOW });
+
+    const everywhere = widgets.flatMap((entry) => rowIdsIn(entry));
+
+    expect(new Set(everywhere).size).toBe(everywhere.length);
   });
 
   test("a finished record leaves the open widgets", async () => {
@@ -243,85 +258,41 @@ describe("my work", () => {
     expect(isDone(done, lenses)).toBe(true);
     expect(DONE_LABELS.has("done")).toBe(true);
 
-    const widgets = await myWorkService.load({ userId: CURRENT_USER.id, nowIso: MOCK_NOW });
-    expect(rowIdsIn(widget(widgets, "overdue"))).not.toContain(rowIdAt(3));
-    expect(rowIdsIn(widget(widgets, "assigned"))).not.toContain(rowIdAt(3));
+    const widgets = await myWorkFake.load({ userId: CURRENT_USER.id, nowIso: MOCK_NOW });
+
+    for (const entry of widgets) expect(rowIdsIn(entry)).not.toContain(rowIdAt(3));
   });
 
-  test("a mention puts the thread's target in the Mentioned widget", async () => {
+  test("work assigned to somebody else never appears", async () => {
     await prepareBoard();
-    const target = ref(1);
+    const widgets = await myWorkFake.load({ userId: CURRENT_USER.id, nowIso: MOCK_NOW });
 
-    await commentService.add({
-      target,
-      body: `${mentionToken(directoryAt(1))} and ${mentionToken(CURRENT_USER)} please review`,
-    });
-
-    const widgets = await myWorkService.load({ userId: CURRENT_USER.id, nowIso: MOCK_NOW });
-    const mentioned = widget(widgets, "mentioned");
-
-    expect(rowIdsIn(mentioned)).toContain(rowIdAt(1));
-    expect(mentioned.items[0]?.displayId).toBe("TASK-001");
+    for (const entry of widgets) expect(rowIdsIn(entry)).not.toContain(rowIdAt(4));
   });
 
   test("the widget count is the match count, not the rendered count", async () => {
     await prepareBoard();
-    const widgets = await myWorkService.load({
+    const widgets = await myWorkFake.load({
       userId: CURRENT_USER.id,
       nowIso: MOCK_NOW,
       limit: 1,
     });
 
-    const assigned = widget(widgets, "assigned");
-    expect(assigned.items).toHaveLength(1);
-    expect(assigned.total).toBe(2);
+    const total = widgets.reduce((sum, entry) => sum + entry.total, 0);
+    const rendered = widgets.reduce((sum, entry) => sum + entry.items.length, 0);
+
+    expect(total).toBe(2);
+    expect(rendered).toBeLessThanOrEqual(total);
   });
 
   test("a board the user cannot open contributes nothing", async () => {
     await prepareBoard();
-    const widgets = await myWorkService.load({
+    const widgets = await myWorkFake.load({
       userId: CURRENT_USER.id,
       nowIso: MOCK_NOW,
       allow: () => false,
     });
 
-    expect(widget(widgets, "assigned").total).toBe(0);
-    expect(widget(widgets, "overdue").total).toBe(0);
-  });
-
-  test("a mention on a target the gate excludes is dropped, not down-shifted", async () => {
-    await prepareBoard();
-    await commentService.add({
-      target: ref(1),
-      body: `${mentionToken(CURRENT_USER)} look at this`,
-    });
-
-    // The record is real and mentions the user, but its board is out of reach:
-    // it must not reappear through the page branch of the widget.
-    const widgets = await myWorkService.load({
-      userId: CURRENT_USER.id,
-      nowIso: MOCK_NOW,
-      allow: () => false,
-    });
-
-    const mentioned = widget(widgets, "mentioned");
-    expect(mentioned.total).toBe(0);
-    expect(mentioned.items.some((item) => item.ref.rowId === rowIdAt(1))).toBe(false);
-  });
-
-  test("a record whose board is not loaded never lands in Mentioned as a page", async () => {
-    await prepareBoard();
-    await commentService.add({
-      target: ref(1),
-      body: `${mentionToken(CURRENT_USER)} still here`,
-    });
-
-    const widgets = await myWorkService.load({
-      userId: CURRENT_USER.id,
-      nowIso: MOCK_NOW,
-      allow: (nodeId) => nodeId !== ID.roadmap,
-    });
-
-    expect(widget(widgets, "mentioned").items).toHaveLength(0);
+    for (const entry of widgets) expect(entry.total).toBe(0);
   });
 });

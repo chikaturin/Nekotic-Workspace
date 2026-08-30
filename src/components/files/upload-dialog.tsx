@@ -17,16 +17,11 @@ import type { UploadTask } from "@/types";
 interface UploadDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
-  /** Destination folder; null uploads to the workspace root. */
   readonly folderId: string | null;
   readonly folderName: string;
   readonly canUpload: boolean;
 }
 
-/**
- * Full-page uploader. Picking files, watching progress and dealing with
- * failures all happen on one screen instead of a corner tray.
- */
 export function UploadDialog({
   open,
   onOpenChange,
@@ -40,7 +35,6 @@ export function UploadDialog({
   const removeTask = useUploadStore((state) => state.removeTask);
   const clearFinished = useUploadStore((state) => state.clearFinished);
 
-  // Only this destination's uploads belong on this screen.
   const scoped = useMemo<readonly UploadTask[]>(
     () => tasks.filter((task) => task.folderId === folderId),
     [tasks, folderId],
@@ -169,7 +163,6 @@ const TYPE_GROUPS: readonly { label: string; extensions: readonly string[] }[] =
   { label: "Source code", extensions: ACCEPTED_EXTENSIONS.code },
 ];
 
-/** What the workspace accepts — visible before anything is picked. */
 function AcceptedTypes() {
   return (
     <section className="rounded-xl border border-border bg-surface p-4">

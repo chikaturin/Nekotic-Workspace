@@ -1,27 +1,37 @@
-import { beforeEach, describe, expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import { flattenTree } from "@/lib/tree";
-import { NEXDROP_TREE } from "@/mock/tree";
-import { CURRENT_USER, memberAt } from "@/mock/users";
-import { documentService } from "@/services/document-service";
+import { NEKOTIC_TREE } from "@/mock/tree";
+import { CURRENT_USER } from "@/mock/users";
+import { documentService, summarize } from "@/services/document-service";
 import { isServiceError } from "@/services/errors";
-import { resetSimulation, setSimulation } from "@/services/simulation";
 import { isDocument, type Block } from "@/types";
 
-/** Resolve a seeded document node by name so ids stay an implementation detail. */
+/**
+ * `documentService` giờ là một CLIENT: nó nói HTTP với backend, và trong test
+ * backend đó là handler MSW đứng trên `document.fake`.
+ *
+ * Điều đáng kiểm vì thế đã đổi. Trước đây là "kho trong bộ nhớ có đúng không";
+ * bây giờ là "service có gọi đúng endpoint, gửi đúng payload và xử lý đúng câu
+ * trả lời không" — kể cả khi câu trả lời là một lỗi.
+ */
+
 function nodeIdByName(name: string): string {
-  const node = flattenTree(NEXDROP_TREE).find((candidate) => candidate.name === name);
+  const node = flattenTree(NEKOTIC_TREE).find(
+    (candidate) => candidate.name === name,
+  );
+
   if (!node || !isDocument(node)) throw new Error(`no document named ${name}`);
+
   return node.id;
 }
 
 const NOTES = nodeIdByName("Payment Integration Notes");
 const LOCKED = nodeIdByName("Component Review");
 
-beforeEach(() => {
-  documentService.reset();
-  resetSimulation();
-  setSimulation({ latency: "fast" });
-});
+const draft = (
+  blocks: readonly Block[],
+  title = "Payment Integration Notes",
+) => ({ title, icon: "💳", blocks });
 
 describe("get", () => {
   test("returns the seeded content for a page", async () => {
@@ -32,9 +42,10 @@ describe("get", () => {
     expect(document.version).toBe(1);
   });
 
-  test("reports a missing page as not found", async () => {
+  test("turns a 404 into a not_found AppError", async () => {
     await expect(documentService.get("nope")).rejects.toSatisfy(
-      (error: unknown) => isServiceError(error) && error.appError.code === "not_found",
+      (error: unknown) =>
+        isServiceError(error) && error.appError.code === "not_found",
     );
   });
 
@@ -47,46 +58,55 @@ describe("get", () => {
 });
 
 describe("save", () => {
-  const draft = (blocks: readonly Block[], title = "Payment Integration Notes") => ({
-    title,
-    icon: "💳",
-    blocks,
-  });
-
   test("persists blocks and bumps the version", async () => {
     const before = await documentService.get(NOTES);
-    const blocks: readonly Block[] = [{ id: "b1", type: "paragraph", text: "Rewritten" }];
+    const blocks: readonly Block[] = [
+      { id: "b1", type: "paragraph", text: "Rewritten" },
+    ];
 
     const saved = await documentService.save(NOTES, draft(blocks));
 
     expect(saved.blocks).toHaveLength(1);
     expect(saved.version).toBe(before.version + 1);
-    expect(await documentService.get(NOTES)).toMatchObject({ version: saved.version });
+    // Đọc lại qua HTTP: phiên bản mới phải THẬT SỰ nằm ở phía server, không chỉ
+    // trong đối tượng vừa trả về.
+    expect(await documentService.get(NOTES)).toMatchObject({
+      version: saved.version,
+    });
   });
 
   test("an empty title falls back to Untitled", async () => {
-    const saved = await documentService.save(NOTES, draft([], "   "));
-    expect(saved.title).toBe("Untitled");
+    expect((await documentService.save(NOTES, draft([], "   "))).title).toBe(
+      "Untitled",
+    );
   });
 
   test("refuses to write to a locked page", async () => {
     await expect(
-      documentService.save(LOCKED, { title: "Component Review", icon: "🧩", blocks: [] }),
+      documentService.save(LOCKED, {
+        title: "Component Review",
+        icon: "🧩",
+        blocks: [],
+      }),
     ).rejects.toSatisfy(
-      (error: unknown) => isServiceError(error) && error.appError.code === "conflict",
+      (error: unknown) =>
+        isServiceError(error) && error.appError.code === "conflict",
     );
   });
 
-  test("surfaces a retryable failure when the simulation asks for one", async () => {
-    setSimulation({ failSaves: true });
+  test("a stale expectedVersion is refused instead of overwriting", async () => {
+    // Hai tab cùng mở một trang. Không có token này thì người lưu sau thắng và
+    // không ai biết bản của người kia đã biến mất.
+    const before = await documentService.get(NOTES);
 
-    await expect(documentService.save(NOTES, draft([]))).rejects.toSatisfy(
-      (error: unknown) => isServiceError(error) && error.appError.isRetryable,
+    await documentService.save(NOTES, draft([]), before.version);
+
+    await expect(
+      documentService.save(NOTES, draft([]), before.version),
+    ).rejects.toSatisfy(
+      (error: unknown) =>
+        isServiceError(error) && error.appError.code === "conflict",
     );
-  });
-
-  test("a title containing the failure marker fails deterministically", async () => {
-    await expect(documentService.save(NOTES, draft([], "this will fail"))).rejects.toThrow();
   });
 });
 
@@ -97,66 +117,86 @@ describe("page actions", () => {
   });
 
   test("locking records the holder and unlocking clears it", async () => {
-    const locked = await documentService.setLocked(NOTES, true, CURRENT_USER);
+    // Ai khoá do SERVER ghi từ phiên đang gọi — client không gửi danh tính lên.
+    const locked = await documentService.setLocked(NOTES, true);
+
     expect(locked.lockedBy?.id).toBe(CURRENT_USER.id);
 
-    const unlocked = await documentService.setLocked(NOTES, false, null);
+    const unlocked = await documentService.setLocked(NOTES, false);
+
     expect(unlocked.isLocked).toBe(false);
     expect(unlocked.lockedBy).toBeNull();
   });
 
-  test("archive and restore flip the flag", async () => {
-    expect((await documentService.setArchived(NOTES, true)).isArchived).toBe(true);
-    expect((await documentService.setArchived(NOTES, false)).isArchived).toBe(false);
-  });
-
-  test("duplicate copies content onto a new node with fresh block ids", async () => {
-    const source = await documentService.get(NOTES);
-    const copy = await documentService.duplicate(NOTES, "node_copy", "Payment Integration Notes (copy)");
-
-    expect(copy.nodeId).toBe("node_copy");
-    expect(copy.title).toContain("(copy)");
-    expect(copy.blocks).toHaveLength(source.blocks.length);
-    expect(copy.blocks[0]?.id).not.toBe(source.blocks[0]?.id);
-    expect(copy.version).toBe(1);
-    expect(copy.isPinned).toBe(false);
-    expect(copy.isLocked).toBe(false);
-  });
-
-  test("a duplicate is retrievable on its own", async () => {
-    await documentService.duplicate(NOTES, "node_copy", "Copy");
-    expect((await documentService.get("node_copy")).title).toBe("Copy");
-  });
-
-  test("create then remove leaves nothing behind", async () => {
+  test("creating a page is its first save, not a separate endpoint", async () => {
     await documentService.create({
       nodeId: "node_new",
-      workspaceId: "ws_nexdrop",
       title: "Fresh page",
       icon: "📄",
-      owner: memberAt(1),
       blocks: [{ id: "b", type: "paragraph", text: "" }],
     });
 
     expect((await documentService.get("node_new")).title).toBe("Fresh page");
+  });
+});
 
-    await documentService.remove("node_new");
-    await expect(documentService.get("node_new")).rejects.toThrow();
+describe("versions", () => {
+  test("every save adds an entry to the history", async () => {
+    const before = await documentService.listVersions(NOTES);
+
+    await documentService.save(NOTES, draft([{ id: "b", type: "paragraph", text: "one" }]));
+
+    expect(await documentService.listVersions(NOTES)).toHaveLength(
+      before.length + 1,
+    );
   });
 
-  test("summarize derives the tree-facing patch from the content", async () => {
+  test("history entries carry rendered lines but not raw blocks", async () => {
+    // Lịch sử một trang dài có hàng chục bản; kèm nội dung đầy đủ vào danh sách
+    // là tải cả cuốn sách để vẽ một cột thời gian.
+    await documentService.save(NOTES, draft([{ id: "b", type: "paragraph", text: "hello" }]));
+
+    const [newest] = await documentService.listVersions(NOTES);
+
+    expect(newest?.lines).toContain("hello");
+    expect(newest).not.toHaveProperty("blocks");
+  });
+
+  test("restoring writes forward instead of rewinding the history", async () => {
+    const original = await documentService.get(NOTES);
+    const [firstVersion] = await documentService.listVersions(NOTES);
+
+    await documentService.save(NOTES, draft([{ id: "b", type: "paragraph", text: "changed" }]));
+
+    const restored = await documentService.restoreVersion(
+      NOTES,
+      firstVersion!.id,
+    );
+
+    expect(restored.blocks).toHaveLength(original.blocks.length);
+    // Bản khôi phục là phiên bản MỚI NHẤT, không phải một lần tua ngược.
+    expect(restored.version).toBeGreaterThan(original.version + 1);
+  });
+
+  test("restoring a locked page is refused for the same reason editing is", async () => {
+    const [version] = await documentService.listVersions(LOCKED);
+
+    await expect(
+      documentService.restoreVersion(LOCKED, version!.id),
+    ).rejects.toSatisfy(
+      (error: unknown) =>
+        isServiceError(error) && error.appError.code === "conflict",
+    );
+  });
+});
+
+describe("summarize", () => {
+  test("derives the tree-facing patch from the content", async () => {
     const document = await documentService.get(NOTES);
-    const summary = documentService.summarize(document);
+    const summary = summarize(document);
 
     expect(summary.name).toBe(document.title);
     expect(summary.blockCount).toBe(document.blocks.length);
     expect(summary.excerpt.length).toBeGreaterThan(0);
-  });
-
-  test("reset restores the seeded catalog", async () => {
-    await documentService.save(NOTES, { title: "Changed", icon: "💳", blocks: [] });
-    documentService.reset();
-
-    expect((await documentService.get(NOTES)).title).toBe("Payment Integration Notes");
   });
 });

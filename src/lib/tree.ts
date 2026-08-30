@@ -9,9 +9,6 @@ import {
   type SortState,
 } from "@/types";
 
-/* ------------------------------------------------------------------ lookups */
-
-/** Depth-first search by id across the whole forest. */
 export function findNodeById(nodes: readonly DriveNode[], id: string): DriveNode | null {
   for (const node of nodes) {
     if (node.id === id) return node;
@@ -22,7 +19,6 @@ export function findNodeById(nodes: readonly DriveNode[], id: string): DriveNode
   return null;
 }
 
-/** Chain of nodes from a root down to `id`, inclusive. Empty when not found. */
 export function findPathToId(nodes: readonly DriveNode[], id: string): readonly DriveNode[] {
   for (const node of nodes) {
     if (node.id === id) return [node];
@@ -33,10 +29,6 @@ export function findPathToId(nodes: readonly DriveNode[], id: string): readonly 
   return [];
 }
 
-/**
- * Resolve URL segments (`['development', 'backend']`) against the tree.
- * Unknown segments produce `isNotFound`, keeping the crumbs resolved so far.
- */
 export function resolvePath(
   nodes: readonly DriveNode[],
   segments: readonly string[],
@@ -59,32 +51,23 @@ export function resolvePath(
   return { node: current, ancestors, children: pool, isNotFound: false };
 }
 
-/** Absolute route for a node given its ancestor chain. */
 export function buildHref(path: readonly DriveNode[]): string {
   if (path.length === 0) return DRIVE_ROOT_PATH;
   return `${DRIVE_ROOT_PATH}/${path.map((node) => node.slug).join("/")}`;
 }
 
-/** Absolute route for a node id, resolved from the forest. */
 export function hrefForNode(nodes: readonly DriveNode[], id: string): string {
   return buildHref(findPathToId(nodes, id));
 }
 
-/** `Development / Backend` — ancestor labels, excluding the node itself. */
 export function pathLabel(nodes: readonly DriveNode[], id: string): string {
   const path = findPathToId(nodes, id);
   const ancestors = path.slice(0, -1);
   return ancestors.length > 0 ? ancestors.map((node) => node.name).join(" / ") : "Workspace root";
 }
 
-/* ----------------------------------------------------------------- mutation */
-
 type NodeUpdater = (node: DriveNode) => DriveNode;
 
-/**
- * Return a new forest with `id` replaced by `updater(node)`. Never mutates.
- * Branches that did not change keep their identity, so React can skip them.
- */
 export function updateNode(
   nodes: readonly DriveNode[],
   id: string,
@@ -101,7 +84,6 @@ export function updateNode(
   return next.some((node, index) => node !== nodes[index]) ? next : nodes;
 }
 
-/** Return a new forest without `id`, plus the node that was removed. */
 export function removeNode(
   nodes: readonly DriveNode[],
   id: string,
@@ -128,10 +110,6 @@ export function removeNode(
   return { tree: nodes, removed: null };
 }
 
-/**
- * Insert `child` into `parentId` (or at the forest root when null).
- * Children stay sorted by the caller; insertion appends.
- */
 export function insertNode(
   nodes: readonly DriveNode[],
   parentId: string | null,
@@ -144,7 +122,6 @@ export function insertNode(
   );
 }
 
-/** True when `descendantId` sits anywhere below `ancestorId`. */
 export function isDescendantOf(
   nodes: readonly DriveNode[],
   ancestorId: string,
@@ -163,10 +140,6 @@ export interface MoveResult {
   readonly rejection: MoveRejection | null;
 }
 
-/**
- * Move a node under a new container, rejecting cycles and no-op drops.
- * Returns the original tree untouched when the move is not allowed.
- */
 export function moveNode(
   nodes: readonly DriveNode[],
   nodeId: string,
@@ -196,10 +169,6 @@ export function moveNode(
   return { tree: insertNode(pruned, targetParentId, relocated), moved: relocated, rejection: null };
 }
 
-/**
- * Deep-copy a node under a new parent, minting a fresh id for every descendant.
- * Slug uniqueness is the caller's job — it needs the sibling list.
- */
 export function cloneNode(
   node: DriveNode,
   parentId: string | null,
@@ -216,24 +185,19 @@ export function cloneNode(
   };
 }
 
-/* ------------------------------------------------------------- aggregations */
-
 export function flattenTree(nodes: readonly DriveNode[]): readonly DriveNode[] {
   return nodes.flatMap((node) => [node, ...flattenTree(childrenOf(node))]);
 }
 
-/** Total bytes stored below (and including) a node. */
 export function totalSize(node: DriveNode): number {
   if (isFile(node)) return node.sizeBytes;
   return childrenOf(node).reduce((sum, child) => sum + totalSize(child), 0);
 }
 
-/** Direct child count, used for folder subtitles. */
 export function childCount(node: DriveNode): number {
   return childrenOf(node).length;
 }
 
-/** Files directly inside a container (or the forest root), minus the trash. */
 export function visibleFilesOf(
   nodes: readonly DriveNode[],
   folder: DriveNode | null,
@@ -241,8 +205,6 @@ export function visibleFilesOf(
   const pool = folder ? childrenOf(folder) : nodes;
   return pool.filter((node) => isFile(node) && !node.isTrashed);
 }
-
-/* ---------------------------------------------------------------- filtering */
 
 const TYPE_WEIGHT: Record<DriveNode["type"], number> = {
   project: 0,
@@ -252,7 +214,6 @@ const TYPE_WEIGHT: Record<DriveNode["type"], number> = {
   file: 4,
 };
 
-/** Containers first, then the requested key. Sorting is stable and pure. */
 export function sortNodes(nodes: readonly DriveNode[], sort: SortState): readonly DriveNode[] {
   const factor = sort.direction === "asc" ? 1 : -1;
 
@@ -275,7 +236,6 @@ export function sortNodes(nodes: readonly DriveNode[], sort: SortState): readonl
   });
 }
 
-/** Case-insensitive name search across the forest, capped at `limit` hits. */
 export function searchNodes(
   nodes: readonly DriveNode[],
   query: string,
@@ -294,13 +254,6 @@ export function searchNodes(
     }));
 }
 
-/**
- * Flatten, pruning any node that fails `allow` *together with its subtree*.
- *
- * Permission is inherited: a file inside a folder the viewer cannot open must
- * not surface in search results just because the file itself carries no
- * restriction of its own.
- */
 export function collectAllowed(
   nodes: readonly DriveNode[],
   allow: (node: DriveNode) => boolean,
@@ -319,7 +272,6 @@ export function collectAllowed(
   return visible;
 }
 
-/** Nodes matching a predicate, flattened — powers the smart views. */
 export function collectNodes(
   nodes: readonly DriveNode[],
   predicate: (node: DriveNode) => boolean,

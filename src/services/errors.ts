@@ -1,6 +1,5 @@
 import type { AppError, AppErrorCode } from "@/types";
 
-/** Error type every service throws. Carries a UI-ready `AppError`. */
 export class ServiceError extends Error {
   readonly appError: AppError;
 
@@ -48,7 +47,6 @@ export const cancelled = (what: string): ServiceError =>
 export const conflict = (message: string, detail?: string): ServiceError =>
   new ServiceError(appError("conflict", message, { detail, isRetryable: false }));
 
-/** Normalise anything thrown into an `AppError` the UI can render. */
 export function toAppError(error: unknown): AppError {
   if (isServiceError(error)) return error.appError;
 

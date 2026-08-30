@@ -909,7 +909,6 @@ describe("rules through the board store", () => {
   beforeEach(async () => {
     resetSimulation();
     setSimulation({ latency: "fast" });
-    boardService.reset();
 
     useWorkspaceStore.setState({
       workspaces: [TEST_WORKSPACE],
@@ -1042,7 +1041,6 @@ describe("bulk writes obey the same rules", () => {
   beforeEach(async () => {
     resetSimulation();
     setSimulation({ latency: "fast" });
-    boardService.reset();
 
     useWorkspaceStore.setState({
       workspaces: [TEST_WORKSPACE],
@@ -1120,7 +1118,6 @@ describe("permission to change the workflow", () => {
   beforeEach(() => {
     resetSimulation();
     setSimulation({ latency: "fast" });
-    boardService.reset();
     signedInAs("admin");
   });
 

@@ -22,6 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useHotkey } from "@/hooks/use-hotkey";
 import { useSheetEditor } from "@/hooks/use-file-editor";
 import {
   addGridColumn,
@@ -41,15 +42,9 @@ interface SheetPreviewProps {
   readonly sheetName: string;
   readonly node: FileNode;
   readonly canEdit: boolean;
-  /** Refresh the preview once new bytes are stored. */
   readonly onSaved: () => void;
 }
 
-/**
- * Spreadsheet surface for CSV, TSV and XLSX: a read-only grid that turns into
- * a cell editor. Writing goes through the file service, which encodes back to
- * the file's own format.
- */
 export function SheetPreview({ rows, sheetName, node, canEdit, onSaved }: SheetPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editor = useSheetEditor(node, rows);
@@ -61,7 +56,6 @@ export function SheetPreview({ rows, sheetName, node, canEdit, onSaved }: SheetP
     editor.change(next);
   }
 
-  /** Cells are addressed by coordinate so growth can hand focus straight on. */
   function focusCell(rowIndex: number, columnIndex: number) {
     requestAnimationFrame(() => {
       containerRef.current
@@ -73,6 +67,21 @@ export function SheetPreview({ rows, sheetName, node, canEdit, onSaved }: SheetP
   async function commit() {
     if (await editor.save(editor.draft)) onSaved();
   }
+
+  /**
+   * Cmd/Ctrl+S lưu TỆP, không phải lưu trang.
+   *
+   * Handler cũ nằm trên chính ô nhập, nên chỉ chạy khi con trỏ đang ở trong đó.
+   * Bấm một nút trên thanh công cụ rồi Ctrl+S là phím rơi thẳng ra trình duyệt
+   * và nó mở hộp thoại lưu .html — người dùng tưởng đã lưu, thực ra chưa.
+   *
+   * Gắn ở tầng document nên bắt được ở mọi chỗ trong lúc đang sửa;
+   * `enableInInputs` để nó vẫn chạy khi con trỏ nằm trong ô nhập.
+   */
+  useHotkey("mod+s", () => void commit(), {
+    enabled: editor.isEditing,
+    enableInInputs: true,
+  });
 
   function handleCellKeyDown(
     event: KeyboardEvent<HTMLInputElement>,
@@ -287,8 +296,6 @@ export function SheetPreview({ rows, sheetName, node, canEdit, onSaved }: SheetP
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ pieces */
 
 function EdgeAdd({ label, onClick }: { label: string; onClick: () => void }) {
   return (

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { IMPORT_MAX_ROWS } from "@/config/app";
+import { IMPORT_MAX_ROWS, IMPORT_SELECT_OPTION_LIMIT } from "@/config/app";
 import {
   autoMapColumns,
   createTarget,
@@ -14,9 +14,17 @@ import {
   resolveProvisionalIds,
   rowsToCreate,
   setMapping,
+  selectOptionsFrom,
   setMappingTarget,
   targetColumnId,
 } from "@/lib/import-mapping";
+import { COLUMN_TYPE_LABELS, makeColumn } from "@/lib/board-schema";
+import {
+  creationRefusalFor,
+  importRefusalFor,
+  typeDescription,
+} from "@/lib/import-column-types";
+import { samplesFor } from "@/components/board/import/import-mapping-row";
 import { parseDelimited, toDelimited } from "@/lib/csv";
 import { buildXlsx, parseXlsx } from "@/lib/xlsx";
 import { zipSync } from "@/lib/zip";
@@ -25,8 +33,14 @@ import { ServiceError } from "@/services/errors";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useBoardStore } from "@/store/board-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
-import type { BoardColumn, ImportSource, ImportSourceRow } from "@/types";
-import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
+import type {
+  BoardColumn,
+  ColumnMapping,
+  ColumnType,
+  ImportSource,
+  ImportSourceRow,
+} from "@/types";
+import { buildTestTree, csvFile, ID, mapToColumns, TEST_WORKSPACE } from "./helpers";
 
 /**
  * SY-IMP-35 — import.
@@ -51,7 +65,6 @@ function columnsOf(board: { columns: readonly BoardColumn[] }): readonly BoardCo
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-  boardService.reset();
 
   useWorkspaceStore.setState({
     workspaces: [TEST_WORKSPACE],
@@ -308,26 +321,35 @@ describe("the import itself", () => {
     const board = await loadBoard();
     const titleId = board.columns.find((column) => column.name === "Title")!.id;
 
-    const created = await boardService.importRows({
+    const outcome = await boardService.importRows({
       boardId: board.id,
-      rows: [
-        { [titleId]: { kind: "text", value: "Imported one" } },
-        { [titleId]: { kind: "text", value: "Imported two" } },
-      ],
+      file: csvFile("two.csv", [["Title"], ["Imported one"], ["Imported two"]]),
+      mappings: mapToColumns([titleId]),
+      invalidPolicy: "skip",
     });
 
-    expect(created.map((row) => row.displayId)).toEqual(["TASK-005", "TASK-006"]);
-    expect(created[0]?.revision).toBe(1);
+    const rows = (await boardService.getBoard(ID.roadmap)).rows.filter((row) =>
+      outcome.rowIds.includes(row.id),
+    );
+
+    expect(rows.map((row) => row.displayId)).toEqual(["TASK-005", "TASK-006"]);
+    expect(rows[0]?.revision).toBe(1);
   });
 
   test("cells the file did not fill are created empty rather than missing", async () => {
     const board = await loadBoard();
     const titleId = board.columns.find((column) => column.name === "Title")!.id;
 
-    const [created] = await boardService.importRows({
+    const outcome = await boardService.importRows({
       boardId: board.id,
-      rows: [{ [titleId]: { kind: "text", value: "Only a title" } }],
+      file: csvFile("one.csv", [["Title"], ["Only a title"]]),
+      mappings: mapToColumns([titleId]),
+      invalidPolicy: "skip",
     });
+
+    const created = (await boardService.getBoard(ID.roadmap)).rows.find(
+      (row) => row.id === outcome.rowIds[0],
+    );
 
     for (const column of board.columns) {
       expect(created?.cells[column.id]).toBeDefined();
@@ -339,14 +361,18 @@ describe("the import itself", () => {
     const titleId = board.columns.find((column) => column.name === "Title")!.id;
     const before = useBoardStore.getState().rowOrder.length;
 
-    const created = await useBoardStore
-      .getState()
-      .importRows([{ [titleId]: { kind: "text", value: "From a file" } }]);
+    const outcome = await useBoardStore.getState().importRows({
+      file: csvFile("one.csv", [["Title"], ["From a file"]]),
+      mappings: mapToColumns([titleId]),
+      invalidPolicy: "skip",
+    });
 
+    // Store đọc lại cả board sau khi nhập: một lần import đổi cả schema, nên
+    // ghép tay phần đổi đó là đúng cái đã làm hỏng hình dạng request ban đầu.
     const { rowOrder, rowsById } = useBoardStore.getState();
     expect(rowOrder).toHaveLength(before + 1);
-    expect(rowOrder.at(-1)).toBe(created?.[0]?.id);
-    expect(rowsById[created![0]!.id]?.boardId).toBe(board.id);
+    expect(rowOrder.at(-1)).toBe(outcome?.rowIds[0]);
+    expect(rowsById[outcome!.rowIds[0]!]?.boardId).toBe(board.id);
   });
 });
 
@@ -508,16 +534,20 @@ describe("keeping every value on its own row", () => {
     const board = await loadBoard();
     const titleId = board.columns.find((column) => column.name === "Title")!.id;
 
-    const created = await boardService.importRows({
+    const outcome = await boardService.importRows({
       boardId: board.id,
-      rows: ["01", "02", "03", "04", "05"].map((value) => ({
-        [titleId]: { kind: "text" as const, value },
-      })),
+      file: csvFile("order.csv", [["Title"], ["01"], ["02"], ["03"], ["04"], ["05"]]),
+      mappings: mapToColumns([titleId]),
+      invalidPolicy: "skip",
     });
 
+    const byId = new Map(
+      (await boardService.getBoard(ID.roadmap)).rows.map((row) => [row.id, row]),
+    );
+
     expect(
-      created.map((row) => {
-        const value = row.cells[titleId];
+      outcome.rowIds.map((rowId) => {
+        const value = byId.get(rowId)?.cells[titleId];
         return value && value.kind === "text" ? value.value : null;
       }),
     ).toEqual(["01", "02", "03", "04", "05"]);
@@ -603,7 +633,12 @@ describe("columns an import brings with it", () => {
     });
 
     await expect(
-      boardService.importRows({ boardId: board.id, rows: [{}] }),
+      boardService.importRows({
+        boardId: board.id,
+        file: csvFile("one.csv", [["Title"], ["Nope"]]),
+        mappings: [],
+        invalidPolicy: "skip",
+      }),
     ).rejects.toBeInstanceOf(ServiceError);
   });
 
@@ -667,5 +702,177 @@ describe("columns an import brings with it", () => {
       col_title: { kind: "text", value: "kept" },
       col_real: { kind: "text", value: "landed" },
     });
+  });
+});
+
+/**
+ * Những gì màn hình ánh xạ NÓI RA.
+ *
+ * Bước này từng chỉ hiện tên cột và một biểu tượng kiểu không chú thích, nên
+ * người dùng phải đoán cả hai đầu: cột "Role" đựng gì, và một chữ T nghĩa là
+ * gì. Ba hàm dưới đây là phần trả lời được, nên chúng được kiểm ở đây.
+ */
+describe("what the mapping step can say about a column", () => {
+  const rows = (values: readonly (readonly string[])[]) =>
+    values.map((cells, index) => ({ sourceRowNumber: index + 1, cells }));
+
+  test("takes real values from the file as the example line", () => {
+    const samples = samplesFor(
+      rows([
+        ["QA", "Login works"],
+        ["Dev", "Logout works"],
+      ]),
+      0,
+    );
+
+    expect(samples).toEqual(["QA", "Dev"]);
+  });
+
+  test("skips blanks and repeats, so three examples are three different things", () => {
+    const samples = samplesFor(rows([["QA"], [""], ["QA"], ["  "], ["PM"], ["Dev"], ["BA"]]), 0);
+
+    // Ba giá trị KHÁC NHAU, không phải ba dòng đầu tiên.
+    expect(samples).toEqual(["QA", "PM", "Dev"]);
+  });
+
+  test("a column with nothing in it yields no examples rather than empty strings", () => {
+    expect(samplesFor(rows([[""], ["   "]]), 0)).toEqual([]);
+  });
+
+  test("every column type has a description in plain words", () => {
+    for (const type of Object.keys(COLUMN_TYPE_LABELS) as ColumnType[]) {
+      expect(typeDescription(type).length).toBeGreaterThan(0);
+      // Không được chỉ lặp lại chính cái nhãn nó đang giải thích.
+      expect(typeDescription(type)).not.toBe(COLUMN_TYPE_LABELS[type]);
+    }
+  });
+
+  /**
+   * Ba kiểu này server TỪ CHỐI vô điều kiện khi import (`coerce` trả `null`),
+   * nên đề nghị chúng ra là đề nghị một lựa chọn chắc chắn hỏng.
+   */
+  test("refuses the target types a spreadsheet cell cannot fill, with a reason", () => {
+    for (const type of ["user", "attachment", "relation"] as const) {
+      expect(importRefusalFor(makeColumn("c", "C", type, 0))).not.toBeNull();
+      expect(creationRefusalFor(type)).not.toBeNull();
+    }
+  });
+
+  test("Select is offered for a new column — its labels come from the file", () => {
+    expect(creationRefusalFor("select")).toBeNull();
+  });
+
+  test("a select column with labels is fine; one without has nothing to match", () => {
+    const select = makeColumn("c", "Status", "select", 0);
+    expect(importRefusalFor(select)).not.toBeNull();
+
+    // Thu hẹp trước khi spread: `makeColumn` trả về union, và một bản sao mất
+    // discriminant thì `config` không còn là config của select nữa.
+    if (select.type !== "select") throw new Error("expected a select column");
+
+    const filled: BoardColumn = {
+      ...select,
+      config: { ...select.config, options: [{ id: "o1", label: "Open", color: "blue" }] },
+    };
+    expect(importRefusalFor(filled)).toBeNull();
+  });
+
+  test("text, long text and date are always offered", () => {
+    for (const type of ["text", "longText", "date"] as const) {
+      expect(creationRefusalFor(type)).toBeNull();
+      expect(importRefusalFor(makeColumn("c", "C", type, 0))).toBeNull();
+    }
+  });
+});
+
+describe("guessing where a column goes", () => {
+  /**
+   * "Expected Result" chứa chữ "Result", nên khớp gần đúng từng cho nó cột
+   * Select tên Result — và mọi ô văn xuôi trong file rơi vào một cột chỉ nhận
+   * nhãn có sẵn. Bản xem trước sẽ đỏ toàn bộ, và người dùng không hiểu vì sao.
+   */
+  test("a loose name match never claims a column that cannot hold the text", () => {
+    const columns = [
+      makeColumn("c_result", "Result", "select", 0),
+      makeColumn("c_notes", "Notes", "longText", 1),
+    ];
+
+    const [mapping] = autoMapColumns(["Expected Result"], columns);
+
+    expect(mapping?.target.kind).toBe("create");
+  });
+
+  test("an exact name still wins — a Status column named Status is deliberate", () => {
+    const columns = [makeColumn("c_status", "Status", "select", 0)];
+
+    const [mapping] = autoMapColumns(["Status"], columns);
+
+    expect(mapping?.target).toEqual({ kind: "existing", columnId: "c_status" });
+  });
+
+  test("a loose match onto a type that can hold text still works", () => {
+    const columns = [makeColumn("c_notes", "Notes", "longText", 0)];
+
+    const [mapping] = autoMapColumns(["Extra Notes"], columns);
+
+    expect(mapping?.target).toEqual({ kind: "existing", columnId: "c_notes" });
+  });
+});
+
+/**
+ * Một cột Select do import dựng ra lấy nhãn TỪ CHÍNH FILE.
+ *
+ * Trước đây cột mới ra đời với `options: []`, nên mọi ô đều không khớp: chọn
+ * Select là chọn một cột chắc chắn rỗng. Dữ liệu để dựng nhãn vốn nằm sẵn
+ * trong file đang đọc.
+ */
+describe("a select column the import creates", () => {
+  const source = (values: readonly string[]): ImportSource => ({
+    fileName: "s.csv",
+    sheetName: null,
+    headers: ["Status"],
+    rows: values.map((value, index) => ({ sourceRowNumber: index + 2, cells: [value] })),
+  });
+
+  const createSelect: readonly ColumnMapping[] = [
+    { sourceIndex: 0, target: { kind: "create", name: "Status", type: "select" } },
+  ];
+
+  test("takes its labels from the values in that column", () => {
+    const options = selectOptionsFrom(source(["Open", "Closed", "Open", ""]).rows, 0);
+
+    expect(options.map((option) => option.label)).toEqual(["Open", "Closed"]);
+  });
+
+  test("folds case, because matching folds case too", () => {
+    const options = selectOptionsFrom(source(["Open", "open", "OPEN"]).rows, 0);
+
+    expect(options).toHaveLength(1);
+  });
+
+  test("every row then reads cleanly — no issues at all", () => {
+    const plan = planImport({
+      source: source(["Open", "Closed", "Blocked", "Open"]),
+      mappings: createSelect,
+      columns: [],
+    });
+
+    expect(plan.issues).toHaveLength(0);
+    expect(plan.invalidCount).toBe(0);
+    expect(plan.validCount).toBe(4);
+  });
+
+  test("too many distinct values is refused, not silently truncated", () => {
+    const many = Array.from({ length: IMPORT_SELECT_OPTION_LIMIT + 1 }, (_, i) => `v${i}`);
+
+    const conflicts = mappingConflicts(createSelect, [], ["Status"], source(many).rows);
+
+    expect(conflicts[0]?.message).toContain("too many for a select column");
+  });
+
+  test("right at the limit it is still allowed", () => {
+    const exactly = Array.from({ length: IMPORT_SELECT_OPTION_LIMIT }, (_, i) => `v${i}`);
+
+    expect(mappingConflicts(createSelect, [], ["Status"], source(exactly).rows)).toEqual([]);
   });
 });

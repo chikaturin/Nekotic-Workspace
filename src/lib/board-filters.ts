@@ -1,13 +1,6 @@
 import { COLUMN_TYPE_LABELS } from "@/lib/board-schema";
 import type { BoardColumn, ColumnType, FilterOperator, ViewFilter } from "@/types";
 
-/**
- * Which conditions a column offers, and how its value is written.
- *
- * Operators are per cell type: "contains" is meaningless on a date and
- * "before" is meaningless on a select, so neither is offered there.
- */
-
 export const OPERATOR_LABELS: Readonly<Record<FilterOperator, string>> = {
   is: "is",
   isNot: "is not",
@@ -58,7 +51,6 @@ export function operatorsFor(type: ColumnType): readonly FilterOperator[] {
   return OPERATORS_BY_TYPE[type];
 }
 
-/** How the value input should be rendered for this column. */
 export type FilterValueKind = "none" | "text" | "option" | "user" | "date";
 
 export function valueKindFor(column: BoardColumn, operator: FilterOperator): FilterValueKind {
@@ -76,13 +68,11 @@ export function valueKindFor(column: BoardColumn, operator: FilterOperator): Fil
   }
 }
 
-/** A condition that is valid the moment it is added. */
 export function makeFilter(column: BoardColumn, id: string): ViewFilter {
   const operator = operatorsFor(column.type)[0] ?? "isNotEmpty";
   return { id, columnId: column.id, operator, value: "" };
 }
 
-/** Keep an operator that the new column supports, otherwise take its first. */
 export function reconcileOperator(column: BoardColumn, operator: FilterOperator): FilterOperator {
   const allowed = operatorsFor(column.type);
   return allowed.includes(operator) ? operator : (allowed[0] ?? "isNotEmpty");

@@ -14,12 +14,10 @@ interface MovePageDialogProps {
   readonly isOpen: boolean;
   readonly onClose: () => void;
   readonly onMove: (folderId: string | null) => void;
-  /** Node being moved — it and its descendants are not valid destinations. */
   readonly nodeId: string;
   readonly currentParentId: string | null;
 }
 
-/** Folder picker for the Move action. */
 export function MovePageDialog({
   isOpen,
   onClose,

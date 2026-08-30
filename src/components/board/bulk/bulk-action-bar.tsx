@@ -35,23 +35,10 @@ interface BulkActionBarProps {
   readonly controller: BulkActionsController;
   readonly people: readonly DirectoryUser[];
   readonly currentBoardId: string;
-  /**
-   * Bound resolver. Each action asks for the key it needs: changing a status
-   * is a record edit, archiving and moving are not — one "canEdit" flag would
-   * have quietly handed a member all three.
-   */
   readonly can: PermissionResolver;
   readonly onExport: () => void;
 }
 
-/**
- * The bulk action bar (SY-BLK-34).
- *
- * It appears the moment a record is ticked and every button on it sends the
- * whole selection in one request. Records that cannot take the write — frozen
- * ones — are counted here up front, so the bar says what will be skipped
- * *before* the click rather than apologising after it.
- */
 export function BulkActionBar({
   controller,
   people,

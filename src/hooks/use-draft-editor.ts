@@ -15,7 +15,6 @@ const IDLE_SAVE: SaveState = {
 
 interface DraftState<T> {
   readonly isEditing: boolean;
-  /** Value as it was when editing started — the discard target. */
   readonly baseline: T;
   readonly draft: T;
   readonly save: SaveState;
@@ -29,21 +28,13 @@ export interface DraftEditor<T> {
   readonly start: () => void;
   readonly change: (value: T) => void;
   readonly discard: () => void;
-  /** Persist `value`; resolves to true once the bytes are stored. */
   readonly save: (value: T) => Promise<boolean>;
 }
 
 interface DraftEditorOptions<T> {
-  /** How a change is detected; reference equality is the default. */
   readonly isEqual?: (a: T, b: T) => boolean;
 }
 
-/**
- * Editing state for one file, whatever shape its content has. Mount the owning
- * component with `key={node.id}` — the controller holds no cross-file logic.
- *
- * `persist` must be a stable reference (a service method, not a closure).
- */
 export function useDraftEditor<T>(
   node: FileNode,
   initial: T,

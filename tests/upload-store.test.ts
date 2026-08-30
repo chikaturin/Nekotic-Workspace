@@ -173,3 +173,57 @@ describe("permission gate", () => {
     expect(useWorkspaceStore.getState().feedback?.tone).toBe("error");
   });
 });
+
+/**
+ * Tệp đính vào một chỗ cụ thể KHÔNG phải một mục trong Drive.
+ *
+ * Lỗi thật: ảnh dán vào một ô của board hiện ra ngay cạnh chính cái board đó
+ * trong Drive. Cả hai đầu đều góp phần — server luôn tạo node vì nhánh
+ * `createDriveNode ? 'drive' : 'drive'` có hai vế như nhau, và client thì chưa
+ * bao giờ khai chỗ ở của tệp.
+ */
+describe("tệp đính kèm không rơi vào Drive", () => {
+  test("ảnh của một ô board không thêm mục nào vào thư mục", async () => {
+    // Arrange
+    const before = childrenOf(findNodeById(tree(), ID.frontend)!).length;
+
+    // Act
+    const assets = await uploads().startUploads([makeFile("anh.png")], ID.frontend, {
+      reference: { kind: "cell", rowId: "row_1", columnId: "col_1" },
+      openPanel: false,
+    });
+
+    // Assert — tệp vẫn tải lên được, chỉ là không hiện ra ngoài.
+    expect(assets).toHaveLength(1);
+    expect(childrenOf(findNodeById(tree(), ID.frontend)!)).toHaveLength(before);
+  });
+
+  test("tệp của bình luận không rơi vào gốc workspace", async () => {
+    const before = tree().length;
+
+    const asset = await uploads().uploadOne(makeFile("bang-chung.png"), null, {
+      kind: "comment",
+    });
+
+    expect(asset).not.toBeNull();
+    expect(tree()).toHaveLength(before);
+  });
+
+  test("nhưng tải thẳng vào Drive thì vẫn hiện ra", async () => {
+    const before = childrenOf(findNodeById(tree(), ID.frontend)!).length;
+
+    await uploads().startUploads([makeFile("bao-cao.pdf")], ID.frontend);
+
+    expect(childrenOf(findNodeById(tree(), ID.frontend)!)).toHaveLength(before + 1);
+  });
+
+  test("dung lượng đã dùng vẫn được cộng, dù tệp không nằm trong cây", async () => {
+    const used = () =>
+      useWorkspaceStore.getState().workspaces[0]?.storage?.usedBytes ?? 0;
+    const before = used();
+
+    await uploads().uploadOne(makeFile("to.png", 4096), null, { kind: "comment" });
+
+    expect(used()).toBeGreaterThan(before);
+  });
+});

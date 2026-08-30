@@ -13,12 +13,6 @@ interface WidgetCardProps {
   readonly onOpen: (item: MyWorkItem) => void;
 }
 
-/**
- * One My Work widget.
- *
- * The header shows the full match count, not the number of rows rendered, so a
- * capped list never reads as the whole story.
- */
 export function WidgetCard({ widget, icon: Icon, tone = "neutral", onOpen }: WidgetCardProps) {
   const hidden = widget.total - widget.items.length;
 

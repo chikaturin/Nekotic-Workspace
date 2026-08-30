@@ -7,15 +7,9 @@ import { findNodeById } from "@/lib/tree";
 import { selectTrash, selectTree, useWorkspaceStore } from "@/store/workspace-store";
 import type { TrashEntry } from "@/types";
 
-/**
- * One row of the Trash view: the deleted item, where it came from, who removed
- * it and when it is due to be swept — plus, resolved up front, whether putting
- * it back would land it somewhere new.
- */
 export interface TrashRow {
   readonly entry: TrashEntry;
   readonly daysLeft: number | null;
-  /** True when the original folder is gone and a restore has to relocate. */
   readonly willRelocate: boolean;
   readonly restoreLocation: string;
 }

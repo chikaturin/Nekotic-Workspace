@@ -2,7 +2,7 @@
 
 import { useCallback, useState, type DragEvent } from "react";
 
-const BLOCK_MIME = "application/x-nexdrop-block";
+const BLOCK_MIME = "application/x-nekotic-block";
 
 export type DropSide = "before" | "after";
 
@@ -14,16 +14,16 @@ export interface BlockDropIndicator {
 export interface BlockDnd {
   readonly draggingBlockId: string | null;
   readonly indicator: BlockDropIndicator | null;
-  readonly onDragStart: (blockId: string) => (event: DragEvent<HTMLElement>) => void;
+  readonly onDragStart: (
+    blockId: string,
+  ) => (event: DragEvent<HTMLElement>) => void;
   readonly onDragEnd: () => void;
-  readonly onDragOver: (index: number) => (event: DragEvent<HTMLElement>) => void;
+  readonly onDragOver: (
+    index: number,
+  ) => (event: DragEvent<HTMLElement>) => void;
   readonly onDrop: (index: number) => (event: DragEvent<HTMLElement>) => void;
 }
 
-/**
- * Native drag-and-drop reordering for blocks. Uses its own MIME type so a block
- * drag can never be mistaken for a drive-node drag by the surrounding page.
- */
 export function useBlockDnd(
   onReorder: (blockId: string, toIndex: number) => void,
   isEditable: boolean,
@@ -52,15 +52,22 @@ export function useBlockDnd(
 
   const onDragOver = useCallback(
     (index: number) => (event: DragEvent<HTMLElement>) => {
-      if (!isEditable || !Array.from(event.dataTransfer.types).includes(BLOCK_MIME)) return;
+      if (
+        !isEditable ||
+        !Array.from(event.dataTransfer.types).includes(BLOCK_MIME)
+      )
+        return;
 
       event.preventDefault();
       event.dataTransfer.dropEffect = "move";
 
       const bounds = event.currentTarget.getBoundingClientRect();
-      const side: DropSide = event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
+      const side: DropSide =
+        event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
       setIndicator((previous) =>
-        previous?.index === index && previous.side === side ? previous : { index, side },
+        previous?.index === index && previous.side === side
+          ? previous
+          : { index, side },
       );
     },
     [isEditable],
@@ -85,5 +92,12 @@ export function useBlockDnd(
     [indicator, isEditable, onReorder],
   );
 
-  return { draggingBlockId, indicator, onDragStart, onDragEnd, onDragOver, onDrop };
+  return {
+    draggingBlockId,
+    indicator,
+    onDragStart,
+    onDragEnd,
+    onDragOver,
+    onDrop,
+  };
 }

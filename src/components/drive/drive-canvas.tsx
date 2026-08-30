@@ -7,16 +7,11 @@ import { useDropTarget } from "@/hooks/use-node-dnd";
 import { cn } from "@/lib/utils";
 
 interface DriveCanvasProps {
-  /** Container that receives dropped items — null is the workspace root. */
   readonly targetId: string | null;
   readonly targetName: string;
   readonly children: ReactNode;
 }
 
-/**
- * Working area drop zone. Accepts OS files (upload) and internal nodes (move)
- * dropped anywhere that is not already a folder tile.
- */
 export function DriveCanvas({ targetId, targetName, children }: DriveCanvasProps) {
   const { dropProps, isOver } = useDropTarget({ targetId });
 

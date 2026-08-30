@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 
 interface HotkeyOptions {
-  /** Fire even while focus is inside an input or textarea. */
   readonly enableInInputs?: boolean;
   readonly enabled?: boolean;
 }
@@ -15,10 +14,42 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return EDITABLE_TAGS.has(target.tagName) || target.isContentEditable;
 }
 
-/**
- * Bind a keyboard shortcut such as `mod+k`, `mod+b` or `escape`.
- * `mod` maps to ⌘ on macOS and Ctrl elsewhere.
- */
+export interface HotkeyChord {
+  readonly key: string;
+  readonly needsMod: boolean;
+  readonly needsShift: boolean;
+  readonly needsAlt: boolean;
+}
+
+export function parseHotkey(combo: string): HotkeyChord {
+  const parts = combo.toLowerCase().split("+");
+
+  return {
+    key: parts[parts.length - 1] ?? "",
+    needsMod: parts.includes("mod"),
+    needsShift: parts.includes("shift"),
+    needsAlt: parts.includes("alt"),
+  };
+}
+
+export interface KeyStroke {
+  readonly key?: string | null;
+  readonly metaKey?: boolean;
+  readonly ctrlKey?: boolean;
+  readonly shiftKey?: boolean;
+  readonly altKey?: boolean;
+}
+
+export function matchesHotkey(chord: HotkeyChord, stroke: KeyStroke): boolean {
+  if (typeof stroke.key !== "string" || stroke.key.length === 0) return false;
+
+  if (stroke.key.toLowerCase() !== chord.key) return false;
+  if (chord.needsMod !== (stroke.metaKey === true || stroke.ctrlKey === true)) return false;
+  if (chord.needsShift !== (stroke.shiftKey === true)) return false;
+
+  return chord.needsAlt === (stroke.altKey === true);
+}
+
 export function useHotkey(
   combo: string,
   handler: (event: KeyboardEvent) => void,
@@ -29,17 +60,10 @@ export function useHotkey(
   useEffect(() => {
     if (!enabled) return;
 
-    const parts = combo.toLowerCase().split("+");
-    const key = parts[parts.length - 1] ?? "";
-    const needsMod = parts.includes("mod");
-    const needsShift = parts.includes("shift");
-    const needsAlt = parts.includes("alt");
+    const chord = parseHotkey(combo);
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key.toLowerCase() !== key) return;
-      if (needsMod !== (event.metaKey || event.ctrlKey)) return;
-      if (needsShift !== event.shiftKey) return;
-      if (needsAlt !== event.altKey) return;
+      if (!matchesHotkey(chord, event)) return;
       if (!enableInInputs && isEditableTarget(event.target)) return;
 
       event.preventDefault();

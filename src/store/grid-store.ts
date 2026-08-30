@@ -14,28 +14,13 @@ import {
   type RangeBox,
 } from "@/lib/grid-selection";
 
-/**
- * Grid interaction state, kept apart from the records.
- *
- * Cells subscribe to *booleans* out of this store ("am I active?", "am I in the
- * selection?"), so moving the cursor re-renders the two cells involved instead
- * of the whole grid.
- */
-
 interface EditingCell {
   readonly rowId: string;
   readonly columnId: string;
-  /** Text typed to open the editor, so the first keystroke is not lost. */
   readonly initialText?: string;
-  /**
-   * A value inside the cell the editor should open *on* — the attachment whose
-   * thumbnail was clicked, so the click lands on that file's preview rather
-   * than on the field's uploader.
-   */
   readonly focusId?: string;
 }
 
-/** What opening an editor was asked to carry into it. */
 export interface EditIntent {
   readonly initialText?: string;
   readonly focusId?: string;
@@ -46,39 +31,16 @@ interface GridState {
   readonly editing: EditingCell | null;
   readonly drawerRowId: string | null;
   readonly isDragSelecting: boolean;
-  /** Collapsed group keys, kept per view so switching views restores them. */
   readonly collapsedByView: Readonly<Record<string, readonly string[]>>;
-  /**
-   * Parent records whose subtasks are folded away, per view. Kept beside the
-   * group state for the same reason: collapsing is presentation, and it must
-   * survive switching to another view and back.
-   */
   readonly collapsedParentsByView: Readonly<Record<string, readonly string[]>>;
-  /**
-   * Records ticked for a bulk action (SY-BLK-34). A map, not an array, so a
-   * row's checkbox subscribes to one boolean instead of the whole selection.
-   */
   readonly selectedRowIds: Readonly<Record<string, true>>;
-  /** Anchor for a shift-click range. */
   readonly lastSelectedRowId: string | null;
-  /**
-   * The column whose header is being renamed in place.
-   *
-   * It lives here rather than inside the header cell because the *board* opens
-   * it: inserting a column and duplicating one both leave the new column's name
-   * ready to type over, and neither of them is the header's own doing. Keyed by
-   * column id, never by position — the whole point is that a column added at
-   * the far right is reached exactly like one added in the middle.
-   */
   readonly renamingColumnId: string | null;
-  /**
-   * The cell open in the detail reader.
-   *
-   * One dialog for the whole grid, addressed by cell, rather than one mounted
-   * per cell — five thousand rows must not carry five thousand dialogs to
-   * serve the one somebody clicked.
-   */
   readonly detailCell: { readonly rowId: string; readonly columnId: string } | null;
+  readonly fill: {
+    readonly source: RangeBox;
+    readonly preview: RangeBox;
+  } | null;
 }
 
 interface GridActions {
@@ -97,16 +59,17 @@ interface GridActions {
   toggleParent: (viewId: string, rowId: string) => void;
   setCollapsedParents: (viewId: string, rowIds: readonly string[]) => void;
 
-  /** Open the header's rename field on a column, or close whichever is open. */
   beginColumnRename: (columnId: string) => void;
   endColumnRename: () => void;
 
-  /** Read one cell in full. Never a write, so it is open to everyone. */
   openDetail: (rowId: string, columnId: string) => void;
   closeDetail: () => void;
 
+  beginFill: (source: RangeBox) => void;
+  setFillPreview: (preview: RangeBox) => void;
+  endFill: () => void;
+
   toggleRowSelection: (rowId: string) => void;
-  /** Shift-click: tick everything between the anchor and `rowId` in view order. */
   extendRowSelection: (orderedRowIds: readonly string[], rowId: string) => void;
   setRowSelection: (rowIds: readonly string[]) => void;
   clearRowSelection: () => void;
@@ -127,6 +90,7 @@ const INITIAL: GridState = {
   lastSelectedRowId: null,
   renamingColumnId: null,
   detailCell: null,
+  fill: null,
 };
 
 export const useGridStore = create<GridStore>()((set, get) => ({
@@ -192,6 +156,13 @@ export const useGridStore = create<GridStore>()((set, get) => ({
       collapsedParentsByView: { ...state.collapsedParentsByView, [viewId]: rowIds },
     })),
 
+  beginFill: (source) => set({ fill: { source, preview: source } }),
+
+  setFillPreview: (preview) =>
+    set((state) => (state.fill ? { fill: { ...state.fill, preview } } : state)),
+
+  endFill: () => set({ fill: null }),
+
   toggleRowSelection: (rowId) =>
     set((state) => {
       const next = { ...state.selectedRowIds };
@@ -207,7 +178,6 @@ export const useGridStore = create<GridStore>()((set, get) => ({
       const from = anchor ? orderedRowIds.indexOf(anchor) : -1;
       const to = orderedRowIds.indexOf(rowId);
 
-      // No anchor (or it scrolled out of the current filter) — plain toggle.
       if (from < 0 || to < 0) {
         return { selectedRowIds: { ...state.selectedRowIds, [rowId]: true }, lastSelectedRowId: rowId };
       }
@@ -228,18 +198,14 @@ export const useGridStore = create<GridStore>()((set, get) => ({
 
   clearRowSelection: () => set({ selectedRowIds: {}, lastSelectedRowId: null }),
 
-  // Renaming and cell editing are two cursors; only one of them can be live.
   beginColumnRename: (columnId) => set({ renamingColumnId: columnId, editing: null }),
   endColumnRename: () => set({ renamingColumnId: null }),
 
-  // Reading closes any editor: the reader is what you opened instead.
   openDetail: (rowId, columnId) => set({ detailCell: { rowId, columnId }, editing: null }),
   closeDetail: () => set({ detailCell: null }),
 
   reset: () => set(INITIAL),
 }));
-
-/* -------------------------------------------------------------- selectors */
 
 export function selectFocus(state: GridStore): CellAddress | null {
   return state.range?.focus ?? null;
@@ -249,7 +215,6 @@ export function selectBox(state: GridStore): RangeBox | null {
   return state.range ? rangeBox(state.range) : null;
 }
 
-/** True when this coordinate holds the cursor. */
 export function selectIsFocused(rowIndex: number, columnIndex: number) {
   return (state: GridStore): boolean => {
     const focus = state.range?.focus;
@@ -257,7 +222,6 @@ export function selectIsFocused(rowIndex: number, columnIndex: number) {
   };
 }
 
-/** True when this coordinate falls inside a multi-cell selection. */
 export function selectIsSelected(rowIndex: number, columnIndex: number) {
   return (state: GridStore): boolean => {
     if (!state.range) return false;
@@ -265,7 +229,29 @@ export function selectIsSelected(rowIndex: number, columnIndex: number) {
   };
 }
 
-/** Collapsed keys for one view — a stable empty array when there are none. */
+export function selectIsFillOrigin(rowIndex: number, columnIndex: number) {
+  return (state: GridStore): boolean => {
+    if (!state.range || state.editing) return false;
+
+    const box = rangeBox(state.range);
+
+    return rowIndex === box.bottom && columnIndex === box.right;
+  };
+}
+
+export function selectIsFillTarget(rowIndex: number, columnIndex: number) {
+  return (state: GridStore): boolean => {
+    if (!state.fill) return false;
+
+    const { source, preview } = state.fill;
+
+    return (
+      isInBox(preview, rowIndex, columnIndex) &&
+      !isInBox(source, rowIndex, columnIndex)
+    );
+  };
+}
+
 const NO_COLLAPSED: readonly string[] = [];
 
 export function selectCollapsedGroups(viewId: string | null) {
@@ -283,13 +269,6 @@ export function selectIsEditing(rowId: string, columnId: string) {
     state.editing?.rowId === rowId && state.editing.columnId === columnId;
 }
 
-/**
- * Bulk selection, read as booleans and counts only.
- *
- * zustand v5 subscribes through `useSyncExternalStore`, so a selector that
- * allocates on every read re-renders forever. The stored map is handed out by
- * reference and turned into a list inside a `useMemo`, never here.
- */
 export function selectIsRowSelected(rowId: string) {
   return (state: GridStore): boolean => state.selectedRowIds[rowId] === true;
 }
@@ -304,7 +283,6 @@ export function clampToBounds(address: CellAddress, bounds: GridBounds): CellAdd
   return clampAddress(address, bounds);
 }
 
-/** True when this column's header is the one being renamed. */
 export function selectIsRenaming(columnId: string) {
   return (state: GridStore): boolean => state.renamingColumnId === columnId;
 }

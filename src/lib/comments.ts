@@ -1,25 +1,10 @@
 import type { Comment, CommentThread } from "@/types";
 
-/**
- * Pure operations over a comment list.
- *
- * Every writer — the optimistic composer, the service reply and the realtime
- * event — goes through `upsertComment`, so applying the same comment twice is
- * a no-op instead of a duplicate.
- */
-
 function byCreatedAt(a: Comment, b: Comment): number {
   const delta = Date.parse(a.createdAt) - Date.parse(b.createdAt);
   return delta !== 0 ? delta : a.id.localeCompare(b.id);
 }
 
-/**
- * Insert or replace by id, keeping the list sorted oldest-first.
- *
- * This is the idempotency guarantee the realtime layer relies on: a frame that
- * arrives after the optimistic insert replaces it rather than appending a
- * second copy.
- */
 export function upsertComment(
   comments: readonly Comment[],
   incoming: Comment,
@@ -38,13 +23,6 @@ export function upsertComment(
   return [...comments, incoming].sort(byCreatedAt);
 }
 
-/**
- * Swap an optimistic comment for the server's answer.
- *
- * Written as remove-then-upsert rather than an in-place swap because the
- * realtime frame for the same write may already have inserted the saved
- * comment — this way both orders converge on exactly one copy.
- */
 export function replaceComment(
   comments: readonly Comment[],
   temporaryId: string,
@@ -58,12 +36,6 @@ export function removeComment(comments: readonly Comment[], id: string): readonl
   return next.length === comments.length ? comments : next;
 }
 
-/**
- * Roots with their replies, oldest first.
- *
- * A reply whose root is gone is promoted to a root rather than dropped — an
- * orphan is still somebody's comment.
- */
 export function buildThreads(comments: readonly Comment[]): readonly CommentThread[] {
   const ordered = [...comments].sort(byCreatedAt);
   const roots = ordered.filter((comment) => comment.parentId === null);

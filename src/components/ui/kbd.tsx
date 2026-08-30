@@ -1,7 +1,6 @@
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
-/** Keycap used in the search trigger, menus and the shortcut legend. */
 export function Kbd({ className, children, ...props }: ComponentProps<"kbd">) {
   return (
     <kbd

@@ -11,10 +11,6 @@ export interface BoardResource {
   readonly reload: () => void;
 }
 
-/**
- * Load one board into the store. Records are fetched once per node and every
- * view reads them from there, so switching views never refetches.
- */
 export function useBoard(nodeId: string): BoardResource {
   const status = useBoardStore((state) => state.status);
   const error = useBoardStore((state) => state.error);

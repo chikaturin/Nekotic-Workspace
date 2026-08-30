@@ -1,4 +1,3 @@
-/** Every failure that crosses a service boundary is normalised to this shape. */
 export type AppErrorCode =
   | "permission_denied"
   | "not_found"
@@ -11,15 +10,11 @@ export type AppErrorCode =
 
 export interface AppError {
   readonly code: AppErrorCode;
-  /** Message safe to render to the user. */
   readonly message: string;
-  /** Extra context for support / logs — never required by the UI. */
   readonly detail?: string;
-  /** Whether offering a retry makes sense. */
   readonly isRetryable: boolean;
 }
 
-/** Discriminated resource state consumed by `AsyncBoundary`. */
 export type AsyncState<T> =
   | { readonly status: "idle" }
   | { readonly status: "loading" }

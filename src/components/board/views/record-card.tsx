@@ -19,24 +19,16 @@ import type { BoardColumn, BoardColumnOf } from "@/types";
 interface RecordCardProps {
   readonly rowId: string;
   readonly primaryColumnId: string;
-  /** Fields shown under the title — the view's own visible columns. */
   readonly fields: readonly BoardColumn[];
   readonly context: CellContext;
   readonly canDrag: boolean;
   readonly density?: "card" | "compact";
-  /** Hierarchy index, when the surface wants the subtask badge. */
   readonly hierarchy?: HierarchyIndex;
   readonly completionColumn?: BoardColumnOf<"select"> | null;
   readonly onDragStart?: (rowId: string) => void;
   readonly onDragEnd?: () => void;
 }
 
-/**
- * One record, rendered the same way in Kanban, Calendar and Timeline.
- *
- * It subscribes to its own record and reuses the table's cell renderers, so a
- * value edited anywhere is the value every view shows — there is no card model.
- */
 export const RecordCard = memo(function RecordCard({
   rowId,
   primaryColumnId,
@@ -59,10 +51,6 @@ export const RecordCard = memo(function RecordCard({
   const label = title && title.kind === "text" ? title.value : "";
   const visible = fields.filter((column) => !isCellEmpty(cellOf(row, column))).slice(0, 3);
 
-  /**
-   * A subtask is an ordinary card — it appears in whatever column its own
-   * status puts it in. The badges only say where it sits in the hierarchy.
-   */
   const childIds = hierarchy ? childIdsOf(hierarchy, rowId) : [];
   const progress = hierarchy ? subtaskProgress(childIds, rowsById, completionColumn) : null;
   const isChild = isSubtask(row);

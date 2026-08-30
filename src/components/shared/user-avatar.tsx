@@ -4,12 +4,6 @@ import type { UserSummary } from "@/types";
 
 interface UserAvatarProps {
   readonly user: UserSummary;
-  /**
-   * Forwarded to `Avatar`. Prefer this over `className="size-5"`: the named
-   * step also scales the initials in the fallback, which a width class on its
-   * own cannot do. `className` still wins on the circle for anything the
-   * ladder does not cover.
-   */
   readonly size?: AvatarSize;
   readonly className?: string;
 }

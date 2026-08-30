@@ -8,55 +8,76 @@ import type {
   TaskBucketId,
 } from "@/types";
 
-/**
- * Reading a board "as a dashboard" (SY-DSH-44).
- *
- * Boards come from different templates, so the widgets cannot address a status
- * by id. They read the *label*, which is what the user sees, and place it in a
- * bucket. A label no bucket claims is reported as unmapped rather than quietly
- * folded into the nearest one — a count you cannot trace is worse than a gap.
- */
-
 interface BucketSpec<T extends string> {
   readonly id: T;
   readonly label: string;
   readonly color: SelectColor;
-  readonly labels: ReadonlySet<string>;
+  readonly keywords: readonly string[];
 }
 
-const set = (...labels: readonly string[]): ReadonlySet<string> => new Set(labels);
-
 export const TASK_BUCKETS: readonly BucketSpec<TaskBucketId>[] = [
-  {
-    id: "todo",
-    label: "Todo",
-    color: "gray",
-    labels: set("to do", "todo", "backlog", "new", "open", "triaged", "not started"),
-  },
-  {
-    id: "doing",
-    label: "Doing",
-    color: "blue",
-    labels: set("in progress", "doing", "active", "wip", "fixing"),
-  },
-  {
-    id: "review",
-    label: "Review",
-    color: "violet",
-    labels: set("in review", "review", "code review", "testing", "verifying", "pending review"),
-  },
   {
     id: "done",
     label: "Done",
     color: "green",
-    labels: set("done", "complete", "completed", "closed", "resolved", "fixed", "verified", "shipped", "released"),
+    keywords: [
+      "done",
+      "complete",
+      "completed",
+      "closed",
+      "shipped",
+      "released",
+      "fixed",
+      "wontfix",
+      "published",
+      "resolved",
+    ],
+  },
+  {
+    id: "blocked",
+    label: "Blocked",
+    color: "red",
+    keywords: ["blocked", "block", "onhold", "hold", "waiting", "paused"],
+  },
+  {
+    id: "inProgress",
+    label: "In progress",
+    color: "blue",
+    keywords: ["inprogress", "progress", "doing", "active", "wip", "started", "review"],
+  },
+  {
+    id: "todo",
+    label: "To do",
+    color: "gray",
+    keywords: ["todo", "backlog", "new", "open", "planned", "ready", "triage", "draft"],
   },
 ];
 
 export const QA_BUCKETS: readonly BucketSpec<QaBucketId>[] = [
-  { id: "passed", label: "Passed", color: "green", labels: set("passed", "pass", "ok") },
-  { id: "failed", label: "Failed", color: "red", labels: set("failed", "fail", "failing") },
-  { id: "blocked", label: "Blocked", color: "amber", labels: set("blocked", "on hold") },
+  {
+    id: "failed",
+    label: "Failed",
+    color: "red",
+    keywords: ["fail", "failed", "rejected", "reopened", "broken"],
+  },
+  {
+    id: "passed",
+    label: "Passed",
+    color: "green",
+    keywords: ["pass", "passed", "verified", "approved", "accepted"],
+  },
+  {
+    id: "inTesting",
+    label: "In testing",
+    color: "blue",
+    keywords: ["testing", "intesting", "inreview", "review", "verifying", "qa"],
+  },
+  {
+    id: "open",
+    label: "Open",
+    color: "gray",
+    keywords: ["open", "new", "todo", "untested", "backlog", "draft"],
+  },
 ];
 
 export const DEADLINE_BUCKETS: readonly {
@@ -65,17 +86,28 @@ export const DEADLINE_BUCKETS: readonly {
   readonly color: SelectColor;
 }[] = [
   { id: "overdue", label: "Overdue", color: "red" },
-  { id: "today", label: "Today", color: "amber" },
+  { id: "today", label: "Due today", color: "amber" },
   { id: "thisWeek", label: "This week", color: "blue" },
+  { id: "later", label: "Later", color: "gray" },
+  { id: "none", label: "No due date", color: "gray" },
 ];
+
+function normalise(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
 
 function bucketFor<T extends string>(
   specs: readonly BucketSpec<T>[],
   label: string | null,
 ): T | null {
   if (label === null) return null;
-  const needle = label.trim().toLowerCase();
-  return specs.find((spec) => spec.labels.has(needle))?.id ?? null;
+
+  const needle = normalise(label);
+  if (needle === "") return null;
+
+  return (
+    specs.find((spec) => spec.keywords.some((keyword) => needle.includes(keyword)))?.id ?? null
+  );
 }
 
 export const taskBucketOf = (label: string | null): TaskBucketId | null =>
@@ -84,11 +116,6 @@ export const taskBucketOf = (label: string | null): TaskBucketId | null =>
 export const qaBucketOf = (label: string | null): QaBucketId | null =>
   bucketFor(QA_BUCKETS, label);
 
-/**
- * A board is read as QA when its status column speaks in verdicts. Template id
- * is not enough: a board created from the QA template and then reshaped should
- * follow what it became, not what it was made from.
- */
 export function isQaBoard(lenses: BoardLenses): boolean {
   if (!lenses.status) return false;
 
@@ -98,29 +125,24 @@ export function isQaBoard(lenses: BoardLenses): boolean {
   });
 }
 
-/**
- * Which deadline bucket a due date falls in, or null for one that is further
- * out than the window. Compared by calendar day in UTC, the way every other
- * date reading in the app is, so "today" never drifts by a timezone.
- */
 export function deadlineBucketOf(
   iso: string | null,
   nowIso: string,
   windowDays: number,
-): DeadlineBucketId | null {
+): DeadlineBucketId {
   const due = dayKey(iso);
   const today = dayKey(nowIso);
-  if (due === null || today === null) return null;
+  if (today === null) return "none";
+  if (due === null) return "none";
 
   if (due < today) return "overdue";
   if (due === today) return "today";
 
-  const horizon = dayKey(new Date(Date.parse(`${today}T00:00:00.000Z`) + windowDays * 86_400_000).toISOString());
-  return horizon !== null && due <= horizon ? "thisWeek" : null;
+  const horizon = dayKey(
+    new Date(Date.parse(`${today}T00:00:00.000Z`) + windowDays * 86_400_000).toISOString(),
+  );
+
+  return horizon !== null && due <= horizon ? "thisWeek" : "later";
 }
 
-/**
- * Solid fills for the distribution bar — the same scale the Gantt bars use, so
- * a status is one colour across the workspace rather than one per surface.
- */
 export const BUCKET_BAR_CLASSES = SELECT_SOLID_CLASSES;

@@ -1,12 +1,3 @@
-/**
- * Minimal, spec-valid PDF generator used by the mock file service so PDF
- * previews work offline, and by board export (SY-EXP-36).
- *
- * Byte offsets in the xref table are computed exactly, which keeps strict
- * viewers (and PDF.js) happy. Long documents paginate: a report that runs to a
- * thousand records produces a thousand *readable* lines rather than one page
- * with everything after the thirty-second drawn off the bottom edge.
- */
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
@@ -18,18 +9,12 @@ const TITLE_SIZE = 22;
 const BODY_SIZE = 12;
 
 const TITLE_BASELINE = PAGE_HEIGHT - 80;
-/** First page leaves room for the title; later pages start higher. */
 const FIRST_BODY_TOP = PAGE_HEIGHT - 130;
 const BODY_TOP = PAGE_HEIGHT - 72;
 
 const FIRST_PAGE_LINES = Math.floor((FIRST_BODY_TOP - BODY_BOTTOM) / LINE_HEIGHT) + 1;
 const PAGE_LINES = Math.floor((BODY_TOP - BODY_BOTTOM) / LINE_HEIGHT) + 1;
 
-/**
- * The base-14 Helvetica encoding this writer targets is a single byte wide, so
- * anything above U+00FF has no glyph. Substituting is honest; emitting a byte
- * that renders as a different letter is not.
- */
 function toLatin1(value: string): string {
   return [...value].map((char) => (char.codePointAt(0)! <= 0xff ? char : "?")).join("");
 }
@@ -47,7 +32,6 @@ export interface PdfDocumentInput {
   readonly lines: readonly string[];
 }
 
-/** Split the body so the first page can carry the title. */
 function paginate(lines: readonly string[]): readonly (readonly string[])[] {
   const pages: (readonly string[])[] = [lines.slice(0, FIRST_PAGE_LINES)];
 
@@ -58,11 +42,9 @@ function paginate(lines: readonly string[]): readonly (readonly string[])[] {
   return pages;
 }
 
-/** Build a paginated PDF as an ASCII string. */
 export function buildPdf({ title, lines }: PdfDocumentInput): string {
   const pages = paginate(lines);
 
-  // 1 catalog · 2 pages · 3 font, then a page and a content stream per sheet.
   const firstPageObject = 4;
   const pageIds = pages.map((_, index) => firstPageObject + index * 2);
 
@@ -110,7 +92,6 @@ export function buildPdf({ title, lines }: PdfDocumentInput): string {
   return pdf;
 }
 
-/** Encode the PDF for a Blob — every byte is ASCII by construction. */
 export function pdfToBytes(pdf: string): Uint8Array<ArrayBuffer> {
   const bytes = new Uint8Array(new ArrayBuffer(pdf.length));
   for (let index = 0; index < pdf.length; index += 1) {

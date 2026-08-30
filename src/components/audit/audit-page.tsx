@@ -18,13 +18,6 @@ const TONES: Readonly<Record<AuditSeverity, "default" | "danger">> = {
   error: "danger",
 };
 
-/**
- * Audit log (SY-AUD-41).
- *
- * Read-only, and read-only by construction rather than by discipline: the
- * service has no update or delete call, so there is nothing for this page to
- * offer even if someone added a button.
- */
 export function AuditPage() {
   const { resource, filters, setFilter, clearFilters, isFiltered, canView } = useAuditLog();
 
@@ -55,7 +48,6 @@ export function AuditPage() {
           </p>
         </div>
 
-        {/* Stated where someone would look for an Edit button. */}
         <span className="ml-auto flex items-center gap-1.5 text-body text-muted-foreground">
           <Lock className="size-3" />
           Append-only · entries cannot be edited or deleted

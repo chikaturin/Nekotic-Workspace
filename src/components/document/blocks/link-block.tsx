@@ -15,7 +15,6 @@ interface LinkBlockProps {
   readonly isEditable: boolean;
 }
 
-/** Bookmark card. Metadata comes from the link service, never from the UI. */
 export function LinkBlock({ block, onChange, isEditable }: LinkBlockProps) {
   const [draftUrl, setDraftUrl] = useState(block.url);
   const [isResolving, setIsResolving] = useState(false);
@@ -32,9 +31,9 @@ export function LinkBlock({ block, onChange, isEditable }: LinkBlockProps) {
       onChange({
         ...block,
         url: metadata.url,
-        title: metadata.title,
-        description: metadata.description,
-        siteName: metadata.siteName,
+        title: metadata.title ?? block.title,
+        description: metadata.description ?? block.description,
+        siteName: metadata.siteName ?? block.siteName,
       });
     } catch (caught) {
       setError(toAppError(caught));

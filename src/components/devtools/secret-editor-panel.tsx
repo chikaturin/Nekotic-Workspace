@@ -5,33 +5,20 @@ import { useState } from "react";
 import { SecretEnvPaste } from "@/components/devtools/secret-env-paste";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { useEnvironments } from "@/hooks/use-environments";
 import type { SecretEditor } from "@/hooks/use-secret-editor";
 import { isConventionalSecretKey, isValidSecretKey } from "@/lib/env-file";
 import { cn } from "@/lib/utils";
 
 interface SecretEditorPanelProps {
   readonly editor: SecretEditor;
-  /** Whether this person may pull a stored value back into the field. */
   readonly canReveal: boolean;
   readonly onReveal: (secretId: string) => Promise<string | null>;
 }
 
-/** What an untouched row shows instead of a value it has never held. */
 const UNCHANGED_PLACEHOLDER = "•••••••••••• unchanged";
 
-/**
- * Editing a secret document.
- *
- * Structured rows, not a text area: a secret document is a list of named
- * values with an audit trail per name, and editing it as raw text would throw
- * that structure away on every save — every key would look rotated because
- * every key was rewritten.
- *
- * A row whose value has not been touched shows "unchanged" and holds nothing.
- * That is what lets somebody rename a key, delete a neighbour or reorder the
- * list without a single production credential being fetched into the browser.
- * Pulling one back is a deliberate, audited act, on one row at a time.
- */
 export function SecretEditorPanel({ editor, canReveal, onReveal }: SecretEditorPanelProps) {
   const [revealingId, setRevealingId] = useState<string | null>(null);
 
@@ -72,9 +59,11 @@ export function SecretEditorPanel({ editor, canReveal, onReveal }: SecretEditorP
                 onChange={(event) => editor.setKey(row.localId, event.target.value)}
               />
 
-              {/* `type="password"` rather than a masked string: the browser
-                  keeps it out of autofill previews and off screen shares, and
-                  the field still behaves like a field. */}
+              <SecretEnvironment
+                optionId={row.environmentOptionId}
+                onChange={(next) => editor.setEnvironment(row.localId, next)}
+              />
+
               <Input
                 type="password"
                 value={row.value ?? ""}
@@ -141,5 +130,35 @@ export function SecretEditorPanel({ editor, canReveal, onReveal }: SecretEditorP
 
       <SecretEnvPaste onApply={editor.applyEnv} />
     </div>
+  );
+}
+
+/**
+ * Môi trường của một hàng secret.
+ *
+ * Server bắt buộc phải biết secret mới thuộc môi trường nào. Hàng mới thừa
+ * hưởng môi trường của hàng ngay trên nó — gần như luôn đúng khi dán một tệp
+ * `.env` — nhưng vẫn phải đổi được, nếu không thì thêm một secret Production
+ * vào giữa danh sách Development là không có đường.
+ */
+function SecretEnvironment({
+  optionId,
+  onChange,
+}: {
+  readonly optionId: string;
+  readonly onChange: (optionId: string) => void;
+}) {
+  const environments = useEnvironments();
+
+  return (
+    <Select
+      value={optionId}
+      options={environments.options}
+      aria-label="Environment"
+      size="sm"
+      className="w-36"
+      isDisabled={environments.isLoading}
+      onValueChange={(next) => next && onChange(next)}
+    />
   );
 }

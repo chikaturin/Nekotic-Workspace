@@ -1,14 +1,5 @@
 import type { DiffLine, DiffSummary } from "@/types";
 
-/**
- * Line diff over two snapshots, used by version compare (SY-VER-39).
- *
- * A longest-common-subsequence table gives the smallest set of insertions and
- * deletions, so an edit in the middle of a file reports as one added and one
- * removed line instead of rewriting everything below it.
- */
-
-/** Guard on the LCS table: past this the diff degrades to a plain replacement. */
 const MAX_LINES = 2_000;
 
 export function diffLines(before: readonly string[], after: readonly string[]): readonly DiffLine[] {
@@ -33,7 +24,6 @@ export function diffLines(before: readonly string[], after: readonly string[]): 
       continue;
     }
 
-    // Prefer the branch that keeps more of the remaining common subsequence.
     if ((table[row + 1]?.[column] ?? 0) >= (table[row]?.[column + 1] ?? 0)) {
       lines.push({ kind: "removed", text: before[row] ?? "" });
       row += 1;
@@ -83,7 +73,6 @@ export function summarizeDiff(lines: readonly DiffLine[]): DiffSummary {
   };
 }
 
-/** `+3 −1 lines` — the label a version carries in the history list. */
 export function describeDiff(summary: DiffSummary): string {
   if (summary.added === 0 && summary.removed === 0) return "no line changes";
 

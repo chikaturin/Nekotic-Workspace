@@ -1,9 +1,3 @@
-/**
- * Least-recently-used list.
- *
- * Recent (CO-REC-33) is the only consumer today: touching an item moves it to
- * the front and the tail past `limit` is dropped.
- */
 export function touchEntry<T>(
   entries: readonly T[],
   entry: T,
@@ -18,7 +12,6 @@ export function touchEntry<T>(
   return [entry, ...rest].slice(0, limit);
 }
 
-/** Drop one entry by key. Returns the same array when nothing matched. */
 export function dropEntry<T>(
   entries: readonly T[],
   key: string,

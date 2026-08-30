@@ -3,21 +3,11 @@ import { DAY_MS, dayIndex } from "@/lib/board-dates";
 import { findNodeById, findPathToId, pathLabel, removeNode } from "@/lib/tree";
 import { childrenOf, isContainer, type DriveNode, type TrashEntry, type UserSummary } from "@/types";
 
-/**
- * Soft delete (SY-TRH-38).
- *
- * Deleting *detaches* the subtree from the tree and parks it here. That is the
- * whole point: a folder can be purged for good while a page deleted out of it
- * earlier survives, which is the one case where restoring has to find the item
- * a new home — and say so.
- */
-
 export interface TrashStamp {
   readonly deletedAt: string;
   readonly deletedBy: UserSummary;
 }
 
-/** Mark a subtree as trashed so nothing that walks it treats it as live. */
 function markTrashed(node: DriveNode): DriveNode {
   const flagged = { ...node, isTrashed: true };
   if (!isContainer(flagged)) return flagged;
@@ -25,7 +15,6 @@ function markTrashed(node: DriveNode): DriveNode {
   return { ...flagged, children: flagged.children.map(markTrashed) };
 }
 
-/** Detach one node and describe where it used to live. */
 export function trashNodeFrom(
   tree: readonly DriveNode[],
   nodeId: string,
@@ -46,24 +35,17 @@ export function trashNodeFrom(
       deletedAt: stamp.deletedAt,
       deletedBy: stamp.deletedBy,
       originalAncestorIds: ancestors.map((ancestor) => ancestor.id),
-      // Resolved now, while the ancestors still exist — after a purge there is
-      // nothing left to resolve it from.
       originalPath: pathLabel(tree, nodeId),
     },
   };
 }
 
-/**
- * Pull nodes the dataset ships as already-deleted into the bin, so the seeded
- * tree and the trash view agree on one representation.
- */
 export function extractTrashed(
   tree: readonly DriveNode[],
   stampFor: (node: DriveNode) => TrashStamp,
 ): { readonly tree: readonly DriveNode[]; readonly entries: readonly TrashEntry[] } {
   const nodes: DriveNode[] = [];
 
-  // Topmost first: a trashed node inside a trashed folder travels with it.
   const walk = (pool: readonly DriveNode[]) => {
     for (const node of pool) {
       if (node.isTrashed) {
@@ -89,17 +71,9 @@ export function extractTrashed(
 
 export interface RestoreTarget {
   readonly parentId: string | null;
-  /** True when the original parent is gone and the node lands elsewhere. */
   readonly isRelocated: boolean;
 }
 
-/**
- * Where a restore should put the node back.
- *
- * The original parent wins. When it has been purged the search walks *up* the
- * recorded ancestor chain to the deepest container still standing, and falls
- * back to the workspace root — never to nowhere.
- */
 export function restoreTargetFor(tree: readonly DriveNode[], entry: TrashEntry): RestoreTarget {
   const original = entry.node.parentId;
 
@@ -113,7 +87,6 @@ export function restoreTargetFor(tree: readonly DriveNode[], entry: TrashEntry):
   return { parentId: null, isRelocated: original !== null };
 }
 
-/** Restore puts the subtree back live; the flag is the caller's to clear. */
 export function untrash(node: DriveNode, parentId: string | null): DriveNode {
   const restored = { ...node, isTrashed: false, parentId };
   if (!isContainer(restored)) return restored;
@@ -124,10 +97,6 @@ export function untrash(node: DriveNode, parentId: string | null): DriveNode {
   };
 }
 
-/**
- * Days left before the retention window closes. Null once it has passed —
- * the backend owns the sweep, so the UI reports "due" rather than inventing it.
- */
 export function daysRemaining(deletedAt: string, nowIso: string): number | null {
   const deleted = Date.parse(deletedAt);
   if (Number.isNaN(deleted)) return null;
@@ -137,7 +106,6 @@ export function daysRemaining(deletedAt: string, nowIso: string): number | null 
   return left > 0 ? left : null;
 }
 
-/** Most recently deleted first — the order anybody looking for a mistake wants. */
 export function sortTrash(entries: readonly TrashEntry[]): readonly TrashEntry[] {
   return [...entries].sort((a, b) => Date.parse(b.deletedAt) - Date.parse(a.deletedAt));
 }

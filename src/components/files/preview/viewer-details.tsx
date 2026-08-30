@@ -9,7 +9,6 @@ import { findPathToId } from "@/lib/tree";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
 import type { FileNode } from "@/types";
 
-/** Everything the file knows about itself, always on screen next to it. */
 export function ViewerDetails({ node }: { node: FileNode }) {
   const tree = useWorkspaceStore(selectTree);
 

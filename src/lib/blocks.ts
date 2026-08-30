@@ -5,7 +5,6 @@ import type {
   TextualBlock,
 } from "@/types";
 
-/** Block kinds that carry a single editable `text` field. */
 const TEXTUAL_TYPES = new Set<BlockType>([
   "heading1",
   "heading2",
@@ -24,15 +23,12 @@ export const DEFAULT_TABLE_COLUMNS = 3;
 export const DEFAULT_TABLE_ROWS = 3;
 export const DEFAULT_CODE_LANGUAGE: CodeLanguage = "typescript";
 
-/* --------------------------------------------------------------- factories */
-
 interface CreateBlockInit {
   readonly text?: string;
   readonly language?: CodeLanguage;
   readonly url?: string;
 }
 
-/** Build an empty block of `type`. Ids are supplied so this stays pure. */
 export function createBlock(type: BlockType, id: string, init: CreateBlockInit = {}): Block {
   const text = init.text ?? "";
 
@@ -74,12 +70,9 @@ function emptyTableRows(): readonly (readonly string[])[] {
   );
 }
 
-/** A brand-new document always starts with one empty paragraph. */
 export function emptyDocumentBlocks(idFactory: () => string): readonly Block[] {
   return [createBlock("paragraph", idFactory())];
 }
-
-/* ------------------------------------------------------------------ access */
 
 export function indexOfBlock(blocks: readonly Block[], blockId: string): number {
   return blocks.findIndex((block) => block.id === blockId);
@@ -89,21 +82,17 @@ export function findBlock(blocks: readonly Block[], blockId: string): Block | nu
   return blocks.find((block) => block.id === blockId) ?? null;
 }
 
-/** Editable text of a block, or null for blocks without a text field. */
 export function blockText(block: Block): string | null {
   if (isTextualBlock(block)) return block.text;
   if (block.type === "code") return block.code;
   return null;
 }
 
-/** Set the text of a textual or code block; other kinds pass through. */
 export function withText(block: Block, text: string): Block {
   if (isTextualBlock(block)) return { ...block, text };
   if (block.type === "code") return { ...block, code: text };
   return block;
 }
-
-/* ---------------------------------------------------------------- mutation */
 
 export function updateBlock(
   blocks: readonly Block[],
@@ -132,10 +121,6 @@ export function insertBlockAfter(
   return index < 0 ? [...blocks, block] : insertBlockAt(blocks, index + 1, block);
 }
 
-/**
- * Remove a block. A document is never left blockless — removing the last block
- * yields a fresh empty paragraph instead.
- */
 export function removeBlock(
   blocks: readonly Block[],
   blockId: string,
@@ -156,7 +141,6 @@ export function duplicateBlock(
   return insertBlockAfter(blocks, blockId, { ...block, id: idFactory() });
 }
 
-/** Move a block to an absolute index, clamped to the document bounds. */
 export function moveBlock(
   blocks: readonly Block[],
   blockId: string,
@@ -175,11 +159,6 @@ export function moveBlock(
   return [...without.slice(0, target), block, ...without.slice(target)];
 }
 
-/**
- * Move a block to an insertion point expressed in the *original* array — what a
- * drop between two blocks means. Dragging downwards has to account for the gap
- * the block itself leaves behind.
- */
 export function moveBlockToInsertionIndex(
   blocks: readonly Block[],
   blockId: string,
@@ -191,7 +170,6 @@ export function moveBlockToInsertionIndex(
   return moveBlock(blocks, blockId, from < insertionIndex ? insertionIndex - 1 : insertionIndex);
 }
 
-/** Move a block by a relative offset — powers Alt+↑ / Alt+↓. */
 export function moveBlockBy(
   blocks: readonly Block[],
   blockId: string,
@@ -202,10 +180,6 @@ export function moveBlockBy(
   return moveBlock(blocks, blockId, from + delta);
 }
 
-/**
- * Convert a block to another type, carrying text across when both sides have
- * one. Converting to a structural block (table, image, …) starts it empty.
- */
 export function convertBlock(block: Block, type: BlockType, idFactory: () => string): Block {
   if (block.type === type) return block;
 
@@ -227,19 +201,11 @@ export function convertBlock(block: Block, type: BlockType, idFactory: () => str
   return converted;
 }
 
-/* ------------------------------------------------------- caret-aware edits */
-
 export interface SplitResult {
   readonly blocks: readonly Block[];
-  /** Block the caret should land in after the split. */
   readonly focusBlockId: string;
 }
 
-/**
- * Enter inside a textual block: text before the caret stays, text after moves
- * into a new sibling. Headings and quotes continue as paragraphs; list items
- * continue as the same list type.
- */
 export function splitBlock(
   blocks: readonly Block[],
   blockId: string,
@@ -270,14 +236,9 @@ export function splitBlock(
 export interface MergeResult {
   readonly blocks: readonly Block[];
   readonly focusBlockId: string | null;
-  /** Caret offset inside the merged block — the length of the kept prefix. */
   readonly caretOffset: number;
 }
 
-/**
- * Backspace at offset 0. A styled block first degrades to a paragraph; an
- * already-plain block merges its text into the previous textual block.
- */
 export function mergeWithPrevious(
   blocks: readonly Block[],
   blockId: string,
@@ -303,8 +264,6 @@ export function mergeWithPrevious(
   const currentText = blockText(block) ?? "";
 
   if (!isTextualBlock(previous)) {
-    // A structural block above: delete it when the current block is empty,
-    // otherwise leave the document untouched.
     if (currentText.length === 0) {
       return {
         blocks: removeBlock(blocks, blockId, idFactory),
@@ -327,9 +286,6 @@ export function mergeWithPrevious(
   };
 }
 
-/* ------------------------------------------------------------- derivations */
-
-/** Flattened plain text — used for excerpts, search and word counts. */
 export function documentPlainText(blocks: readonly Block[]): string {
   return blocks
     .map((block) => {
@@ -353,7 +309,6 @@ export function documentPlainText(blocks: readonly Block[]): string {
     .join("\n");
 }
 
-/** Structural markers so a diff shows a heading becoming a paragraph. */
 const LINE_PREFIX: Partial<Record<BlockType, string>> = {
   heading1: "# ",
   heading2: "## ",
@@ -363,11 +318,6 @@ const LINE_PREFIX: Partial<Record<BlockType, string>> = {
   numberedList: "1. ",
 };
 
-/**
- * The document as numbered lines — the snapshot version history stores and the
- * unit a version diff compares. Structure is part of the text on purpose: a
- * paragraph promoted to a heading is a change worth seeing.
- */
 export function documentLines(blocks: readonly Block[]): readonly string[] {
   return blocks.flatMap((block): readonly string[] => {
     if (block.type === "checklist") return [`[${block.isChecked ? "x" : " "}] ${block.text}`];
@@ -402,7 +352,6 @@ export function countWords(blocks: readonly Block[]): number {
   return text.length === 0 ? 0 : text.split(/\s+/).length;
 }
 
-/** True when the document holds nothing a reader would see. */
 export function isDocumentEmpty(blocks: readonly Block[]): boolean {
   return documentPlainText(blocks).trim().length === 0;
 }

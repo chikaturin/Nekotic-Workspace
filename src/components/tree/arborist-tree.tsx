@@ -14,10 +14,6 @@ import { childrenOf, isContainer, type DriveNode } from "@/types";
 
 const TREE_VIEWPORT_CLASS = "h-[min(52vh,460px)] w-full";
 
-/**
- * react-arborist engine — virtualised rows plus its own react-dnd drag layer.
- * Interchangeable with `FolderTree`; selected via `TREE_ENGINE` in app config.
- */
 export function ArboristTree({ nodes }: { nodes: readonly DriveNode[] }) {
   const [ref, size] = useContainerSize<HTMLDivElement>();
   const moveNode = useWorkspaceStore((state) => state.moveNode);
@@ -52,7 +48,6 @@ export function ArboristTree({ nodes }: { nodes: readonly DriveNode[] }) {
   );
 }
 
-/** Absolute drive route for an arborist node, walked up through its parents. */
 function hrefFor(node: NodeApi<DriveNode>): string {
   const segments: string[] = [];
   let current: NodeApi<DriveNode> | null = node;

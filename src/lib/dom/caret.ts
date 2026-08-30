@@ -1,8 +1,3 @@
-/**
- * Caret helpers for `contentEditable` blocks. Browser-only by nature — they
- * take an element and talk to the live selection, so they are exercised through
- * the editor rather than in unit tests.
- */
 
 export function getCaretOffset(element: HTMLElement): number {
   const selection = window.getSelection();
@@ -73,7 +68,6 @@ export function isCaretAtEnd(element: HTMLElement): boolean {
   return getCaretOffset(element) === (element.textContent?.length ?? 0);
 }
 
-/** True when the selection covers characters rather than sitting between them. */
 export function hasTextSelection(): boolean {
   const selection = window.getSelection();
   return Boolean(selection && !selection.isCollapsed);

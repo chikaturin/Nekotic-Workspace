@@ -1,6 +1,13 @@
 "use client";
 
-import { AlarmClock, AtSign, Briefcase, CalendarClock, History, UserCheck, type LucideIcon } from "lucide-react";
+import {
+  AlarmClock,
+  Briefcase,
+  CalendarClock,
+  CalendarRange,
+  CircleDashed,
+  type LucideIcon,
+} from "lucide-react";
 import { AsyncBoundary } from "@/components/shared/async-boundary";
 import { WidgetCard } from "@/components/my-work/widget-card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,20 +16,16 @@ import { useOpenEntity } from "@/hooks/use-entity-navigation";
 import type { MyWorkWidgetId } from "@/types";
 
 const WIDGET_ICONS: Readonly<Record<MyWorkWidgetId, LucideIcon>> = {
-  assigned: UserCheck,
-  mentioned: AtSign,
-  dueToday: CalendarClock,
   overdue: AlarmClock,
-  recentlyUpdated: History,
+  dueToday: CalendarClock,
+  dueThisWeek: CalendarRange,
+  unscheduled: CircleDashed,
 };
 
-/**
- * My Work (CO-MYW-30).
- *
- * Five readings of the boards the user can see — never a separate dataset, so
- * a record edited on its board is reflected here on the next load without any
- * syncing step.
- */
+function widgetIcon(id: MyWorkWidgetId): LucideIcon {
+  return WIDGET_ICONS[id] ?? Briefcase;
+}
+
 export function MyWorkPage() {
   const resource = useMyWork();
   const openEntity = useOpenEntity();
@@ -49,7 +52,7 @@ export function MyWorkPage() {
                 <WidgetCard
                   key={widget.id}
                   widget={widget}
-                  icon={WIDGET_ICONS[widget.id]}
+                  icon={widgetIcon(widget.id)}
                   tone={widget.id === "overdue" ? "danger" : "neutral"}
                   onOpen={(item) => openEntity(item.ref)}
                 />

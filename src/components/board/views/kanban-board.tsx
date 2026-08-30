@@ -23,17 +23,6 @@ interface KanbanBoardProps {
   readonly canEdit: boolean;
 }
 
-/**
- * Kanban is the group engine with a horizontal layout: a column *is* a group,
- * and a card *is* a row id. Dropping a card writes the group column's cell on
- * the board record — the same mutation the table would make.
- *
- * Dragging is deliberately never blocked. A card can be picked up and carried
- * anywhere, because a drag that dies under the cursor with no explanation is
- * worse than one that is refused out loud: the drop is what gets validated,
- * and a refusal nudges the card and says why. The card never visits the
- * column it was refused from, so there is no flicker to undo either.
- */
 export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
   const { groupColumn, groups, columnsShown, context, board } = model;
   const editCells = useBoardStore((state) => state.editCells);
@@ -42,9 +31,7 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
-  /** The card a rule just turned away — nudged once so the toast has a subject. */
   const [refusedId, setRefusedId] = useState<string | null>(null);
-  /** Cards mounted per column — a 5.000-record board must not build 5.000 DOM cards. */
   const [limits, setLimits] = useState<Readonly<Record<string, number>>>({});
 
   const cardFields = columnsShown.filter(
@@ -53,17 +40,6 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
 
   const rowsById = useBoardStore((state) => state.rowsById);
 
-  /**
-   * A drop asks two separate questions, in order:
-   *
-   *   1. Permission — "may this user change Status at all?"
-   *   2. Transition rule — "may Status go from where it is to here?"
-   *
-   * They are deliberately not merged: the first is about the person, the
-   * second about the record, and a refusal from each says something different.
-   * Either refusal returns before the optimistic write, so no request is made
-   * and the board record is untouched.
-   */
   const drop = useCallback(
     (group: RowGroup, rowId: string) => {
       if (!groupColumn) return;
@@ -88,18 +64,11 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
       const value = groupValueFor(groupColumn, group.key);
       if (!value) return;
 
-      // Optimistic: the store writes the record, then reconciles or reverts on
-      // its own if the service refuses. Nothing here refetches the board.
       void editCells([{ rowId, columnId: groupColumn.id, value }]);
     },
     [groupColumn, canEdit, editCells, pushFeedback, rowsById],
   );
 
-  /**
-   * Which columns the card being dragged may land in — resolved once, when the
-   * drag starts, so hovering a column is a set lookup rather than a rule
-   * evaluation, and never a request.
-   */
   const reachable = useMemo<ReadonlySet<string> | null>(() => {
     if (!draggingId || !groupColumn || groupColumn.type !== "select") return null;
     if (!groupColumn.config.transitionRules?.enabled) return null;
@@ -120,7 +89,6 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
     );
   }
 
-  /** True when a transition rule permits the dragged card to land here. */
   function isDroppable(groupKey: string): boolean {
     return reachable === null || reachable.has(transitionKeyOf(groupKey));
   }
@@ -147,16 +115,11 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
             <section
               key={group.key}
               aria-label={group.label}
-              // Always a valid drop target while the user may edit: refusing
-              // the drop outright would swallow the drop event, and with it
-              // the explanation the reader needs.
               onDragOver={(event) => {
                 event.preventDefault();
                 event.dataTransfer.dropEffect = canEdit ? "move" : "none";
                 setOverKey(group.key);
               }}
-              // dragleave also fires when the pointer crosses into a child, so
-              // the column only lets go once the pointer is genuinely outside.
               onDragLeave={(event) => {
                 const next = event.relatedTarget;
                 if (next instanceof Node && event.currentTarget.contains(next)) return;
@@ -166,8 +129,6 @@ export function KanbanBoard({ model, canEdit }: KanbanBoardProps) {
               className={cn(
                 "flex w-72 shrink-0 flex-col rounded-xl border bg-background/60 transition-[opacity,border-color,background-color] duration-150",
                 "border-border",
-                // While a card is in the air: valid targets lift gently, ones a
-                // rule rules out fade back. Two states, no colour wash.
                 isDragging && canLand && "border-dashed border-accent/40",
                 isDragging && !canLand && "is-dragging",
                 isOver && canLand && "border-solid border-accent bg-accent-soft",

@@ -7,19 +7,11 @@ import { useWorkspaceStore } from "@/store/workspace-store";
 import type { DriveNode } from "@/types";
 
 interface ArchivedBannerProps {
-  /** The archived node — the subject itself, or an ancestor freezing it. */
   readonly source: DriveNode | null;
   readonly subject: DriveNode;
   readonly canRestore: boolean;
 }
 
-/**
- * Read-only notice for archived content (SY-ARC-37).
- *
- * Archiving is inherited, so the banner names the node that actually holds the
- * freeze: restoring a page that sits inside an archived project would not
- * unfreeze it, and saying "Restore this page" there would be a lie.
- */
 export function ArchivedBanner({ source, subject, canRestore }: ArchivedBannerProps) {
   const setNodeArchived = useWorkspaceStore((state) => state.setNodeArchived);
   if (!source) return null;

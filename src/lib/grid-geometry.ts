@@ -1,4 +1,3 @@
-/** Pure geometry for the virtualised grid — no DOM, no React. */
 
 export const ROW_HEIGHTS = { short: 32, medium: 44, tall: 68 } as const;
 
@@ -9,25 +8,17 @@ export interface WindowInput {
   readonly viewportHeight: number;
   readonly rowHeight: number;
   readonly count: number;
-  /** Extra rows rendered above and below the viewport. */
   readonly overscan: number;
 }
 
 export interface WindowRange {
   readonly start: number;
-  /** Exclusive. */
   readonly end: number;
-  /** Pixels of spacer above the first rendered row. */
   readonly paddingTop: number;
-  /** Pixels of spacer below the last rendered row. */
   readonly paddingBottom: number;
   readonly totalHeight: number;
 }
 
-/**
- * Which rows to mount for a scroll position. Rendering 5.000 rows costs the
- * same as rendering 30 because only the window is ever in the DOM.
- */
 export function windowRange({
   scrollTop,
   viewportHeight,
@@ -56,7 +47,6 @@ export function windowRange({
   };
 }
 
-/** Scroll offset that brings `index` fully into view, or null if it already is. */
 export function scrollOffsetFor(
   index: number,
   scrollTop: number,
@@ -71,25 +61,6 @@ export function scrollOffsetFor(
   return null;
 }
 
-/* --------------------------------------------------- variable row heights */
-
-/**
- * Rows of different heights, still without measuring one.
- *
- * Wrap and Full make a row as tall as its content, which breaks the arithmetic
- * the uniform path relies on — `index * rowHeight` stops being where a row
- * starts. The replacement is a running total: `offsets[i]` is the top of row
- * `i`, `offsets[count]` is the height of the whole list, and both ends of the
- * window come out of a binary search over it.
- *
- * The heights themselves are *computed* from the text (see `lib/cell-display`),
- * never read back from the DOM. That is what keeps this compatible with
- * virtualisation at all: a row's height has to be known before it is mounted,
- * or the scrollbar is a guess and every scroll is a jump.
- *
- * Building the totals is one pass over the list. It happens when the rows, the
- * columns or the display modes change — not on a render, and not per frame.
- */
 export function prefixOffsets(heights: readonly number[]): readonly number[] {
   const offsets = new Array<number>(heights.length + 1);
   offsets[0] = 0;
@@ -101,7 +72,13 @@ export function prefixOffsets(heights: readonly number[]): readonly number[] {
   return offsets;
 }
 
-/** Last index whose top is at or before `position`. */
+export function rowIndexAtOffset(
+  offsets: readonly number[],
+  position: number,
+): number {
+  return indexAt(offsets, position);
+}
+
 function indexAt(offsets: readonly number[], position: number): number {
   let low = 0;
   let high = offsets.length - 1;
@@ -118,12 +95,10 @@ function indexAt(offsets: readonly number[], position: number): number {
 export interface VariableWindowInput {
   readonly scrollTop: number;
   readonly viewportHeight: number;
-  /** Running tops, `count + 1` long. */
   readonly offsets: readonly number[];
   readonly overscan: number;
 }
 
-/** The same window as `windowRange`, over rows that are not all one height. */
 export function variableWindowRange({
   scrollTop,
   viewportHeight,
@@ -153,7 +128,6 @@ export function variableWindowRange({
   };
 }
 
-/** `scrollOffsetFor` over running tops. */
 export function variableScrollOffsetFor(
   index: number,
   scrollTop: number,

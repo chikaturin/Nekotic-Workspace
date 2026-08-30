@@ -26,11 +26,6 @@ const KIND_MARK: Readonly<Record<DiffLine["kind"], string>> = {
   removed: "−",
 };
 
-/**
- * The right-hand side of the history: a version as it was, or what changed
- * between it and the content on screen. Added lines are green, removed lines
- * are red — the comparison the PRD asks for, and nothing else.
- */
 export function VersionDetail({ entry, mode, currentLines }: VersionDetailProps) {
   const lines = useMemo<readonly DiffLine[]>(() => {
     if (!entry) return [];

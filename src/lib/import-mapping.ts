@@ -1,6 +1,7 @@
-import { IMPORT_MAX_ROWS } from "@/config/app";
+import { IMPORT_MAX_ROWS, IMPORT_SELECT_OPTION_LIMIT } from "@/config/app";
 import { parseTextIntoCell } from "@/lib/cell-conversion";
-import { isProtectedColumn, makeColumn } from "@/lib/board-schema";
+import { isProtectedColumn, makeColumn, SELECT_COLORS } from "@/lib/board-schema";
+import { importRefusalFor } from "@/lib/import-column-types";
 import { emptyCellFor, type CellContext } from "@/lib/cell-values";
 import { columnLabel, normalizeGrid, type Grid } from "@/lib/grid";
 import type {
@@ -16,27 +17,8 @@ import type {
   ImportSourceRow,
   MappingConflict,
   MappingTarget,
+  SelectOption,
 } from "@/types";
-
-/**
- * Spreadsheet import (SY-IMP-35).
- *
- * The flow is upload → map → validate → confirm, and every step before the
- * last one is pure: mapping and validation compute what *would* happen without
- * touching the board, so the user sees the errors while they can still change
- * the mapping instead of after 1.000 rows have landed.
- *
- * Two invariants hold the data straight:
- *
- *   - **A row is a row.** Cells are carried per source row, with the file's own
- *     row number attached, and nothing is ever filtered out of a column and
- *     zipped back together by position. That is the shape of the bug where a
- *     blank cell high in the file pulls every value below it up a row.
- *   - **A target belongs to one source column.** Two source columns cannot
- *     write the same board column, and a source column that creates its own
- *     column holds that decision itself — there is no shared draft for one
- *     column's cell type to leak out of.
- */
 
 export interface SourceInput {
   readonly fileName: string;
@@ -45,13 +27,6 @@ export interface SourceInput {
   readonly hasHeaderRow: boolean;
 }
 
-/**
- * Split a parsed sheet into a header row and the data under it.
- *
- * Row numbers are assigned before the header is taken off and before the row
- * cap is applied, so they keep meaning "the row Excel would show you" no matter
- * what the wizard does with the rows afterwards.
- */
 export function readImportSource({
   fileName,
   sheetName = null,
@@ -77,12 +52,9 @@ export function readImportSource({
   return { fileName, sheetName, headers, rows: body.slice(0, IMPORT_MAX_ROWS) };
 }
 
-/** True when the file carried more rows than one import may write. */
 export function isTruncated(grid: Grid, hasHeaderRow: boolean): boolean {
   return normalizeGrid(grid).length - (hasHeaderRow ? 1 : 0) > IMPORT_MAX_ROWS;
 }
-
-/* --------------------------------------------------------------- mapping */
 
 const NOISE = /[^a-z0-9]/g;
 
@@ -98,18 +70,10 @@ export function createTarget(name: string, type: ColumnType): MappingTarget {
   return { kind: "create", name, type };
 }
 
-/** The board column a mapping writes into, or null when it writes nowhere. */
 export function targetColumnId(mapping: ColumnMapping): string | null {
   return mapping.target.kind === "existing" ? mapping.target.columnId : null;
 }
 
-/**
- * How a column this import would create is addressed before it exists.
- *
- * Planning has to parse values against it and the drafts have to key cells by
- * *something*, so it gets a provisional id derived from its source column. The
- * confirm step swaps every one of these for the real id the board hands back.
- */
 export function provisionalColumnId(sourceIndex: number): string {
   return `new_${sourceIndex}`;
 }
@@ -118,14 +82,6 @@ export function isProvisionalColumnId(columnId: string): boolean {
   return columnId.startsWith("new_");
 }
 
-/**
- * Which cell type to offer for a column the file brings and the board lacks.
- *
- * A guess from the header alone, and deliberately a shallow one: Text takes
- * anything, so being wrong costs a dropdown rather than a failed import. Only
- * the two names that are unambiguous in every board this app ships get a
- * stronger guess.
- */
 const DATE_NAME = /(^|[^a-z])(date|due|deadline|start|end|created|updated)([^a-z]|$)/i;
 const LONG_NAME = /(step|description|note|notes|detail|details|summary|expected|actual|result)/i;
 
@@ -135,13 +91,6 @@ export function guessColumnType(header: string): ColumnType {
   return "text";
 }
 
-/**
- * Guess the mapping: exact name match first, then a containment match, each
- * board column claimed at most once. Whatever the board has no column for
- * becomes a column this import would create, named after the file's own header
- * — which is what makes an extra column in the sheet arrive as a column on the
- * board rather than being silently dropped.
- */
 export function autoMapColumns(
   headers: readonly string[],
   columns: readonly BoardColumn[],
@@ -166,10 +115,13 @@ export function autoMapColumns(
     if (already) return { sourceIndex, target: existingTarget(already) };
 
     const needle = normalizeName(header);
+
     const fuzzy =
       needle.length === 0
         ? null
         : claim((column) => {
+            if (importRefusalFor(column) !== null) return false;
+
             const name = normalizeName(column.name);
             return name.includes(needle) || needle.includes(name);
           });
@@ -183,16 +135,6 @@ export function autoMapColumns(
   });
 }
 
-/**
- * Point one source column somewhere.
- *
- * Nothing is released from any other source column. Claiming a board column
- * that another source column already writes used to quietly unmap the first
- * one, which reads from the user's side as the mapping "jumping" between
- * columns; it is now left in place and reported as a conflict they resolve
- * themselves. A change the user did not ask for is worse than an error they
- * can see.
- */
 export function setMappingTarget(
   mappings: readonly ColumnMapping[],
   sourceIndex: number,
@@ -203,7 +145,6 @@ export function setMappingTarget(
   );
 }
 
-/** Convenience for the common case: an existing column, or nothing. */
 export function setMapping(
   mappings: readonly ColumnMapping[],
   sourceIndex: number,
@@ -216,14 +157,6 @@ export function setMapping(
   );
 }
 
-/**
- * Board columns this import writes nothing into.
- *
- * What the user is offered as "the board's leftovers": a QA board made from a
- * template arrives with columns nobody asked for, and importing a file that
- * defines the real ones leaves them sitting there empty. The column that titles
- * a record is never in this list — it is the one thing the board cannot lose.
- */
 export function unmappedBoardColumns(
   mappings: readonly ColumnMapping[],
   columns: readonly BoardColumn[],
@@ -233,7 +166,6 @@ export function unmappedBoardColumns(
   return columns.filter((column) => !written.has(column.id) && !isProtectedColumn(column));
 }
 
-/** Source columns that would add a column to the board, in file order. */
 export function newColumnDrafts(
   mappings: readonly ColumnMapping[],
 ): readonly { readonly sourceIndex: number; readonly name: string; readonly type: ColumnType }[] {
@@ -244,18 +176,11 @@ export function newColumnDrafts(
   );
 }
 
-/**
- * What the mapping gets wrong, checked against the board's *current* schema
- * rather than against anything a dialog is holding.
- *
- * Three things stop an import: two source columns writing one board column, a
- * new column whose name is already taken, and a new column with no name. Each
- * is reported against the source column that has to change.
- */
 export function mappingConflicts(
   mappings: readonly ColumnMapping[],
   columns: readonly BoardColumn[],
   headers: readonly string[] = [],
+  rows: readonly ImportSourceRow[] = [],
 ): readonly MappingConflict[] {
   const conflicts: MappingConflict[] = [];
   const nameOf = (index: number) => headers[index] ?? `Column ${columnLabel(index)}`;
@@ -277,6 +202,20 @@ export function mappingConflicts(
         message: `“${column?.name ?? "That column"}” is already taken by “${nameOf(sources[0] ?? 0)}”`,
       });
     }
+  }
+
+  // Quá ngần này giá trị khác nhau thì cột đó KHÔNG phải danh mục, và một bộ
+  // chọn nghìn nhãn vô dụng y như một bộ chọn rỗng. Server áp đúng trần này.
+  for (const draft of newColumnDrafts(mappings)) {
+    if (draft.type !== "select") continue;
+
+    const count = selectOptionsFrom(rows, draft.sourceIndex).length;
+    if (count <= IMPORT_SELECT_OPTION_LIMIT) continue;
+
+    conflicts.push({
+      sourceIndex: draft.sourceIndex,
+      message: `${count} different values is too many for a select column — import it as Text instead`,
+    });
   }
 
   const taken = new Set(columns.map((column) => normalizeName(column.name)));
@@ -315,8 +254,6 @@ export function mappingConflicts(
   return conflicts;
 }
 
-/* ------------------------------------------------------------ validation */
-
 export interface PlanInput {
   readonly source: ImportSource;
   readonly mappings: readonly ColumnMapping[];
@@ -324,38 +261,69 @@ export interface PlanInput {
   readonly context?: CellContext;
 }
 
-/**
- * The columns planning parses against: the board's, plus a stand-in for each
- * one this import would create.
- */
 export function planColumns(
   mappings: readonly ColumnMapping[],
   columns: readonly BoardColumn[],
+  rows: readonly ImportSourceRow[] = [],
 ): readonly BoardColumn[] {
-  const provisional = newColumnDrafts(mappings).map((draft, offset) =>
-    makeColumn(
+  const provisional = newColumnDrafts(mappings).map((draft, offset) => {
+    const column = makeColumn(
       provisionalColumnId(draft.sourceIndex),
       draft.name.trim(),
       draft.type,
       columns.length + offset,
-    ),
-  );
+    );
+
+    // Cột Select mới lấy nhãn TỪ CHÍNH FILE — cùng một luật server chạy khi
+    // ghi. Không dựng nhãn ở đây thì bản xem trước báo đỏ mọi dòng của một cột
+    // mà lần ghi thật lại nhận hết.
+    if (column.type !== "select") return column;
+
+    return {
+      ...column,
+      config: {
+        ...column.config,
+        options: selectOptionsFrom(rows, draft.sourceIndex),
+      },
+    };
+  });
 
   return provisional.length === 0 ? columns : [...columns, ...provisional];
 }
 
 /**
- * Parse every mapped cell and report, per row, what the column could not read.
- * Nothing is written and nothing is thrown — an unparsable date is a finding,
- * not a failure.
+ * Nhãn của một cột Select do import dựng ra: các giá trị có trong file, bỏ
+ * trống và gộp hoa thường.
  *
- * A row is dropped only when the *whole source row* is empty. Emptiness is a
- * property of the row in the file, not of the columns that happen to be mapped:
- * deciding it per mapped column made a row that carried data the user chose not
- * to import disappear, taking its row number with it.
+ * Gộp hoa thường vì lúc khớp cũng không phân biệt — để "Open" và "open" thành
+ * hai nhãn thì nhãn thứ hai vĩnh viễn không ô nào trỏ tới.
  */
+export function selectOptionsFrom(
+  rows: readonly ImportSourceRow[],
+  sourceIndex: number,
+): readonly SelectOption[] {
+  const labels: string[] = [];
+  const seen = new Set<string>();
+
+  for (const row of rows) {
+    const label = (row.cells[sourceIndex] ?? "").trim();
+    const key = label.toLowerCase();
+
+    if (label === "" || seen.has(key)) continue;
+
+    seen.add(key);
+    labels.push(label);
+  }
+
+  return labels.map((label, index) => ({
+    id: `${provisionalColumnId(sourceIndex)}_opt_${index}`,
+    label,
+    color: SELECT_COLORS[index % SELECT_COLORS.length] as SelectOption["color"],
+  }));
+}
+
 export function planImport({ source, mappings, columns, context = {} }: PlanInput): ImportPlan {
-  const resolved = planColumns(mappings, columns);
+  const resolved = planColumns(mappings, columns, source.rows);
   const byId = new Map(resolved.map((column) => [column.id, column]));
 
   const active = mappings.flatMap((mapping) => {
@@ -373,7 +341,6 @@ export function planImport({ source, mappings, columns, context = {} }: PlanInpu
   let blankCount = 0;
 
   for (const row of source.rows) {
-    // Whole-row emptiness, decided before anything is mapped.
     if (row.cells.every((cell) => cell.trim().length === 0)) {
       blankCount += 1;
       continue;
@@ -390,8 +357,6 @@ export function planImport({ source, mappings, columns, context = {} }: PlanInpu
       const raw = row.cells[mapping.sourceIndex] ?? "";
       const result = parseTextIntoCell(raw, column, context);
 
-      // An empty source cell stays empty. It is never filled from a
-      // neighbouring row, and it never causes the row to be dropped.
       cells[column.id] = result.value;
       if (result.ok) continue;
 
@@ -418,7 +383,7 @@ export function planImport({ source, mappings, columns, context = {} }: PlanInpu
     validCount: drafts.length - invalidCount,
     invalidCount,
     blankCount,
-    conflicts: mappingConflicts(mappings, columns, source.headers),
+    conflicts: mappingConflicts(mappings, columns, source.headers, source.rows),
   };
 }
 
@@ -439,13 +404,6 @@ function messageFor(column: BoardColumn): string {
   }
 }
 
-/**
- * The records the import will actually create, in the file's own row order.
- *
- * `skip` leaves flagged rows out entirely; `blank` imports them with the
- * offending cells empty — the two answers the PRD gives the user, made
- * explicit rather than chosen for them.
- */
 export function rowsToCreate(
   plan: ImportPlan,
   policy: ImportInvalidPolicy,
@@ -467,13 +425,6 @@ export function rowsToCreate(
   });
 }
 
-/**
- * Re-key the drafted cells once the board has handed back the real columns.
- *
- * The plan was computed against provisional ids; this is the one place they
- * turn into the ids the board issued, and it happens after the columns exist
- * and before any record is written.
- */
 export function resolveProvisionalIds(
   rows: readonly Readonly<Record<string, CellValue>>[],
   realIdBySourceIndex: ReadonlyMap<number, string>,
@@ -493,8 +444,6 @@ export function resolveProvisionalIds(
         if (!isProvisionalColumnId(columnId)) return [[columnId, value] as const];
 
         const realId = rename.get(columnId);
-        // A provisional id with no real column behind it means the column was
-        // never created; dropping the cell is right, inventing one is not.
         return realId ? [[realId, value] as const] : [];
       }),
     ),

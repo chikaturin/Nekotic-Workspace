@@ -7,7 +7,6 @@ interface FileMetadataTableProps {
   readonly className?: string;
 }
 
-/** name · type · size · owner · createdAt — the contract for every file. */
 export function FileMetadataTable({ node, className }: FileMetadataTableProps) {
   return (
     <dl

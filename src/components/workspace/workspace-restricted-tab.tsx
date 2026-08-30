@@ -12,24 +12,6 @@ import { selectRulesFor, usePermissionStore } from "@/store/permission-store";
 import { selectActiveWorkspace, selectFullTree, useWorkspaceStore } from "@/store/workspace-store";
 import type { DriveNode } from "@/types";
 
-/**
- * Restricted folders, listed for whoever administers the workspace.
- *
- * This is the one surface that deliberately looks past resource access, and it
- * exists so a folder can never be locked beyond recovery. The trade is stated
- * plainly rather than hidden: an admin sees that a restricted folder exists,
- * what it is called and where it sits — and nothing inside it. They still do
- * not appear in its access list, they are still not counted as a member of it,
- * and the tree, search, favourites and every other surface still hide it from
- * them until somebody grants it.
- *
- * The alternative — an admin who is implicitly inside every restricted folder —
- * makes "restricted" mean "restricted unless you outrank it", which is not a
- * promise anybody can rely on. The alternative in the other direction is a
- * folder whose last member leaves and which nobody can ever reopen.
- *
- * Granting from here is an ordinary, audited rule write.
- */
 export function WorkspaceRestrictedTab() {
   const workspace = useWorkspaceStore(selectActiveWorkspace);
   const tree = useWorkspaceStore(selectFullTree);

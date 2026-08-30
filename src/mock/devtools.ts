@@ -1,7 +1,6 @@
 import { PRODUCTION_OPTION_ID } from "@/lib/board-templates";
 import type { ConfigFormat } from "@/types";
 
-/** Seed content for config documents, keyed by node slug. */
 export interface ConfigSeed {
   readonly format?: ConfigFormat;
   readonly environmentOptionId: string;
@@ -40,7 +39,6 @@ export const CONFIG_SEEDS: Readonly<Record<string, ConfigSeed>> = {
   default: { format: "env", environmentOptionId: "env_0", content: DEFAULT_CONFIG },
 };
 
-/** Seed material for secret documents. Values never reach the client unasked. */
 export interface SecretSeed {
   readonly key: string;
   readonly value: string;

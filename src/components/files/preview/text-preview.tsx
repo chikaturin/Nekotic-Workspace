@@ -5,6 +5,7 @@ import { useState, type KeyboardEvent } from "react";
 import { SaveIndicator } from "@/components/document/save-indicator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useHotkey } from "@/hooks/use-hotkey";
 import { useFileEditor } from "@/hooks/use-file-editor";
 import { cn } from "@/lib/utils";
 import type { FileNode } from "@/types";
@@ -14,17 +15,11 @@ interface TextPreviewProps {
   readonly language: string;
   readonly node: FileNode;
   readonly canEdit: boolean;
-  /** Refresh the preview once new bytes are stored. */
   readonly onSaved: () => void;
 }
 
 const COPY_FEEDBACK_MS = 1600;
 
-/**
- * Text, CSV and source files render here — read-only by default, editable in
- * place for anyone with edit rights. Saving goes through the file service, so
- * the new bytes are what every other surface reads back.
- */
 export function TextPreview({ content, language, node, canEdit, onSaved }: TextPreviewProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isWrapped, setIsWrapped] = useState(true);
@@ -39,7 +34,6 @@ export function TextPreview({ content, language, node, canEdit, onSaved }: TextP
       setIsCopied(true);
       window.setTimeout(() => setIsCopied(false), COPY_FEEDBACK_MS);
     } catch {
-      // Clipboard permission denied — leave the button in its default state.
       setIsCopied(false);
     }
   }
@@ -47,6 +41,21 @@ export function TextPreview({ content, language, node, canEdit, onSaved }: TextP
   async function commit() {
     if (await editor.save(editor.draft)) onSaved();
   }
+
+  /**
+   * Cmd/Ctrl+S lưu TỆP, không phải lưu trang.
+   *
+   * Handler cũ nằm trên chính ô nhập, nên chỉ chạy khi con trỏ đang ở trong đó.
+   * Bấm một nút trên thanh công cụ rồi Ctrl+S là phím rơi thẳng ra trình duyệt
+   * và nó mở hộp thoại lưu .html — người dùng tưởng đã lưu, thực ra chưa.
+   *
+   * Gắn ở tầng document nên bắt được ở mọi chỗ trong lúc đang sửa;
+   * `enableInInputs` để nó vẫn chạy khi con trỏ nằm trong ô nhập.
+   */
+  useHotkey("mod+s", () => void commit(), {
+    enabled: editor.isEditing,
+    enableInInputs: true,
+  });
 
   function handleShortcut(event: KeyboardEvent<HTMLTextAreaElement>) {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {

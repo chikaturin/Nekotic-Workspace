@@ -3,6 +3,7 @@
 import { Archive, ArchiveRestore, Copy, CornerLeftUp, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ActivityTimeline } from "@/components/board/drawer/activity-timeline";
+import { useBoardPeople } from "@/hooks/use-board-people";
 import { DrawerTabs, type DrawerTabId } from "@/components/board/drawer/drawer-tabs";
 import { WatchButton } from "@/components/collab/watch-button";
 import { AttachmentPanel } from "@/components/board/drawer/attachment-panel";
@@ -40,15 +41,6 @@ interface RowDrawerProps {
   readonly canEdit: boolean;
 }
 
-/**
- * Record detail.
- *
- * The drawer reads the same normalised record the grid renders and writes
- * through the same store action, so an edit here is visible in the row behind
- * it on the next frame — no syncing, no second copy of the data. Details,
- * Comments and Activity are tabs rather than a stack: all three stay mounted,
- * so switching to the history and back never costs a half-typed comment.
- */
 export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
   const rowId = useGridStore((state) => state.drawerRowId);
   const closeDrawer = useGridStore((state) => state.closeDrawer);
@@ -59,16 +51,9 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
   const deleteRow = useBoardStore((state) => state.deleteRow);
   const bulkArchive = useBoardStore((state) => state.bulkArchive);
   const createOption = useBoardStore((state) => state.createOption);
-  const people = useBoardStore((state) => state.people);
+  const people = useBoardPeople();
 
   const [tab, setTab] = useState<DrawerTabId>("details");
-  /**
-   * The one field with its editor open, stored with the record it belongs to.
-   * Keying it by row means opening another record starts closed by derivation
-   * rather than by resetting state in an effect, and only ever one editor is
-   * mounted — two open pickers competing for the caret is not "editing", it is
-   * a stack of half-finished inputs.
-   */
   const [editing, setEditing] = useState<{ rowId: string; columnId: string } | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const { board, columns, context } = model;
@@ -79,7 +64,6 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
     return value && value.kind === "text" ? value.value : "";
   }, [row, board]);
 
-  /** The record this one sits under, when it is a subtask. */
   const parent = useBoardStore(selectRow(row?.parentRowId ?? ""));
   const parentTitle = useMemo(() => {
     if (!parent || !board) return "";
@@ -91,10 +75,8 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
 
   const isOpen = Boolean(rowId && row && board);
   const isArchived = row ? isRowArchived(row) : false;
-  /** Archived records are frozen: readable, commentable, but not editable. */
   const isEditable = canEdit && !isArchived;
 
-  /** The record's address: what the comment thread and the watch button follow. */
   const target = useMemo(
     () =>
       row && board
@@ -123,13 +105,8 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
       }}
     >
       <DrawerContent
-        // Named rather than left to the default: `md` is the 36rem the record
-        // drawer has always been, and saying so keeps a later width change a
-        // decision about this surface instead of a side effect of the ladder.
         size="md"
         aria-describedby={undefined}
-        // A mention picker or a reply composer owns its own Escape; the drawer
-        // only closes on presses nothing inside it claimed.
         onEscapeKeyDown={(event) => {
           const target = event.target;
           if (target instanceof Element && target.closest(`[${ESCAPE_OWNER_ATTRIBUTE}="true"]`)) {
@@ -176,8 +153,6 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
 
             <DrawerTabs active={tab} onChange={setTab} />
 
-            {/* `inline` because the three panels below pad themselves, and the
-                Activity timeline deliberately runs to the edges. */}
             <DrawerBody variant="inline">
               <section
                 role="tabpanel"
@@ -186,15 +161,9 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
                 hidden={tab !== "details"}
                 className="space-y-5 px-5 py-4"
               >
-                {/* `inert` takes the fields out of the tab order too — a frozen
-                    record must not be reachable by keyboard either. */}
                 <div
                   inert={isArchived}
                   className={cn(isArchived && "is-frozen")}
-                  // A press anywhere in the field list that is not on a field
-                  // puts the open editor away, the way clicking off a cell does
-                  // in the grid. Editors that portal out sit outside this
-                  // subtree, so their own clicks never reach it.
                   onPointerDown={(event) => {
                     const target = event.target;
                     if (target instanceof Element && target.closest("[data-drawer-field]")) return;
@@ -228,9 +197,6 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
 
                 <Separator />
 
-                {/* Subtasks are records, so they sit beside the fields rather
-                    than inside one — and commenting/attaching on a subtask
-                    happens in that subtask's own drawer. */}
                 <SubtaskPanel
                   parentRowId={row.id}
                   parentDisplayId={row.displayId}
@@ -250,9 +216,7 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
                 />
 
                 <Separator />
-                {/* Relations are dependencies, not containment — kept apart
-                    from Subtasks on purpose. */}
-                <BacklinksPanel rowId={row.id} />
+                <BacklinksPanel boardId={row.boardId} rowId={row.id} />
               </section>
 
               <section
@@ -262,7 +226,6 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
                 hidden={tab !== "comments"}
                 className="px-5 py-4"
               >
-                {/* Commenting is not editing: a frozen record still takes one. */}
                 {target && <CommentPanel target={target} people={people} canComment={canEdit} />}
               </section>
 
@@ -276,9 +239,6 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
               </section>
             </DrawerBody>
 
-            {/* The actions read left to right and the status note is pushed to
-                the far end by its own margin, so the row starts rather than
-                ends — the opposite of a dialog's confirm/cancel pair. */}
             <DrawerFooter align="start">
               <Button
                 size="sm"
@@ -318,8 +278,6 @@ export function RowDrawer({ model, folderId, canEdit }: RowDrawerProps) {
         )}
       </DrawerContent>
 
-      {/* Same wording as the grid and the bulk bar: one sentence, one verb,
-          and the same reason the Trash cannot help here. */}
       <ConfirmDialog
         isOpen={isConfirmingDelete}
         title={row ? `Delete ${row.displayId}?` : "Delete record?"}

@@ -14,18 +14,10 @@ import type { DirectoryUser, EntityRef } from "@/types";
 interface CommentPanelProps {
   readonly target: EntityRef;
   readonly people: readonly DirectoryUser[];
-  /** Read-only viewers still see the thread; they just cannot add to it. */
   readonly canComment: boolean;
   readonly className?: string;
 }
 
-/**
- * Comments on anything (CO-CMT-26).
- *
- * The same panel serves a record drawer and a page, because a thread only
- * needs its target — the drawer does not own the comment model, and neither
- * does the editor.
- */
 export function CommentPanel({ target, people, canComment, className }: CommentPanelProps) {
   const controller = useComments(target);
   const [replyToId, setReplyToId] = useState<string | null>(null);
@@ -112,7 +104,6 @@ export function CommentPanel({ target, people, canComment, className }: CommentP
 
       {canComment ? (
         <CommentComposer
-          // Attachments live in component state; a new target starts fresh.
           key={targetKey}
           draftKey={targetKey}
           people={people}

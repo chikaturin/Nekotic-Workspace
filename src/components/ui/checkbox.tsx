@@ -6,14 +6,9 @@ import { cn } from "@/lib/utils";
 
 interface CheckboxProps extends Omit<ComponentProps<"input">, "type" | "checked"> {
   readonly checked: boolean;
-  /** "Some, but not all" — the select-all box over a partial selection. */
   readonly isIndeterminate?: boolean;
 }
 
-/**
- * A native checkbox, styled. Keyboard behaviour, form semantics and the
- * indeterminate state come from the platform rather than a re-implementation.
- */
 export function Checkbox({
   checked,
   isIndeterminate = false,

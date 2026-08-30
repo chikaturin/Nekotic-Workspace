@@ -3,7 +3,6 @@ import { MOCK_NOW } from "@/config/app";
 const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
 const BYTES_PER_UNIT = 1024;
 
-/** `1.4 MB` — compact, tabular-friendly size label. */
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
 
@@ -23,10 +22,6 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const WEEK = 7 * DAY;
 
-/**
- * Relative label such as `12m ago`.
- * `reference` defaults to the frozen mock clock so server and client markup match.
- */
 export function formatRelativeTime(iso: string, reference: string = MOCK_NOW): string {
   const then = new Date(iso).getTime();
   const now = new Date(reference).getTime();
@@ -40,7 +35,6 @@ export function formatRelativeTime(iso: string, reference: string = MOCK_NOW): s
   return formatDate(iso);
 }
 
-/** `24 Aug 2026` — deterministic across locales/timezones. */
 export function formatDate(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
@@ -61,7 +55,6 @@ export function formatPercent(ratio: number): string {
   return `${Math.round(Math.min(Math.max(ratio, 0), 1) * 100)}%`;
 }
 
-/** `14:32` — a stable label for "saved at", with no dependency on now. */
 export function formatClockTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";

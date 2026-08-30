@@ -33,7 +33,6 @@ export type UploadEvent =
   | { readonly type: "remove"; readonly id: string }
   | { readonly type: "clear-finished" };
 
-/** Pure upload queue. The service performs I/O; this only tracks state. */
 export function uploadQueueReducer(
   tasks: readonly UploadTask[],
   event: UploadEvent,
@@ -99,7 +98,6 @@ function clamp(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-/** Aggregate view used by the upload banner and the progress bar. */
 export function summarizeUploads(tasks: readonly UploadTask[]): UploadSummary {
   const total = tasks.length;
   const active = tasks.filter((task) => ACTIVE_STATUSES.includes(task.status)).length;

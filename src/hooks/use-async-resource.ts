@@ -5,36 +5,18 @@ import { isCancellation, toAppError } from "@/services/errors";
 import { errorState, idleState, loadingState, successState, type AsyncState } from "@/types";
 
 interface Settled<T> {
-  /** Identity of the request this result belongs to. */
   readonly token: object;
   readonly state: AsyncState<T>;
 }
 
 export interface AsyncResource<T> {
   readonly state: AsyncState<T>;
-  /** True while a reload runs on top of data that is already on screen. */
   readonly isRefreshing: boolean;
-  /** Re-run the loader — wired to every "Try again" button. */
   readonly reload: () => void;
-  /** Replace the loaded value locally after a successful mutation. */
   readonly setData: (data: T) => void;
-  /**
-   * Update the loaded value in place. Used where several writers touch the
-   * same list — an optimistic insert and a realtime frame, for instance — and
-   * each needs to build on whatever the others already applied.
-   */
   readonly patchData: (update: (current: T) => T) => void;
 }
 
-/**
- * Load a service call into an `AsyncState`.
- *
- * The loading state is derived from "no settled result for this request yet"
- * rather than pushed from the effect, so mounting costs one render and the
- * effect never sets state synchronously. In-flight work is aborted when the
- * loader changes or the component unmounts, and a cancellation is never
- * reported as an error.
- */
 export function useAsyncResource<T>(
   loader: (signal: AbortSignal) => Promise<T>,
   options: { enabled?: boolean; keepPreviousData?: boolean } = {},
@@ -44,7 +26,6 @@ export function useAsyncResource<T>(
   const [reloadToken, setReloadToken] = useState(0);
   const [settled, setSettled] = useState<Settled<T> | null>(null);
 
-  // A fresh identity per request: a new loader or an explicit reload.
   const requestToken = useMemo(() => ({ loader, reloadToken }), [loader, reloadToken]);
   const isSettled = settled?.token === requestToken;
 
@@ -76,7 +57,6 @@ export function useAsyncResource<T>(
     if (!enabled) return idleState<T>();
     if (isSettled && settled) return settled.state;
 
-    // Keep the previous page of data visible while a reload is in flight.
     if (keepPreviousData && settled?.state.status === "success") return settled.state;
     return loadingState<T>();
   }, [enabled, isSettled, settled, keepPreviousData]);
@@ -98,8 +78,6 @@ export function useAsyncResource<T>(
     [],
   );
 
-  // Refreshing means "reloading on top of data already on screen" — the first
-  // load is a plain loading state, not a refresh.
   const isRefreshing = enabled && !isSettled && settled?.state.status === "success";
 
   return { state, isRefreshing, reload, setData, patchData };

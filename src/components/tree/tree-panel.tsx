@@ -10,10 +10,6 @@ interface TreePanelProps {
   readonly nodes: readonly DriveNode[];
 }
 
-/**
- * Single entry point for the sidebar tree. Swap engines from `TREE_ENGINE`:
- * `recursive` (default, animated, unbounded depth) or `arborist` (virtualised).
- */
 export function TreePanel({ nodes }: TreePanelProps) {
   if (nodes.length === 0) {
     return (

@@ -78,7 +78,7 @@ Two interchangeable implementations behind `TreePanel`, selected by `TREE_ENGINE
 Native HTML5 DnD, so OS file drops and internal moves use one code path
 ([`lib/dnd.ts`](src/lib/dnd.ts), [`hooks/use-node-dnd.ts`](src/hooks/use-node-dnd.ts)):
 
-- internal nodes travel as `application/x-nexdrop-node`; `text/plain` is set for external apps
+- internal nodes travel as `application/x-nekotic-node`; `text/plain` is set for external apps
 - drop targets: folder cards, folder rows, tree rows, breadcrumb crumbs, the canvas background
 - a target only highlights if it can *actually* accept the drop — self-drops, descendant-drops
   and same-parent drops are rejected before any state changes

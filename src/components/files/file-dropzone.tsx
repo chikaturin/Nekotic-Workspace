@@ -10,20 +10,13 @@ import { cn } from "@/lib/utils";
 import { useUploadStore } from "@/store/upload-store";
 
 interface FileDropzoneProps {
-  /** Destination folder; null uploads to the workspace root. */
   readonly folderId: string | null;
   readonly canUpload: boolean;
-  /** `hero` fills a full-page uploader; `card` sits inside a listing. */
   readonly tone?: "card" | "hero";
   readonly className?: string;
-  /** Notified when files are handed over, so a host can react (open a panel). */
   readonly onFilesPicked?: () => void;
 }
 
-/**
- * Drag-and-drop plus click-to-browse upload surface. Validation and progress
- * live in the upload store — this only collects files and reflects state.
- */
 export function FileDropzone({
   folderId,
   canUpload,

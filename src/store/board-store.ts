@@ -2,7 +2,6 @@
 
 import { create } from "zustand";
 import {
-  appendRows,
   applyCellEdits,
   captureCells,
   copyCells,
@@ -22,8 +21,8 @@ import { guardCellEdits } from "@/lib/board-write-rules";
 import { pruneView, reorderViews } from "@/lib/board-view";
 import type { CellContext } from "@/lib/cell-values";
 import { boardService } from "@/services/board-service";
+import type { ImportRowsInput, ImportRowsResult } from "@/services/board-types";
 import { isCancellation, toAppError } from "@/services/errors";
-import { CURRENT_USER } from "@/mock/users";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type {
   AppError,
@@ -49,14 +48,7 @@ import type {
   ViewFilter,
   ViewSort,
 } from "@/types";
-
-/**
- * The board is the single source of truth.
- *
- * Records are normalised once (`rowsById` + `rowOrder`) and every view — table,
- * kanban, calendar, timeline — reads that one set through `lib/board-view`.
- * There is deliberately no per-view copy of the data.
- */
+import { currentUser } from "@/store/session-store";
 
 type BoardStatus = "idle" | "loading" | "ready" | "error";
 
@@ -70,16 +62,13 @@ interface BoardState {
   readonly people: readonly DirectoryUser[];
   readonly activeViewId: string | null;
   readonly search: string;
-  /** Writes in flight — the toolbar shows a saving hint while it is above 0. */
   readonly pendingWrites: number;
   readonly conflicts: readonly ConflictNotice[];
-  /** Archived records are hidden until the board is asked to show them. */
   readonly isShowingArchived: boolean;
 }
 
 interface BoardActions {
   load: (nodeId: string) => Promise<void>;
-  /** Forget the loaded board outright — used when access to it is withdrawn. */
   clear: () => void;
   reload: () => Promise<void>;
   setActiveView: (viewId: string) => void;
@@ -90,33 +79,29 @@ interface BoardActions {
 
   editCells: (edits: readonly CellEdit[]) => Promise<void>;
 
-  /* Bulk writes — one request for the whole selection, never a loop. */
   bulkUpdate: (rowIds: readonly string[], values: Readonly<Record<string, CellValue>>, verb?: string) => Promise<BulkResult | null>;
   bulkArchive: (rowIds: readonly string[], isArchived: boolean) => Promise<BulkResult | null>;
   bulkDelete: (rowIds: readonly string[]) => Promise<BulkResult | null>;
   bulkMove: (rowIds: readonly string[], targetNodeId: string, targetName: string) => Promise<BulkMoveResult | null>;
-  importRows: (rows: readonly Readonly<Record<string, CellValue>>[]) => Promise<readonly BoardRow[] | null>;
+  importRows: (
+    input: Omit<ImportRowsInput, "boardId">,
+  ) => Promise<ImportRowsResult | null>;
   addRow: (afterRowId?: string | null) => Promise<string | null>;
   duplicateRow: (rowId: string) => Promise<string | null>;
   deleteRow: (rowId: string) => Promise<void>;
 
-  /**
-   * Subtasks. A child is a full board record — same store, same order, same
-   * views — so these two actions only ever move a pointer.
-   */
   createSubtask: (
     parentRowId: string,
     values?: Readonly<Record<string, CellValue>>,
   ) => Promise<string | null>;
   setRowParent: (rowId: string, parentRowId: string | null) => Promise<boolean>;
 
-  /**
-   * Add a column. `atIndex` is what Insert left / Insert right pass; without
-   * it the column goes at the end. Returns the column the board actually
-   * created — the import needs its id before it can write a single record
-   * against it.
-   */
-  addColumn: (type: ColumnType, name: string, atIndex?: number) => Promise<BoardColumn | null>;
+  addColumn: (
+    type: ColumnType,
+    name: string,
+    atIndex?: number,
+    config?: BoardColumn["config"],
+  ) => Promise<BoardColumn | null>;
   duplicateColumn: (columnId: string) => Promise<BoardColumn | null>;
   renameColumn: (columnId: string, name: string) => Promise<boolean>;
   updateColumnConfig: (columnId: string, patch: ColumnPatch) => Promise<void>;
@@ -126,7 +111,6 @@ interface BoardActions {
 
   setSort: (columnId: string, direction: "asc" | "desc" | null) => Promise<void>;
 
-  /* View configuration — all of it lives on the SavedView, never on the data. */
   setSorts: (sorts: readonly ViewSort[]) => Promise<void>;
   setFilters: (filters: readonly ViewFilter[]) => Promise<void>;
   setFilterConjunction: (conjunction: FilterConjunction) => Promise<void>;
@@ -136,26 +120,20 @@ interface BoardActions {
   setEndDateColumn: (columnId: string | null) => Promise<void>;
   setViewType: (type: BoardViewType) => Promise<void>;
   setRowHeight: (rowHeight: RowHeight) => Promise<void>;
-  /** How this view reads the parent/child hierarchy. Presentation, not data. */
   setSubtaskDisplay: (display: SubtaskDisplay) => Promise<void>;
-  /** Gantt's time scale and whether it draws the dependency connectors. */
   setGanttZoom: (zoom: GanttZoom) => Promise<void>;
   setShowDependencies: (showDependencies: boolean) => Promise<void>;
 
-  /* Saved views. Switching between them never copies a record. */
   createView: (name: string, type: BoardViewType) => Promise<string | null>;
   duplicateView: (viewId: string) => Promise<string | null>;
   renameView: (viewId: string, name: string) => Promise<void>;
-  /** Where a view sits in the tab strip. Shared, like the view itself. */
   moveViewTo: (viewId: string, toIndex: number) => Promise<void>;
   deleteView: (viewId: string) => Promise<void>;
 
-  /** Presentation lives on the view, so these never touch the schema. */
   resizeColumn: (columnId: string, width: number) => void;
   commitColumnWidth: (columnId: string, width: number) => Promise<void>;
   setColumnHidden: (columnId: string, hidden: boolean) => Promise<void>;
   moveColumnTo: (columnId: string, toIndex: number) => Promise<void>;
-  /** How much of a column's content this view shows. Presentation, per view. */
   setColumnDisplay: (columnId: string, mode: CellDisplayMode) => Promise<void>;
 }
 
@@ -182,11 +160,9 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
   const feedback = (message: string, tone: "info" | "success" | "error" = "error") =>
     useWorkspaceStore.getState().pushFeedback(message, tone);
 
-  /** Bulk results always report both halves: what was written and what was not. */
   const report = (result: BulkResult, verb: string) =>
     feedback(describeBulkResult(result, verb), bulkTone(result));
 
-  /** Wrap a write: count it, surface failures, always settle the counter. */
   async function write<T>(request: () => Promise<T>, onError: () => void): Promise<T | null> {
     set((state) => ({ pendingWrites: state.pendingWrites + 1 }));
 
@@ -206,11 +182,6 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
     return get().board;
   }
 
-  /**
-   * Lookups the rule guard needs to read a cell the way a column displays it.
-   * Relation labels stay local — a rule that spans boards is not a thing the
-   * builder can author, so there is nothing to resolve across one.
-   */
   function writeContext(): CellContext {
     const { people, rowsById, rowOrder } = get();
     const relationLabels = new Map<string, string>();
@@ -241,7 +212,6 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
     });
   }
 
-  /** Optimistic view patch with a rollback to the fields it touched. */
   async function patchActiveView(
     patch: Partial<SavedView>,
     rollback: (view: SavedView) => Partial<SavedView>,
@@ -286,7 +256,16 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
         });
       } catch (error) {
         if (token !== loadToken) return;
-        set({ status: "error", error: toAppError(error) });
+
+        const appError = toAppError(error);
+
+        // Server nói mục này không còn: gỡ nó khỏi thanh điều hướng luôn, đừng
+        // để nó tiếp tục mời người dùng bấm vào một trang báo lỗi.
+        if (appError.code === "not_found") {
+          useWorkspaceStore.getState().forgetMissingNode(nodeId);
+        }
+
+        set({ status: "error", error: appError });
       }
     },
 
@@ -295,13 +274,6 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
       if (nodeId) await get().load(nodeId);
     },
 
-    /**
-     * Drop the loaded board and everything derived from it.
-     *
-     * Records are a *copy*: the tree can be re-derived from the rules, a page
-     * of somebody's data already in memory cannot un-load itself. Losing access
-     * has to reach in and throw it away.
-     */
     clear: () => set({ ...INITIAL }),
 
     setActiveView: (viewId) => set({ activeViewId: viewId }),
@@ -310,17 +282,10 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
     dismissConflict: (id) =>
       set((state) => ({ conflicts: state.conflicts.filter((conflict) => conflict.id !== id) })),
 
-    /* ------------------------------------------------------------- records */
-
     editCells: async (rawEdits) => {
       const board = currentBoard();
       if (!board || rawEdits.length === 0) return;
 
-      /**
-       * Record rules first: an edit a transition rule or a conditional option
-       * refuses never becomes an optimistic write, so nothing has to be rolled
-       * back and no request leaves the client.
-       */
       const { allowed: edits, rejected } = guardCellEdits({
         edits: rawEdits,
         board,
@@ -337,7 +302,6 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
         reverts.map((revert) => [revert.rowId, before[revert.rowId]?.revision ?? 0]),
       );
 
-      // Optimistic: the grid shows the new value before the request leaves.
       set({ rowsById: applyCellEdits(before, edits, new Date().toISOString()) });
 
       const result = await write(
@@ -360,7 +324,6 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
       const tempId = `tmp_${Date.now().toString(36)}`;
       const now = new Date().toISOString();
 
-      // The display id is the server's to assign; the placeholder says so.
       const optimistic: BoardRow = {
         id: tempId,
         boardId: board.id,
@@ -371,7 +334,7 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
         ),
         createdAt: now,
         updatedAt: now,
-        createdBy: CURRENT_USER.id,
+        createdBy: currentUser().id,
         revision: 0,
         isPending: true,
       };
@@ -452,15 +415,6 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
       );
     },
 
-    /* ----------------------------------------------------------- subtasks */
-
-    /**
-     * Create a child of `parentRowId`, optionally pre-filled.
-     *
-     * The optimistic row already carries its parent, so the drawer's subtask
-     * list and the table's nested rows both show it on the next frame — and
-     * the server's real `TASK-00n` replaces the placeholder when it answers.
-     */
     createSubtask: async (parentRowId, values) => {
       const board = currentBoard();
       const parent = get().rowsById[parentRowId];
@@ -482,7 +436,7 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
         },
         createdAt: now,
         updatedAt: now,
-        createdBy: CURRENT_USER.id,
+        createdBy: currentUser().id,
         revision: 0,
         parentRowId,
         isPending: true,
@@ -514,12 +468,6 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
       return created.id;
     },
 
-    /**
-     * Move a record under a new parent, or back to the top level.
-     *
-     * The cycle guard runs before the optimistic write: a loop would hang every
-     * reader of the hierarchy, so it must never reach the store at all.
-     */
     setRowParent: async (rowId, parentRowId) => {
       const board = currentBoard();
       const row = get().rowsById[rowId];
@@ -553,15 +501,6 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
       return true;
     },
 
-    /* --------------------------------------------------------------- bulk */
-
-    /**
-     * The same record rules apply to a hundred records as to one: a bulk
-     * status change is still a status change, so the selection is split into
-     * the records the rules permit and the ones they do not before anything is
-     * written. Refusing the whole batch because one record cannot make the
-     * move would be worse than telling the user which ones could not.
-     */
     bulkUpdate: async (rowIds, values, verb = "Updated") => {
       const board = currentBoard();
       if (!board || rowIds.length === 0) return null;
@@ -627,11 +566,6 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
       return result;
     },
 
-    /**
-     * Records leave this board and arrive on another with new ids, so the two
-     * halves of the answer are applied to two different places: the source
-     * forgets `applied`, the destination already holds `rows`.
-     */
     bulkMove: async (rowIds, targetNodeId, targetName) => {
       const board = currentBoard();
       if (!board || rowIds.length === 0) return null;
@@ -656,34 +590,31 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
       return result;
     },
 
-    importRows: async (rows) => {
+    importRows: async (input) => {
       const board = currentBoard();
-      if (!board || rows.length === 0) return null;
+      if (!board) return null;
 
-      const created = await write(
-        () => boardService.importRows({ boardId: board.id, rows }),
+      const outcome = await write(
+        () => boardService.importRows({ ...input, boardId: board.id }),
         () => {},
       );
-      if (!created) return null;
+      if (!outcome) return null;
 
-      set((state) => appendRows(state, created));
-      return created;
+      await get().reload();
+
+      return outcome;
     },
 
-    /* ------------------------------------------------------------- schema */
-
-    addColumn: async (type, name, atIndex) => {
+    addColumn: async (type, name, atIndex, config) => {
       const board = currentBoard();
       if (!board) return null;
 
       const column = await write(
-        () => boardService.createColumn(board.id, type, name, atIndex),
+        () => boardService.createColumn(board.id, type, name, atIndex, config),
         () => {},
       );
       if (!column) return null;
 
-      // Positions shift for everything after an insert, so the schema is read
-      // back rather than patched by hand.
       set((state) =>
         state.board
           ? {
@@ -728,14 +659,6 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
       return result.column;
     },
 
-    /**
-     * Rename a column, refusing a name another column already wears.
-     *
-     * The check reads the board's current schema, not anything a header input
-     * is holding: two columns with the same name make the board ambiguous to
-     * read and ambiguous to import into, since the importer pairs source
-     * columns to board columns by name.
-     */
     renameColumn: async (columnId, name) => {
       const board = currentBoard();
       if (!board) return false;
@@ -874,8 +797,6 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
       return option;
     },
 
-    /* --------------------------------------------------------- view state */
-
     setSort: async (columnId, direction) => {
       await get().setSorts(direction === null ? [] : [{ columnId, direction }]);
     },
@@ -1001,17 +922,13 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
 
       const before = board.views;
       const views = reorderViews(before, viewId, toIndex);
-      // A drop back where it started: nothing moved, so nothing is written.
       if (views === before) return;
 
       const from = before.findIndex((view) => view.id === viewId);
       set((state) => ({ board: state.board ? { ...state.board, views } : state.board }));
 
       await write(
-        () => boardService.reorderView(board.id, viewId, toIndex),
-        // Put it back by moving it, not by restoring the array we snapshotted:
-        // a rename that landed while this was in flight lives in that array too,
-        // and undoing the move should not undo somebody else's edit with it.
+        () => boardService.reorderView(board.id, views.map((view) => view.id)),
         () =>
           set((state) => ({
             board: state.board
@@ -1118,9 +1035,6 @@ export const useBoardStore = create<BoardStore>()((set, get) => {
   };
 });
 
-/* -------------------------------------------------------------- selectors */
-
-/** One row, by id. Cells subscribe through their row, never through the map. */
 export const selectRow = (rowId: string) => (state: BoardStore) => state.rowsById[rowId];
 
 export function selectActiveView(state: BoardStore): SavedView | null {

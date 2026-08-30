@@ -2,6 +2,7 @@
 
 import { Download, Info, PanelRightClose, Pencil, X } from "lucide-react";
 import { useRef, useState, type KeyboardEvent } from "react";
+import { DriveItemMenu } from "@/components/drive/drive-item-menu";
 import { FavoriteButton } from "@/components/shared/favorite-star";
 import { Button } from "@/components/ui/button";
 import { DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -9,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { formatBytes, formatDate } from "@/lib/format";
 import { nodeVisual } from "@/lib/node-visuals";
 import { cn } from "@/lib/utils";
-import { useWorkspaceStore } from "@/store/workspace-store";
+import { hrefForNode } from "@/lib/tree";
+import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
 import type { FileNode } from "@/types";
 
 interface ViewerHeaderProps {
@@ -22,7 +24,6 @@ interface ViewerHeaderProps {
   readonly onClose: () => void;
 }
 
-/** Identity, rename and the viewer-wide actions. */
 export function ViewerHeader({
   node,
   canEdit,
@@ -33,8 +34,8 @@ export function ViewerHeader({
   onClose,
 }: ViewerHeaderProps) {
   const renameNode = useWorkspaceStore((store) => store.renameNode);
+  const tree = useWorkspaceStore(selectTree);
   const [draftName, setDraftName] = useState<string | null>(null);
-  /** Escape must win over the blur that follows it. */
   const isCancellingRef = useRef(false);
   const visual = nodeVisual(node);
 
@@ -54,7 +55,6 @@ export function ViewerHeader({
       return;
     }
     if (event.key === "Escape") {
-      // Stop the key from also closing the whole viewer.
       event.preventDefault();
       event.stopPropagation();
       isCancellingRef.current = true;
@@ -136,6 +136,15 @@ export function ViewerHeader({
         >
           {isDetailsOpen ? <PanelRightClose /> : <Info />}
         </Button>
+
+        {/*
+          Cùng menu với item trên cây drive, không phải bản chép lại: chia sẻ,
+          phân quyền, lưu trữ, xoá. Mở một tệp ra xem không nên là lúc mất hết
+          những việc làm được với nó lúc còn ở danh sách.
+
+          Xoá xong viewer tự đóng — node được tra từ cây, và tra không thấy nữa.
+        */}
+        <DriveItemMenu node={node} href={hrefForNode(tree, node.id)} />
 
         <Button size="icon-sm" variant="ghost" aria-label="Close viewer" onClick={onClose}>
           <X />

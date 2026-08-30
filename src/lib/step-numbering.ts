@@ -1,31 +1,5 @@
 import type { StepNumbering } from "@/types";
 
-/**
- * Numbered steps in a long-text cell.
- *
- * A QA case is written `B1: open the login page`, `B2: enter the username`; a
- * test plan uses `T1:`, `T2:`. The shape never varies — a prefix, a number, a
- * separator — so this is three fields of configuration and a parser, not a
- * templating engine.
- *
- * Two rules keep it honest:
- *
- *   - **The number is a number.** `B9` is followed by `B10`, never by `B:` or
- *     `B10` reached by incrementing a character. Everything here parses the
- *     digits and adds one.
- *   - **It never guesses.** Formatting a block that does not already read as a
- *     list of steps returns the text untouched. Renumbering somebody's prose
- *     because it happened to start with a letter and a digit is worse than
- *     doing nothing.
- */
-
-/**
- * Plain numbers out of the box: `1:`, `2:`, `3:`.
- *
- * A prefix is a house convention — `B` for one team, `T` for another — and
- * guessing which one is worse than starting with none. Anybody who wants `B1:`
- * types a `B` into one field.
- */
 export const DEFAULT_STEP_NUMBERING: StepNumbering = {
   enabled: false,
   prefix: "",
@@ -38,14 +12,10 @@ export function stepNumberingOf(config: { readonly stepNumbering?: StepNumbering
 }
 
 /**
- * `  B12:  open the page` → indent `  `, prefix `B`, number 12, separator `: `,
- * body `open the page`.
+ * Dòng bước "chung chung": đoán lấy tiền tố chữ cái, rồi tới số.
  *
- * The prefix is letters and spaces so `Step 1:` parses as readily as `B1:`; the
- * separator is whatever punctuation and space sit between the number and the
- * text. Both are captured rather than assumed, so reading a line never depends
- * on the column's current configuration — a cell written under one prefix stays
- * readable after somebody changes it.
+ * Nó KHÔNG đọc được tiền tố có dấu như `STEP-`, nên khi cột đã khai tiền tố
+ * riêng thì `prefixPattern` bên dưới được thử trước.
  */
 const STEP_LINE = /^([ \t]*)([A-Za-z][A-Za-z ]{0,7}?)?(\d+)([.):\-\]]?[ \t]*)(.*)$/;
 
@@ -54,63 +24,129 @@ export interface ParsedStep {
   readonly prefix: string;
   readonly number: number;
   readonly separator: string;
+  /** Phần sau dấu phân cách, GIỮ NGUYÊN khoảng trắng. */
   readonly body: string;
+  /** `body` đã trim — đây mới là "nội dung" theo nghĩa người dùng hiểu. */
+  readonly content: string;
+  /**
+   * Bước này đã được viết chưa.
+   *
+   * Đây là thứ quyết định có tăng số hay không: một bước rỗng KHÔNG đẩy bộ đếm,
+   * nếu không thì gõ Enter vài lần là số nhảy qua những bước chưa ai viết.
+   */
+  readonly hasContent: boolean;
 }
 
-export function parseStepLine(line: string): ParsedStep | null {
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Regex khớp ĐÚNG tiền tố và dấu phân cách mà cột đã khai. */
+function prefixPattern(config: StepNumbering): RegExp | null {
+  const prefix = config.prefix;
+  const separator = config.separator.trim();
+
+  if (prefix === "" && separator === "") return null;
+
+  return new RegExp(
+    `^([ \\t]*)(${escapeRegExp(prefix)})(\\d+)(${escapeRegExp(separator)})([ \\t]*)(.*)$`,
+  );
+}
+
+function build(
+  indent: string,
+  prefix: string,
+  rawNumber: string,
+  separator: string,
+  body: string,
+): ParsedStep | null {
+  const number = Number.parseInt(rawNumber, 10);
+  if (!Number.isFinite(number)) return null;
+
+  const content = body.trim();
+
+  return { indent, prefix, number, separator, body, content, hasContent: content.length > 0 };
+}
+
+/**
+ * Đọc một dòng thành các phần của nó, hoặc `null` nếu đó không phải dòng bước.
+ *
+ * Truyền `config` vào để đọc được tiền tố mà regex chung không đoán nổi
+ * (`STEP-`, `Case_`…). Không có config thì rơi về cách đoán cũ.
+ */
+export function parseStepLine(line: string, config?: StepNumbering): ParsedStep | null {
+  if (config) {
+    const exact = prefixPattern(config)?.exec(line);
+
+    if (exact) {
+      return build(exact[1] ?? "", exact[2] ?? "", exact[3] ?? "", exact[4] ?? "", exact[6] ?? "");
+    }
+  }
+
   const match = STEP_LINE.exec(line);
   if (!match) return null;
 
-  const number = Number.parseInt(match[3] ?? "", 10);
-  if (!Number.isFinite(number)) return null;
-
-  return {
-    indent: match[1] ?? "",
-    prefix: match[2] ?? "",
-    number,
-    separator: match[4] ?? "",
-    body: match[5] ?? "",
-  };
+  return build(match[1] ?? "", match[2] ?? "", match[3] ?? "", match[4] ?? "", match[5] ?? "");
 }
 
-/** `B` + `3` + `:` + one space — the token a new step line opens with. */
 export function stepToken(config: StepNumbering, number: number): string {
   const separator = config.separator.trim();
   return `${config.prefix}${number}${separator}${separator ? " " : ""}`;
 }
 
 /**
- * What Enter inserts: a newline, then the next step's opening token.
+ * Bước hợp lệ gần nhất TỪ con trỏ NGƯỢC LÊN.
  *
- * The number comes from the line the caret is on, parsed as an integer, so `B9`
- * is followed by `B10`. A line that is not a step at all starts the sequence at
- * the column's configured start — pressing Enter under a heading gives you step
- * one rather than nothing.
+ * Con trỏ không phải lúc nào cũng nằm trên một dòng bước: Shift+Enter đẻ ra
+ * dòng nối tiếp ("+Kho" thụt lề dưới B2), và những dòng đó không mang số. Chỉ
+ * nhìn đúng một dòng dưới con trỏ thì gặp dòng nối tiếp là mất dấu, và số quay
+ * về đầu — B1 mọc ra giữa danh sách.
  */
-export function nextStepInsertion(currentLine: string, config: StepNumbering): string {
-  const parsed = parseStepLine(currentLine);
-  const number = parsed ? parsed.number + 1 : config.start;
+function stepBefore(
+  text: string,
+  caret: number,
+  config: StepNumbering,
+): { parsed: ParsedStep; isCurrentLine: boolean } | null {
+  const upto = text.slice(0, Math.max(0, caret));
+  const lines = upto.split("\n");
 
-  // An existing line's own prefix and separator win, so a cell someone wrote
-  // as `T1:` keeps going in `T`, whatever the column now says.
-  const prefix = parsed && parsed.prefix ? parsed.prefix : config.prefix;
-  const separator = parsed ? parsed.separator.trim() : config.separator.trim();
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const parsed = parseStepLine(lines[index] ?? "", config);
 
-  return `\n${parsed?.indent ?? ""}${prefix}${number}${separator}${separator ? " " : ""}`;
+    if (parsed) return { parsed, isCurrentLine: index === lines.length - 1 };
+  }
+
+  return null;
 }
 
 /**
- * What a cell's editor opens with.
+ * Phần văn bản cần chèn khi người dùng bấm Enter — chuỗi rỗng nghĩa là KHÔNG
+ * chèn gì.
  *
- * A blank cell opens on its first step, already numbered. Without it the first
- * line is the one line with no number on it and the numbering only announces
- * itself on the second — you find out what the column does by pressing Enter,
- * which reads as the feature misfiring rather than starting.
- *
- * Only ever where there is nothing to disturb: a cell that is empty, or one a
- * keystroke is replacing. An existing value is never prefixed, and neither is
- * anything that already opens with a step.
+ * Số suy ra từ bước thật gần nhất phía trên, không phải từ số dòng và cũng
+ * không phải từ mỗi dòng đang đứng. Đứng trên một bước còn rỗng thì Enter đứng
+ * yên — số chỉ đi tiếp khi bước đó đã được viết.
  */
+export function nextStepInsertion(text: string, caret: number, config: StepNumbering): string {
+  const found = stepBefore(text, caret, config);
+
+  if (!found) {
+    const separator = config.separator.trim();
+
+    return `\n${config.prefix}${config.start}${separator}${separator ? " " : ""}`;
+  }
+
+  const { parsed, isCurrentLine } = found;
+
+  // Bước hiện tại chưa viết gì: giữ nguyên, để nội dung gõ tiếp thuộc về nó.
+  // Chỉ áp dụng khi con trỏ ĐANG ở trên chính dòng đó — đứng ở dòng nối tiếp
+  // nghĩa là bước phía trên đã có nội dung để mà nối.
+  if (isCurrentLine && !parsed.hasContent) return "";
+
+  const separator = parsed.separator.trim();
+  const prefix = parsed.prefix === "" ? config.prefix : parsed.prefix;
+
+  return `\n${parsed.indent}${prefix}${parsed.number + 1}${separator}${separator ? " " : ""}`;
+}
+
 export function openingText(
   existing: string,
   typed: string | undefined,
@@ -125,70 +161,34 @@ export function openingText(
   return `${stepToken(config, config.start)}${base}`;
 }
 
-/**
- * Spaces immediately after the caret that opening a new step should absorb.
- *
- * Splitting `B1: open the page` at "open" would otherwise give `B2:  the page`
- * with two spaces — one from the step token, one that was separating the words.
- * Only ever horizontal whitespace, and only ever what the token has replaced.
- */
 export function spacesAfter(text: string, caret: number): number {
   return /^[ \t]*/.exec(text.slice(caret))?.[0].length ?? 0;
 }
 
-/** The line the caret sits on, given the whole value and a caret offset. */
 export function lineAt(text: string, caret: number): string {
   const upto = text.slice(0, Math.max(0, caret));
   const start = upto.lastIndexOf("\n") + 1;
   return upto.slice(start);
 }
 
-/* ------------------------------------------------------------------ indent */
-
-/**
- * One level of indent, in spaces.
- *
- * Spaces rather than a tab character, for two reasons. A `\t` in a textarea is
- * laid out against the browser's default tab stops — eight columns wide, and
- * not the same eight everywhere — so a step aligned on one machine is ragged on
- * the next. And the text leaves here constantly: pasted into a ticket, exported
- * to a spreadsheet, read back by an importer. Spaces mean the same thing in all
- * of them.
- *
- * Four, because that is the width of a step token — `B1: ` — so a continuation
- * line indented once lands under the words of the step above it rather than
- * under its number.
- */
 export const INDENT = "    ";
 
-/** A rewritten value and where the caret or selection should sit in it. */
 export interface TextEdit {
   readonly text: string;
   readonly selectionStart: number;
   readonly selectionEnd: number;
 }
 
-/** The bounds of the whole lines a selection touches, even partly. */
 function lineSpan(text: string, start: number, end: number): { from: number; to: number } {
   const from = text.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
   const after = text.indexOf("\n", end);
   return { from, to: after === -1 ? text.length : after };
 }
 
-/** Whether a selection covers more than one line — the block-indent case. */
 function isMultiLine(text: string, start: number, end: number): boolean {
   return start !== end && text.slice(start, end).includes("\n");
 }
 
-/**
- * What Tab does.
- *
- * A caret, or a selection inside one line, gets an indent typed at it — the
- * "a wider space" a writer is reaching for when they line up a sub-point under
- * the one above. A selection spanning several lines indents every line it
- * touches, and keeps covering them afterwards, which is the only way to move a
- * block in one gesture.
- */
 export function indentSelection(text: string, start: number, end: number): TextEdit {
   if (!isMultiLine(text, start, end)) {
     return {
@@ -204,13 +204,11 @@ export function indentSelection(text: string, start: number, end: number): TextE
 
   return {
     text: `${text.slice(0, from)}${indented}${text.slice(to)}`,
-    // The first line grew before the selection began, the rest grew inside it.
     selectionStart: start + INDENT.length,
     selectionEnd: end + INDENT.length * lines.length,
   };
 }
 
-/** How much leading whitespace one outdent takes off a line: up to a level. */
 function outdentWidth(line: string): number {
   if (line.startsWith("\t")) return 1;
 
@@ -218,13 +216,6 @@ function outdentWidth(line: string): number {
   return spaces;
 }
 
-/**
- * What Shift+Tab does: the inverse, and never more than one level.
- *
- * A line with nothing to take off is left exactly as it is rather than
- * borrowing from the line above — so holding Shift+Tab on an already-flush
- * block does nothing at all, instead of quietly eating the text.
- */
 export function outdentSelection(text: string, start: number, end: number): TextEdit {
   const { from, to } = lineSpan(text, start, end);
   const lines = text.slice(from, to).split("\n");
@@ -241,8 +232,6 @@ export function outdentSelection(text: string, start: number, end: number): Text
 
   if (totalRemoved === 0) return { text, selectionStart: start, selectionEnd: end };
 
-  // A caret sitting inside the whitespace being removed must not be dragged
-  // in front of the line it is on.
   const lineStart = from;
   return {
     text: `${text.slice(0, from)}${outdented.join("\n")}${text.slice(to)}`,
@@ -251,16 +240,6 @@ export function outdentSelection(text: string, start: number, end: number): Text
   };
 }
 
-/* ------------------------------------------------------------------ paste */
-
-/**
- * Number a block of pasted lines.
- *
- * Only for a paste that is plainly a list of unnumbered steps: if any line
- * already carries a number, the paste is left exactly as it arrived. Somebody
- * pasting `B1: … B2: …` has already numbered it, and a second pass would give
- * them `B1: B1: …`.
- */
 export function numberPastedLines(text: string, config: StepNumbering): string | null {
   const lines = text.split(/\r?\n/);
   const filled = lines.filter((line) => line.trim().length > 0);
@@ -279,15 +258,6 @@ export function numberPastedLines(text: string, config: StepNumbering): string |
     .join("\n");
 }
 
-/* ----------------------------------------------------------------- format */
-
-/**
- * Whether a block reads as steps at all.
- *
- * Every non-empty line has to be one. A block where half the lines are numbered
- * and half are prose is ambiguous — it might be steps with notes between them —
- * and this refuses to decide.
- */
 export function looksLikeSteps(text: string): boolean {
   const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
   if (lines.length === 0) return false;
@@ -295,17 +265,6 @@ export function looksLikeSteps(text: string): boolean {
   return lines.every((line) => parseStepLine(line) !== null);
 }
 
-/**
- * Normalise an existing block: one prefix, one separator, numbered in sequence
- * from the configured start.
- *
- * `b1 open browser / b2 login` becomes `B1: Open browser / B2: Login`. The
- * bodies are never touched beyond trimming — the numbering is rewritten, the
- * user's words are not.
- *
- * Returns the text unchanged when the block does not read as steps, so the
- * action is safe to offer on anything.
- */
 export function formatSteps(text: string, config: StepNumbering): string {
   if (!looksLikeSteps(text)) return text;
 
@@ -327,7 +286,6 @@ export function formatSteps(text: string, config: StepNumbering): string {
     .join("\n");
 }
 
-/** Whether Format Steps would change anything — what disables the button. */
 export function canFormatSteps(text: string, config: StepNumbering): boolean {
   return looksLikeSteps(text) && formatSteps(text, config) !== text;
 }

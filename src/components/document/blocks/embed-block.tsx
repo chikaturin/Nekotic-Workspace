@@ -25,16 +25,8 @@ interface EmbedBlockProps {
   readonly isEditable: boolean;
 }
 
-/** Rows mounted inside a document. The source board holds the rest. */
 const EMBED_ROW_LIMIT = 12;
 
-/**
- * DV-EMB-25 — a saved view of a board, embedded in a page.
- *
- * The block stores two ids and nothing else. Columns, filters, sorting and the
- * cell renderers all come from the board engine, and an edit here writes to the
- * source board rather than to the document.
- */
 export function EmbedBlock({ block, onChange, isEditable }: EmbedBlockProps) {
   const boards = useBoardList();
   const embed = useEmbeddedBoard(block.boardNodeId, block.viewId);

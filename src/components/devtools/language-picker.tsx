@@ -16,19 +16,6 @@ const OPTIONS = CONFIG_FORMATS.map((format) => ({
   label: CONFIG_FORMAT_LABELS[format],
 }));
 
-/**
- * Which language a config document is written in.
- *
- * One control, used by the document header. It is a `Select` rather than a
- * native one so the trigger can carry the glyph and the list stays in the
- * workspace's own type scale — and because there are fifteen entries, which is
- * exactly the length at which a native dropdown becomes a scroll.
- *
- * Changing it changes how the document is coloured and which formatter it is
- * offered. It never touches the content: a JSON file relabelled TypeScript is
- * still the same bytes, badly coloured, and that is recoverable. A picker that
- * "converted" would not be.
- */
 export function LanguagePicker({ value, canEdit, onChange }: LanguagePickerProps) {
   return (
     <Select

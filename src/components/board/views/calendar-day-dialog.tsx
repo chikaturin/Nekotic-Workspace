@@ -9,7 +9,6 @@ import { formatCount } from "@/lib/format";
 import type { BoardColumn } from "@/types";
 
 interface CalendarDayDialogProps {
-  /** The day being inspected; null keeps the dialog closed. */
   readonly day: { readonly iso: string; readonly rowIds: readonly string[] } | null;
   readonly primaryColumnId: string;
   readonly fields: readonly BoardColumn[];
@@ -18,15 +17,6 @@ interface CalendarDayDialogProps {
   readonly onClose: () => void;
 }
 
-/**
- * Everything on one day.
- *
- * A month cell can only hold a couple of cards before it stops being a month,
- * so the rest were summarised as "+3 more" — which named them without ever
- * showing them. The count is now the way in: it opens the day and lists every
- * record on it, as the same cards the grid renders, so opening one still goes
- * to the same drawer.
- */
 export function CalendarDayDialog({
   day,
   primaryColumnId,

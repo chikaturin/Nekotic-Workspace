@@ -25,23 +25,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
-/**
- * Popover + cmdk — the pairing `ui/popover` has documented as the correct one
- * since it was written, and which nothing implemented until now.
- *
- * Three surfaces arrived at their own version of it independently: the folder
- * access dialog, the workspace invite dialog and the page mover each pair a
- * bare `Input` with a hand-rolled result list, and each one filters, highlights
- * and commits slightly differently.
- *
- * The line between this and `Select` is the length of the list. `Select` walks
- * a short, known set of options with a substring filter and owns its own
- * highlight; a Combobox hands a long list to `cmdk`, which scores matches
- * rather than merely testing for them and keeps the keyboard for itself. The
- * other difference is `onCreate`: a list you search is often a list you are
- * about to add to, which the status picker in the board already knows.
- */
-
 export type ComboboxSize = ListboxSize;
 
 const CREATE_ITEM_VALUE = "__combobox_create__";
@@ -53,7 +36,6 @@ function defaultCreateLabel(query: string): string {
 export interface ComboboxProps {
   readonly options: readonly ListboxOption[];
   readonly value: string | null;
-  /** Symmetric with `value`: clearing reports `null` rather than an empty id. */
   readonly onValueChange: (value: string | null) => void;
   readonly placeholder?: string;
   readonly searchPlaceholder?: string;
@@ -63,12 +45,6 @@ export interface ComboboxProps {
   readonly isClearable?: boolean;
   readonly isLoading?: boolean;
   readonly isDisabled?: boolean;
-  /**
-   * Offered as the last row whenever the query matches no existing label.
-   * May be async — the row shows a spinner and the popover stays open until it
-   * settles, because a dialog that closes before the write lands leaves the
-   * user unsure whether anything happened.
-   */
   readonly onCreate?: (label: string) => void | Promise<void>;
   readonly createLabel?: (query: string) => string;
   readonly renderValue?: (option: ListboxOption | null) => ReactNode;
@@ -138,8 +114,6 @@ export function Combobox({
     if (isDisabled || isOpen) return;
 
     if (OPENING_KEYS.includes(event.key)) {
-      // The trigger is a div, so Enter and Space raise no click of their own;
-      // every key that opens the list has to be claimed explicitly.
       event.preventDefault();
       setIsOpen(true);
     }
@@ -163,8 +137,6 @@ export function Combobox({
       close();
       triggerRef.current?.focus();
     } catch (error: unknown) {
-      // Swallowing this would leave the row spinning and the option missing,
-      // with nothing on screen to say which of the two happened.
       setCreateError(
         error instanceof Error ? error.message : `“${trimmedQuery}” could not be created.`,
       );
@@ -187,8 +159,6 @@ export function Combobox({
           size={size}
           variant={variant}
           popupId={popupId}
-          // The popup is a search field above a list, not a bare list, and
-          // `cmdk`'s own input already carries `role="combobox"` for the pair.
           popupRole="dialog"
           onKeyDown={handleTriggerKeyDown}
           className={className}
@@ -242,45 +212,24 @@ export function Combobox({
   );
 }
 
-/**
- * What `cmdk` scores the search against.
- *
- * The label first, because that is what the user believes they are typing;
- * the description behind it so "the one about billing" still finds a row whose
- * label never says billing.
- */
 function keywordsOf(option: ListboxOption): string[] {
   return option.description === undefined
     ? [option.label]
     : [option.label, option.description];
 }
 
-/* --------------------------------------------------------------- palette */
-
 export interface CommandDialogProps {
   readonly isOpen: boolean;
   readonly onOpenChange: (isOpen: boolean) => void;
-  /** Read to screen readers as the dialog's name; not drawn. */
   readonly title: string;
   readonly description: string;
   readonly children: ReactNode;
   readonly size?: DialogSize;
-  /** Off when the results already arrive filtered — a server-backed search. */
   readonly shouldFilter?: boolean;
   readonly loop?: boolean;
   readonly className?: string;
 }
 
-/**
- * A command palette: the Dialog and the Command, wired once.
- *
- * Global search composes these two by hand today, and the composition is
- * fiddlier than it looks — the padding has to come off the dialog, the title
- * and description are required by the dialog and unwanted on screen, and the
- * whole thing has to clip so the command list's own scroll port is the one
- * that scrolls. Getting any of that subtly wrong is invisible until the list
- * is long.
- */
 export function CommandDialog({
   isOpen,
   onOpenChange,
@@ -322,22 +271,9 @@ interface ComboboxPanelProps {
   readonly emptyMessage: ReactNode;
   readonly createLabel: (query: string) => string;
   readonly onChoose: (option: ListboxOption) => void;
-  /** Undefined when the caller did not supply an `onCreate`. */
   readonly onCreate?: () => void | Promise<void>;
 }
 
-/**
- * Everything inside the popover, as one element.
- *
- * `PopoverContent` renders nothing while it is shut, but JSX children are
- * evaluated before they are handed to it — so writing the list inline builds
- * one React element and one `cn()` merge per option on every render of every
- * closed Combobox on the page. Behind a component boundary the whole subtree
- * is a single unrendered element instead, and the duplicate scan that decides
- * whether "create" is offered stops running too. It is the same extraction
- * `SelectPanel` documents; a picker in a virtualised grid cannot afford
- * otherwise.
- */
 function ComboboxPanel({
   popupId,
   label,
@@ -356,12 +292,6 @@ function ComboboxPanel({
   onChoose,
   onCreate,
 }: ComboboxPanelProps) {
-  /**
-   * Creating a duplicate is never what somebody typing an existing name meant,
-   * so the row disappears the moment the query names an option that is already
-   * there — including one that is disabled, which exists just as much as the
-   * rest of them.
-   */
   const canCreate =
     onCreate !== undefined &&
     trimmedQuery.length > 0 &&
@@ -391,13 +321,8 @@ function ComboboxPanel({
               <CommandItem
                 key={option.value}
                 value={option.value}
-                // The value is an opaque id, so what the user is actually
-                // typing has to be handed to the matcher separately.
                 keywords={keywordsOf(option)}
                 disabled={option.isDisabled}
-                // cmdk lowercases the value it reports back, which would
-                // quietly corrupt a case-sensitive id; the option itself is
-                // closed over instead of trusting the argument.
                 onSelect={() => onChoose(option)}
                 className={listboxRowVariants({ size })}
               >

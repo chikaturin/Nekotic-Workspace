@@ -7,10 +7,6 @@ export interface Size {
   readonly height: number;
 }
 
-/**
- * Track an element's box via ResizeObserver — required by virtualised trees
- * that need explicit pixel dimensions.
- */
 export function useContainerSize<T extends HTMLElement>(): [RefObject<T | null>, Size] {
   const ref = useRef<T | null>(null);
   const [size, setSize] = useState<Size>({ width: 0, height: 0 });

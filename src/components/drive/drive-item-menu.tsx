@@ -8,6 +8,8 @@ import {
   ExternalLink,
   Lock,
   PenLine,
+  Pin,
+  PinOff,
   Share2,
   ShieldCheck,
   Trash2,
@@ -36,12 +38,19 @@ interface DriveItemMenuProps {
   readonly node: DriveNode;
   readonly href: string;
   readonly className?: string;
+  /** Dáng của nút mở menu — thanh công cụ dùng nút viền cỡ thường, các dòng danh sách dùng nút chìm cỡ nhỏ. */
+  readonly trigger?: "row" | "toolbar";
 }
 
-/** Row/card overflow actions. Shared so both layouts stay in sync. */
-export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
+const TRIGGER_LOOK = {
+  row: { size: "icon-sm", variant: "ghost" },
+  toolbar: { size: "icon", variant: "outline" },
+} as const;
+
+export function DriveItemMenu({ node, href, className, trigger = "row" }: DriveItemMenuProps) {
   const openNode = useOpenNode();
   const toggleFavorite = useWorkspaceStore((state) => state.toggleFavorite);
+  const togglePinned = useWorkspaceStore((state) => state.togglePinned);
   const trashNode = useWorkspaceStore((state) => state.trashNode);
   const requestRename = useWorkspaceStore((state) => state.requestRename);
   const openPreview = useWorkspaceStore((state) => state.openPreview);
@@ -53,11 +62,6 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
   const [isAccessOpen, setIsAccessOpen] = useState(false);
   const [isRolesOpen, setIsRolesOpen] = useState(false);
 
-  /**
-   * A toast that says "copied" while nothing reached the clipboard is worse
-   * than no button at all, so the message follows the write rather than
-   * announcing it in advance.
-   */
   async function copyShareLink() {
     const url = new URL(href, window.location.origin).toString();
 
@@ -73,8 +77,8 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          size="icon-sm"
-          variant="ghost"
+          size={TRIGGER_LOOK[trigger].size}
+          variant={TRIGGER_LOOK[trigger].variant}
           aria-label={`Actions for ${node.name}`}
           onClick={(event) => event.stopPropagation()}
           className={cn("shrink-0", className)}
@@ -90,9 +94,12 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
           <ExternalLink />
           {node.type === "file" ? "Preview" : "Open"}
         </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => togglePinned(node.id)}>
+          {node.isPinned ? <PinOff /> : <Pin />}
+          {node.isPinned ? "Unpin from sidebar" : "Pin to sidebar"}
+        </DropdownMenuItem>
+
         <DropdownMenuItem onSelect={() => toggleFavorite(node.id)}>
-          {/* The icon is the state you have; the label is what the click
-              does. A slashed star said neither clearly. */}
           <FavoriteStar isFavorite={node.isFavorite} />
           {node.isFavorite ? "Remove from favorites" : "Add to favorites"}
         </DropdownMenuItem>
@@ -109,15 +116,6 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
           <Share2 />
           Copy share link
         </DropdownMenuItem>
-        {/* Two separate things, and the menu keeps them apart on purpose.
-            "Manage access" answers who gets *in*; "Roles on this item" answers
-            what somebody who is already in may do. Folding them into one entry
-            is how a role becomes a way past a restriction.
-
-            Offered on every node, files included. It used to be folders only,
-            which meant the commonest thing anyone wants to shut — one file
-            holding credentials, sitting beside a dozen harmless ones — could
-            only be shut by restricting everything around it. */}
         <DropdownMenuItem
           disabled={!can("node.access.manage")}
           onSelect={() => setIsAccessOpen(true)}
@@ -139,13 +137,8 @@ export function DriveItemMenu({ node, href, className }: DriveItemMenuProps) {
           </DropdownMenuItem>
         )}
 
-        {/* Files have no read-only mode of their own, so they are not archived —
-            they are moved to Trash or left where they are. */}
         {!isFile(node) && (
           <DropdownMenuItem
-            // An inherited freeze cannot be lifted from here at all: the
-            // resolver has already closed the key for everything below the
-            // ancestor that holds it.
             disabled={!can("node.archive")}
             onSelect={() => setNodeArchived(node.id, !isArchivedNode(node))}
           >

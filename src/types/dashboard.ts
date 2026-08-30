@@ -1,18 +1,10 @@
 import type { SelectColor } from "./board";
 
-/**
- * Dashboard (SY-DSH-44).
- *
- * Three readings of the same record set — task progress, QA outcome and
- * deadlines. Every widget is a bucket count over boards the user may open, so
- * losing access to a board removes it from all three at once.
- */
+export type DashboardWidgetId = "tasks" | "qa" | "deadlines";
 
-export type DashboardWidgetId = "task" | "qa" | "deadline";
-
-export type TaskBucketId = "todo" | "doing" | "review" | "done";
-export type QaBucketId = "passed" | "failed" | "blocked";
-export type DeadlineBucketId = "overdue" | "today" | "thisWeek";
+export type TaskBucketId = "todo" | "inProgress" | "blocked" | "done";
+export type QaBucketId = "open" | "inTesting" | "passed" | "failed";
+export type DeadlineBucketId = "overdue" | "today" | "thisWeek" | "later" | "none";
 
 export type DashboardBucketId = TaskBucketId | QaBucketId | DeadlineBucketId;
 
@@ -23,7 +15,6 @@ export interface DashboardBucket {
   readonly color: SelectColor;
 }
 
-/** A board that contributed to a widget, so the count can be traced. */
 export interface DashboardSource {
   readonly nodeId: string;
   readonly name: string;
@@ -36,17 +27,12 @@ export interface DashboardWidget {
   readonly description: string;
   readonly buckets: readonly DashboardBucket[];
   readonly total: number;
-  /**
-   * Records the widget saw but could not place in one of its buckets — a task
-   * in a status no bucket claims. Reported rather than silently dropped.
-   */
   readonly unmapped: number;
   readonly sources: readonly DashboardSource[];
 }
 
 export interface DashboardSummary {
   readonly widgets: readonly DashboardWidget[];
-  /** No board the user can open holds any record — the onboarding case. */
   readonly isNewWorkspace: boolean;
   readonly boardCount: number;
   readonly recordCount: number;

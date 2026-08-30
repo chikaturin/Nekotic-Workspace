@@ -3,10 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { usePermissions } from "@/hooks/use-permissions";
+import { ANONYMOUS_USER, useCurrentUser } from "@/store/session-store";
 import { canToggleLock } from "@/lib/permissions";
 import { useOpenNode } from "@/hooks/use-open-node";
 import { hrefForNode } from "@/lib/tree";
-import { CURRENT_USER } from "@/mock/users";
 import { documentService } from "@/services/document-service";
 import { toAppError } from "@/services/errors";
 import { getActiveTree, selectTree, useWorkspaceStore } from "@/store/workspace-store";
@@ -15,12 +15,10 @@ import type { DocumentActionId, DriveNode, WorkspaceDocument } from "@/types";
 interface UseDocumentActionsInput {
   readonly node: DriveNode | null;
   readonly document: WorkspaceDocument | null;
-  /** Applies the service result back into the editor. */
   readonly onDocumentChanged: (document: WorkspaceDocument) => void;
 }
 
 export interface DocumentActions {
-  /** Action currently running, for spinners and disabled menu items. */
   readonly pending: DocumentActionId | null;
   readonly canToggleLock: boolean;
   readonly togglePin: () => Promise<void>;
@@ -31,10 +29,6 @@ export interface DocumentActions {
   readonly move: (targetFolderId: string | null) => void;
 }
 
-/**
- * Page-level actions. Every one of them goes through the service and reports
- * failures as feedback rather than throwing into a render.
- */
 export function useDocumentActions({
   node,
   document,
@@ -43,10 +37,11 @@ export function useDocumentActions({
   const router = useRouter();
   const openNode = useOpenNode();
   const can = usePermissions(node);
+  const me = useCurrentUser() ?? ANONYMOUS_USER;
   const [pending, setPending] = useState<DocumentActionId | null>(null);
 
   const tree = useWorkspaceStore(selectTree);
-  const duplicateNode = useWorkspaceStore((state) => state.duplicateNode);
+  const refreshTree = useWorkspaceStore((state) => state.hydrate);
   const moveNode = useWorkspaceStore((state) => state.moveNode);
   const trashNode = useWorkspaceStore((state) => state.trashNode);
   const pushFeedback = useWorkspaceStore((state) => state.pushFeedback);
@@ -80,7 +75,6 @@ export function useDocumentActions({
       const updated = await documentService.setLocked(
         document.nodeId,
         !document.isLocked,
-        CURRENT_USER,
       );
       onDocumentChanged(updated);
       pushFeedback(updated.isLocked ? "Page locked — editing is off" : "Page unlocked", "info");
@@ -90,20 +84,20 @@ export function useDocumentActions({
   const duplicate = useCallback(async () => {
     if (!document || !node) return;
     await run("duplicate", async () => {
-      const clone = duplicateNode(node.id);
-      if (!clone) throw new Error("The page could not be duplicated");
+      const clone = await documentService.duplicate(node.id);
 
-      await documentService.duplicate(document.nodeId, clone.id, clone.name);
+      await refreshTree();
       openNode(hrefForNode(getActiveTree(), clone.id));
     });
-  }, [document, node, duplicateNode, openNode, run]);
+  }, [document, node, openNode, refreshTree, run]);
 
   const setArchived = useCallback(
     async (isArchived: boolean) => {
       if (!document) return;
       await run(isArchived ? "archive" : "restore", async () => {
-        const updated = await documentService.setArchived(document.nodeId, isArchived);
-        onDocumentChanged(updated);
+        await documentService.setArchived(document.nodeId, isArchived);
+
+        onDocumentChanged(await documentService.get(document.nodeId));
         pushFeedback(isArchived ? "Page archived" : "Page restored", "info");
         if (isArchived) router.push("/archive");
       });
@@ -124,7 +118,6 @@ export function useDocumentActions({
     (targetFolderId: string | null) => {
       if (!node) return;
       moveNode(node.id, targetFolderId);
-      // The move changed the node's path, so its old URL is now stale too.
       openNode(hrefForNode(getActiveTree(), node.id));
     },
     [moveNode, node, openNode],
@@ -132,7 +125,7 @@ export function useDocumentActions({
 
   return {
     pending,
-    canToggleLock: document ? canToggleLock(can, document, CURRENT_USER) : false,
+    canToggleLock: document ? canToggleLock(can, document, me) : false,
     togglePin,
     toggleLock,
     duplicate,

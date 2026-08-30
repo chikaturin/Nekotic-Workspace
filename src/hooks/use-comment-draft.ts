@@ -2,19 +2,8 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
-const KEY_PREFIX = "nexdrop-comment-draft:";
+const KEY_PREFIX = "nekotic-comment-draft:";
 
-/**
- * Unsent comments, kept per composer.
- *
- * The PRD asks for exactly this: closing the drawer must not lose what you
- * were typing. Drafts are read through an external store rather than component
- * state, so switching to another record swaps the draft without a syncing
- * effect, and a viewer whose storage is blocked still gets a working composer
- * from the in-memory half.
- */
-
-/** Authoritative in-session copy; local storage is the persistence layer. */
 const drafts = new Map<string, string>();
 const listeners = new Set<() => void>();
 
@@ -30,7 +19,6 @@ function snapshot(draftKey: string): string {
   try {
     stored = window.localStorage.getItem(storageKey(draftKey)) ?? "";
   } catch {
-    /* private mode or blocked storage — the composer starts empty */
   }
 
   drafts.set(draftKey, stored);
@@ -51,13 +39,11 @@ function writeDraft(draftKey: string, value: string): void {
     if (value.trim().length === 0) window.localStorage.removeItem(storageKey(draftKey));
     else window.localStorage.setItem(storageKey(draftKey), value);
   } catch {
-    /* the draft still lives in the in-memory map for this session */
   }
 
   for (const listener of listeners) listener();
 }
 
-/** Current value of a draft, outside React — used to clear only what was sent. */
 export function peekCommentDraft(draftKey: string): string {
   return snapshot(draftKey);
 }
@@ -68,10 +54,6 @@ export interface CommentDraft {
   readonly clearDraft: () => void;
 }
 
-/**
- * `draftKey` is the target key, plus the root id for a reply composer, so a
- * half-written reply never overwrites a half-written top-level comment.
- */
 export function useCommentDraft(draftKey: string): CommentDraft {
   const draft = useSyncExternalStore(
     subscribe,

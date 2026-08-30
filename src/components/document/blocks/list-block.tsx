@@ -7,7 +7,6 @@ import type { FocusRequest, ListBlock as ListBlockModel } from "@/types";
 
 interface ListBlockProps {
   readonly block: ListBlockModel;
-  /** 1-based position within the current run of numbered items. */
   readonly ordinal: number;
   readonly onChange: (value: string) => void;
   readonly onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;

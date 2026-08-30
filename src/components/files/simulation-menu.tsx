@@ -24,10 +24,6 @@ const LIST_MODES: readonly { value: ListFailureMode; label: string }[] = [
 
 const LATENCIES: readonly LatencyProfile[] = ["fast", "normal", "slow"];
 
-/**
- * Mock-only switches that force each async state. Ships with the prototype so
- * loading, empty, error and denied screens can be reviewed without a backend.
- */
 export function SimulationMenu() {
   const { config, update } = useSimulation();
   const isActive =
@@ -35,21 +31,6 @@ export function SimulationMenu() {
 
   return (
     <DropdownMenu>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <DropdownMenuTrigger asChild>
-            <Button
-              size="icon"
-              variant={isActive ? "subtle" : "outline"}
-              aria-label="Simulation settings"
-            >
-              <FlaskConical className={isActive ? "text-accent" : undefined} />
-            </Button>
-          </DropdownMenuTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Simulate loading, error and permission states</TooltipContent>
-      </Tooltip>
-
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuLabel>Listing response</DropdownMenuLabel>
         {LIST_MODES.map((mode) => (

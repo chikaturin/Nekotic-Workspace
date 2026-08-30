@@ -19,11 +19,6 @@ interface BreadcrumbNavProps {
   readonly trail: BreadcrumbTrail;
 }
 
-/**
- * Dynamic path header — `NexDrop / Development / Backend / Payment`.
- * Deep paths collapse their middle into an overflow menu so the header never
- * pushes the search field off screen.
- */
 export function BreadcrumbNav({ trail }: BreadcrumbNavProps) {
   if (trail.length === 0) return null;
 

@@ -16,26 +16,8 @@ interface FolderTreeProps {
   readonly nodes: readonly DriveNode[];
 }
 
-/**
- * How many leaves a branch shows before it says how many it is holding back.
- *
- * The sidebar used to show containers only, which made every folder look like
- * it held nothing but more folders — a project whose entire contents were six
- * documents rendered as an empty twisty. Showing everything is the other
- * failure: a folder with two hundred files turns the nav into the drive, and
- * the structure it exists to show scrolls off the top.
- *
- * Three is enough to say what *kind* of thing lives in a branch, which is the
- * question a nav tree actually answers. The count that follows is the honest
- * part: it says there is more, and it goes to the drive listing where the rest
- * of it is.
- */
 const LEAF_PREVIEW = 3;
 
-/**
- * Dependency-free recursive tree. Depth is unbounded; each level animates its
- * own height so expanding deep branches never reflows the whole panel.
- */
 export function FolderTree({ nodes }: FolderTreeProps) {
   return <TreeLevel nodes={nodes} depth={0} parentHref={DRIVE_ROOT_PATH} />;
 }
@@ -52,9 +34,6 @@ function TreeLevel({ nodes, depth, parentHref }: TreeLevelProps) {
 
   const visible = nodes.filter((node) => !node.isTrashed && !isArchivedNode(node));
 
-  // Structure first and never truncated; contents after it, and capped. A tree
-  // that dropped a folder to make room for a file would be hiding the one thing
-  // it is for.
   const containers = visible.filter(isContainer);
   const leaves = visible.filter((node) => !isContainer(node));
   const shown = [...containers, ...leaves.slice(0, LEAF_PREVIEW)];
@@ -103,13 +82,6 @@ function TreeLevel({ nodes, depth, parentHref }: TreeLevelProps) {
   );
 }
 
-/**
- * "+12 more", opening the folder that holds them.
- *
- * It is a link rather than an expander on purpose: the drive listing sorts,
- * filters, selects and previews, and reproducing any of that in a 240px rail
- * would be building a second file browser inside the navigation for one.
- */
 function MoreRow({
   count,
   depth,

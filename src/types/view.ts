@@ -11,7 +11,6 @@ export interface SortState {
   readonly direction: SortDirection;
 }
 
-/** Non-drive destinations reachable from the sidebar. */
 export type SmartViewId =
   | "my-work"
   | "favorites"
@@ -27,21 +26,15 @@ export interface SmartView {
   readonly description: string;
 }
 
-/** Result of resolving a URL path against the workspace tree. */
 export interface DriveLocation {
-  /** Node addressed by the URL, or null when at the workspace root. */
   readonly node: DriveNode | null;
-  /** Ancestors from workspace root down to (and excluding) `node`. */
   readonly ancestors: readonly DriveNode[];
-  /** Items rendered in the working area. */
   readonly children: readonly DriveNode[];
-  /** True when the URL points at a segment that does not exist. */
   readonly isNotFound: boolean;
 }
 
 export interface SearchHit {
   readonly node: DriveNode;
-  /** Human-readable ancestor path, e.g. `Development / Backend`. */
   readonly path: string;
   readonly href: string;
 }

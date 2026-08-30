@@ -5,14 +5,6 @@ import {
   type PermissionModule,
 } from "@/types";
 
-/**
- * The permission catalogue (SY-RBC-42).
- *
- * One entry per key, and the module is *derived from the key* rather than
- * declared beside it — a key can therefore never be filed under a module it
- * does not belong to.
- */
-
 const LABELS: Readonly<Record<PermissionKey, readonly [string, string]>> = {
   "workspace.manage": ["Manage workspace", "Rename the workspace, change its plan and settings"],
   "workspace.settings.view": ["Open workspace settings", "See the workspace settings screen at all"],
@@ -62,7 +54,6 @@ const LABELS: Readonly<Record<PermissionKey, readonly [string, string]>> = {
   "secret.rotate": ["Rotate secrets", "Replace a secret value with a new one"],
 };
 
-/** First segment of the key — `board.column.create` lives under `board`. */
 export function moduleOf(key: PermissionKey): PermissionModule {
   return key.slice(0, key.indexOf(".")) as PermissionModule;
 }
@@ -98,7 +89,6 @@ export const PERMISSION_MODULES: readonly PermissionModule[] = [
   "secret",
 ];
 
-/** Catalogue grouped for the matrix, in the module order above. */
 export function permissionsByModule(): readonly {
   readonly module: PermissionModule;
   readonly label: string;
@@ -111,7 +101,6 @@ export function permissionsByModule(): readonly {
   }));
 }
 
-/** Human label for one key, used by the audit log and denial messages. */
 export function permissionLabel(key: PermissionKey): string {
   return PERMISSION_BY_KEY.get(key)?.label ?? key;
 }

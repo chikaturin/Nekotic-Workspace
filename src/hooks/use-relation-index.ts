@@ -1,16 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { cellOf } from "@/lib/cell-values";
 import { boardService } from "@/services/board-service";
-import type { BoardColumn } from "@/types";
+import type { BoardColumn, BoardRow } from "@/types";
 
 export interface RelationIndex {
-  /** Row id → label, across every board a relation column points at. */
   readonly labels: ReadonlyMap<string, string>;
-  /**
-   * True once every referenced board has answered. Until then a missing id is
-   * simply unknown — never rendered as deleted.
-   */
   readonly isResolved: boolean;
 }
 
@@ -22,44 +18,53 @@ interface Loaded {
   readonly index: RelationIndex;
 }
 
-/**
- * Resolves relation chips across boards.
- *
- * One request per target board rather than one per cell: a relation column
- * names its board, so a whole column resolves in a single call.
- */
-export function useRelationIndex(columns: readonly BoardColumn[]): RelationIndex {
-  const targetIds = useMemo(() => {
+export function useRelationIndex(input: {
+  readonly boardId: string;
+  readonly columns: readonly BoardColumn[];
+  readonly rows: readonly BoardRow[];
+}): RelationIndex {
+  const { boardId, columns, rows } = input;
+
+  const referencedIds = useMemo(() => {
+    const relationColumns = columns.filter((column) => column.type === "relation");
+
+    if (relationColumns.length === 0) return [];
+
     const ids = new Set<string>();
 
-    for (const column of columns) {
-      if (column.type === "relation" && column.config.boardId) ids.add(column.config.boardId);
+    for (const row of rows) {
+      for (const column of relationColumns) {
+        const cell = cellOf(row, column);
+
+        if (cell.kind !== "relation") continue;
+
+        for (const rowId of cell.rowIds) ids.add(rowId);
+      }
     }
 
     return [...ids].sort();
-  }, [columns]);
+  }, [columns, rows]);
 
-  const key = targetIds.join("|");
+  const key = referencedIds.join(",");
   const [loaded, setLoaded] = useState<Loaded | null>(null);
 
   useEffect(() => {
-    if (key.length === 0) return;
+    if (key.length === 0 || boardId === "") return undefined;
 
     const controller = new AbortController();
-    const ids = key.split("|");
 
-    Promise.all(ids.map((id) => boardService.relationIndex(id, controller.signal)))
-      .then((results) => {
+    boardService
+      .relationIndex(boardId, key.split(","), controller.signal)
+      .then((targets) => {
         if (controller.signal.aborted) return;
 
         const labels = new Map<string, string>();
-        for (const targets of results) {
-          for (const target of targets) {
-            labels.set(
-              target.rowId,
-              target.title ? `${target.displayId} · ${target.title}` : target.displayId,
-            );
-          }
+
+        for (const target of targets) {
+          labels.set(
+            target.rowId,
+            target.title ? `${target.displayId} · ${target.title}` : target.displayId,
+          );
         }
 
         setLoaded({ key, index: { labels, isResolved: true } });
@@ -69,8 +74,9 @@ export function useRelationIndex(columns: readonly BoardColumn[]): RelationIndex
       });
 
     return () => controller.abort();
-  }, [key]);
+  }, [key, boardId]);
 
   if (key.length === 0) return NO_TARGETS;
+
   return loaded?.key === key ? loaded.index : PENDING;
 }

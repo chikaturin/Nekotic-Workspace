@@ -1,6 +1,10 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { SessionGate } from "@/components/layout/session-gate";
 
-/** Every authenticated surface renders inside the workspace shell. */
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
-  return <AppShell>{children}</AppShell>;
+  return (
+    <SessionGate>
+      <AppShell>{children}</AppShell>
+    </SessionGate>
+  );
 }

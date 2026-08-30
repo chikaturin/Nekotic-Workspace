@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils";
 
 interface ProgressProps {
-  /** 0 – 1. */
   readonly value: number;
   readonly className?: string;
   readonly indicatorClassName?: string;

@@ -18,16 +18,11 @@ import { useWorkspaceStore } from "@/store/workspace-store";
 import type { FileNode } from "@/types";
 
 interface FileManagerProps {
-  /** Folder whose files are managed; null is the workspace root. */
   readonly folderId: string | null;
   readonly title: string;
   readonly description?: string;
 }
 
-/**
- * File management surface: upload (drop or browse), listing with metadata,
- * preview, download — plus every async state the workspace can produce.
- */
 export function FileManager({ folderId, title, description }: FileManagerProps) {
   const { state, isRefreshing, capabilities, reload } = useFileCatalog(folderId);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -50,7 +45,6 @@ export function FileManager({ folderId, title, description }: FileManagerProps) 
 
   const handleDownload = useCallback((node: FileNode) => void download(node), [download]);
 
-  /** Dropping files anywhere on the listing opens the full-page uploader. */
   const handleDroppedFiles = useCallback(
     (dropped: readonly File[]) => {
       setUploaderOpen(true);

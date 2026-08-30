@@ -22,6 +22,7 @@ import {
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { Board, BoardColumn, BoardColumnOf, BoardRow, SavedView, ViewFilter } from "@/types";
 import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
+import { boardFake } from "./msw/fake/board.fake";
 
 const WORKSPACE_ID = "ws_test";
 const BOUNDS = { rowCount: 10, columnCount: 4 };
@@ -29,7 +30,6 @@ const BOUNDS = { rowCount: 10, columnCount: 4 };
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-  boardService.reset();
   useGridStore.getState().reset();
 
   useWorkspaceStore.setState({
@@ -267,7 +267,7 @@ describe("board service schema and collaboration endpoints", () => {
     const renamed = await boardService.updateColumn(current.id, created.id, { name: "Field notes" });
     expect(renamed.name).toBe("Field notes");
 
-    const reordered = await boardService.reorderColumn(current.id, created.id, 0);
+    const reordered = await boardFake.reorderColumn(current.id, created.id, 0);
     expect(reordered[0]?.id).toBe(created.id);
 
     const afterDelete = await boardService.deleteColumn(current.id, created.id);

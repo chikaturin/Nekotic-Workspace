@@ -2,32 +2,20 @@
 
 import { create } from "zustand";
 import { refKey } from "@/lib/entity-ref";
-import { CURRENT_USER } from "@/mock/users";
 import { toAppError } from "@/services/errors";
 import { watchService } from "@/services/watch-service";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { EntityRef, WatchEntry } from "@/types";
 
-/**
- * What the signed-in user follows (CO-WAT-28).
- *
- * The set of watched keys is kept as a `Record<string, true>` so a button can
- * subscribe to one boolean instead of to the whole list — toggling a watch
- * re-renders that button, not every row on screen.
- */
-
 interface WatchState {
   readonly entries: readonly WatchEntry[];
   readonly watching: Readonly<Record<string, true>>;
   readonly isLoaded: boolean;
-  /** Keys with a write in flight, so the button can disable itself. */
   readonly pending: Readonly<Record<string, true>>;
 }
 
 interface WatchActions {
-  /** Loads once; later callers are no-ops until `refresh` asks for a re-read. */
   load: () => Promise<void>;
-  /** Re-read the authoritative list — after a write the service made on its own. */
   refresh: () => Promise<void>;
   toggle: (ref: EntityRef) => Promise<void>;
 }
@@ -48,18 +36,11 @@ export const useWatchStore = create<WatchStore>()((set, get) => ({
     await get().refresh();
   },
 
-  /**
-   * Posting a comment makes the author a watcher server-side. Nothing else
-   * would tell the button about it, so the caller re-reads rather than the
-   * store inventing a rule that could drift from the service's.
-   */
   refresh: async () => {
     try {
-      const entries = await watchService.list(CURRENT_USER.id);
+      const entries = await watchService.list();
       set({ entries, watching: indexOf(entries), isLoaded: true });
     } catch {
-      // A failed load leaves every button in its "not watching" default; the
-      // next toggle re-reads the authoritative list anyway.
       set({ isLoaded: true });
     }
   },
@@ -77,11 +58,7 @@ export const useWatchStore = create<WatchStore>()((set, get) => ({
     }));
 
     try {
-      const entries = await watchService.setWatching({
-        ref,
-        userId: CURRENT_USER.id,
-        isWatching: next,
-      });
+      const entries = await watchService.setWatching(ref, next);
 
       set({ entries, watching: indexOf(entries) });
       useWorkspaceStore
@@ -115,9 +92,6 @@ function writeFlag(
   return next;
 }
 
-/* -------------------------------------------------------------- selectors */
-
-/** One boolean per target — the only thing a watch button needs. */
 export const selectIsWatching = (key: string) => (state: WatchStore) =>
   Boolean(state.watching[key]);
 

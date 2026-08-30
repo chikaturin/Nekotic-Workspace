@@ -8,13 +8,11 @@ import { selectActiveWorkspace, selectTree, useWorkspaceStore } from "@/store/wo
 import { isContainer } from "@/types";
 
 export interface CurrentTarget {
-  /** Container that create/upload actions write into — null means root. */
   readonly targetId: string | null;
   readonly targetName: string;
   readonly segments: readonly string[];
 }
 
-/** Path segments of the current drive route, or an empty list elsewhere. */
 export function useDriveSegments(): readonly string[] {
   const pathname = usePathname();
 
@@ -32,10 +30,6 @@ export function useDriveSegments(): readonly string[] {
   }, [pathname]);
 }
 
-/**
- * Resolve the folder the user is currently looking at. Used by the sidebar and
- * header so "New" and "Upload" always land in the visible location.
- */
 export function useCurrentTarget(): CurrentTarget {
   const segments = useDriveSegments();
   const tree = useWorkspaceStore(selectTree);

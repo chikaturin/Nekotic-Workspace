@@ -1,9 +1,5 @@
 import type { Grid } from "@/lib/grid";
 
-/**
- * Deterministic workbook content for spreadsheet fixtures that ship without
- * bytes, so the grid has something real to show and edit.
- */
 const HEADERS: readonly string[] = ["Item", "Owner", "Q3", "Q4", "Status"];
 const OWNERS: readonly string[] = ["Khanh Luu", "Mai Tran", "Duc Pham", "Lan Nguyen", "Hai Vo"];
 const STATUSES: readonly string[] = ["On track", "At risk", "Done", "Planned"];

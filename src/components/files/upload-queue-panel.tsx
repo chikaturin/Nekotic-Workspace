@@ -9,10 +9,6 @@ import { useUploads } from "@/hooks/use-uploads";
 import { formatCount } from "@/lib/format";
 import { useUploadStore } from "@/store/upload-store";
 
-/**
- * Global upload tray. Uploads keep running while the user navigates, so their
- * progress has to live outside any one screen.
- */
 export function UploadQueuePanel() {
   const { tasks, summary, hasActive, isPanelOpen } = useUploads();
   const setPanelOpen = useUploadStore((state) => state.setPanelOpen);

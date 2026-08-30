@@ -19,13 +19,6 @@ interface ConvertColumnDialogProps {
   readonly onClose: () => void;
 }
 
-/**
- * Type conversion, previewed before it runs.
- *
- * Values the target type cannot parse are never dropped: they are kept as text
- * on the new value and flagged in the cell, which is the behaviour the PRD
- * calls for when Text becomes Date.
- */
 export function ConvertColumnDialog({
   column,
   targetType,

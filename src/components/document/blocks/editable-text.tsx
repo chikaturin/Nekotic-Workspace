@@ -15,14 +15,9 @@ interface EditableTextProps {
   readonly placeholder: string;
   readonly className?: string;
   readonly ariaLabel: string;
-  /** Present while the slash menu is open, wiring up the combobox pattern. */
   readonly menu?: { readonly listboxId: string; readonly activeOptionId: string | null };
 }
 
-/**
- * One editable line. The caret contract lives in `useContentEditable`; this
- * component only owns presentation and forwards key events upwards.
- */
 export function EditableText({
   blockId,
   value,

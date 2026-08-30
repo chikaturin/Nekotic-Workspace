@@ -8,7 +8,8 @@ import {
   EMPTY_VALUE_LABEL,
   groupActivityByDay,
 } from "@/lib/activity";
-import { boardIdFor, boardService } from "@/services/board-service";
+import { boardService } from "@/services/board-service";
+import { boardIdFor } from "./msw/fake/board.fake";
 import { commentService } from "@/services/comment-service";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { rowRef } from "@/lib/entity-ref";
@@ -16,7 +17,7 @@ import { directoryAt } from "@/mock/users";
 import { useBoardStore } from "@/store/board-store";
 import { useWorkspaceStore } from "@/store/workspace-store";
 import type { ActivityEntry, BoardColumnOf } from "@/types";
-import { buildTestTree, ID, TEST_WORKSPACE } from "./helpers";
+import { buildTestTree, csvFile, ID, mapToColumns, TEST_WORKSPACE } from "./helpers";
 
 /**
  * SY-ACT-40 — record history.
@@ -59,8 +60,6 @@ const entry = (overrides: Partial<ActivityEntry>): ActivityEntry => ({
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-  boardService.reset();
-  commentService.reset();
 
   useWorkspaceStore.setState({
     workspaces: [TEST_WORKSPACE],
@@ -193,9 +192,15 @@ describe("what the log records", () => {
 
   test("an imported record starts with its own history", async () => {
     const board = await loadBoard();
-    const [created] = await boardService.importRows({ boardId: board.id, rows: [{}] });
+    const titleId = board.columns.find((column) => column.name === "Title")!.id;
+    const outcome = await boardService.importRows({
+      boardId: board.id,
+      file: csvFile("one.csv", [["Title"], ["From a file"]]),
+      mappings: mapToColumns([titleId]),
+      invalidPolicy: "skip",
+    });
 
-    const history = await boardService.listActivity(board.id, created!.id);
+    const history = await boardService.listActivity(board.id, outcome.rowIds[0]!);
     expect(history.some((item) => item.kind === "imported")).toBe(true);
   });
 

@@ -1,13 +1,5 @@
 import type { SearchGroup, SearchResult, SearchResultKind } from "@/types";
 
-/**
- * Ranking and grouping for global search.
- *
- * Scoring is deliberately explainable rather than fuzzy: an exact hit beats a
- * prefix, a prefix beats a word start, a word start beats a loose substring.
- * The result order is therefore reproducible in a test.
- */
-
 export const SEARCH_GROUP_ORDER: readonly SearchResultKind[] = [
   "document",
   "api",
@@ -35,7 +27,6 @@ const PREFIX = 70;
 const WORD_START = 50;
 const SUBSTRING = 30;
 
-/** 0 means "no match" — callers drop anything that scores zero. */
 export function scoreMatch(haystack: string, needle: string): number {
   const text = haystack.trim().toLowerCase();
   const query = needle.trim().toLowerCase();
@@ -51,7 +42,6 @@ export function scoreMatch(haystack: string, needle: string): number {
   return /[\s/_\-.:]/.test(preceding) ? WORD_START : SUBSTRING;
 }
 
-/** A short window of text around the match, for comment and long-text hits. */
 export function snippetAround(text: string, needle: string, radius = 48): string {
   const at = text.toLowerCase().indexOf(needle.trim().toLowerCase());
   if (at < 0) return text.slice(0, radius * 2).trim();
@@ -62,10 +52,6 @@ export function snippetAround(text: string, needle: string, radius = 48): string
   return `${from > 0 ? "…" : ""}${text.slice(from, to).trim()}${to < text.length ? "…" : ""}`;
 }
 
-/**
- * Bucket results by kind in the fixed group order, best score first inside
- * each group, capped so one noisy board cannot crowd out every other kind.
- */
 export function groupResults(
   results: readonly SearchResult[],
   limitPerGroup: number,
@@ -100,7 +86,6 @@ export function totalResults(groups: readonly SearchGroup[]): number {
   return groups.reduce((total, group) => total + group.results.length, 0);
 }
 
-/** Flat list in render order — what the palette's keyboard navigation walks. */
 export function flattenGroups(groups: readonly SearchGroup[]): readonly SearchResult[] {
   return groups.flatMap((group) => group.results);
 }

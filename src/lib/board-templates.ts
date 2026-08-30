@@ -9,22 +9,10 @@ import type {
   TransitionRules,
 } from "@/types";
 
-/**
- * Board blueprints.
- *
- * A template is inert data: `instantiateTemplate` deep-copies everything it
- * hands out, so a board can add, rename or delete columns without the template
- * it came from ever changing — the acceptance criterion for DV-TMP-19.
- */
-
 function options(values: readonly (readonly [string, SelectOption["color"]])[], prefix: string) {
   return values.map(([label, color], index) => ({ id: `${prefix}_${index}`, label, color }));
 }
 
-/**
- * The three deployment labels, defined once (DV-ENV-21). Bug, QA, API and the
- * config document all point at this list rather than re-declaring it.
- */
 export const ENVIRONMENT_OPTIONS: readonly SelectOption[] = options(
   [
     ["Development", "cyan"],
@@ -36,7 +24,6 @@ export const ENVIRONMENT_OPTIONS: readonly SelectOption[] = options(
 
 export const PRODUCTION_OPTION_ID = "env_2";
 
-/** HTTP verbs carry their own colour so a method reads at a glance. */
 export const METHOD_OPTIONS: readonly SelectOption[] = options(
   [
     ["GET", "green"],
@@ -48,8 +35,6 @@ export const METHOD_OPTIONS: readonly SelectOption[] = options(
   "method",
 );
 
-/* ------------------------------------------------------------- builders */
-
 interface ColumnSpec {
   readonly id: string;
   readonly name: string;
@@ -59,12 +44,7 @@ interface ColumnSpec {
   readonly options?: readonly SelectOption[];
   readonly isMulti?: boolean;
   readonly includesTime?: boolean;
-  /**
-   * Which options mean "finished". Subtask progress is measured against these,
-   * so completion is a setting on the board rather than a label match in code.
-   */
   readonly completedOptionIds?: readonly string[];
-  /** Seed rules the user can then edit, disable or replace entirely. */
   readonly transitionRules?: TransitionRules;
 }
 
@@ -101,13 +81,6 @@ function schema(specs: readonly ColumnSpec[]): readonly BoardColumn[] {
   return specs.map(column);
 }
 
-/**
- * A transition table, written as "from → allowed targets".
- *
- * Templates ship a sensible starting graph; it is ordinary configuration from
- * the moment the board exists, and the user can rewrite or switch it off. No
- * code path anywhere depends on the pairs declared here.
- */
 function transitions(
   table: Readonly<Record<string, readonly string[]>>,
   enabled = false,
@@ -115,7 +88,6 @@ function transitions(
   return { enabled, mode: "allow-list", transitions: table };
 }
 
-/** `Field is empty` — the one condition the seeded rules need. */
 function whenEmpty(id: string, columnId: string): ConditionGroup {
   return {
     id,
@@ -124,8 +96,6 @@ function whenEmpty(id: string, columnId: string): ConditionGroup {
     groups: [],
   };
 }
-
-/* ------------------------------------------------------------ templates */
 
 const TASK: BoardTemplate = {
   id: "task",
@@ -140,9 +110,6 @@ const TASK: BoardTemplate = {
       name: "Status",
       type: "select",
       width: 150,
-      // "Done" is only offered while nothing is blocking the record. The rule
-      // is data on the option, editable under Options & rules — the Select
-      // component itself knows nothing about blocking.
       options: options(
         [
           ["To do", "gray"],
@@ -158,8 +125,6 @@ const TASK: BoardTemplate = {
           : option,
       ),
       completedOptionIds: ["status_4"],
-      // Off by default: a board should behave exactly as it always has until
-      // someone opts into the rules.
       transitionRules: transitions({
         status_0: ["status_1", "status_3"],
         status_1: ["status_2", "status_3", "status_0"],
@@ -244,8 +209,6 @@ const BUG: BoardTemplate = {
         "status",
       ),
       completedOptionIds: ["status_4", "status_5"],
-      // A defect walks the ladder: nothing jumps from New straight to
-      // Verified. Seeded, disabled, and entirely the user's to change.
       transitionRules: transitions({
         status_0: ["status_1", "status_5"],
         status_1: ["status_2", "status_5"],
@@ -338,10 +301,6 @@ const QA: BoardTemplate = {
   ],
 };
 
-/**
- * DV-API-20. `API ID` is the board's own row identifier (`API-001`), so it is a
- * prefix rather than a column — one source of truth for the reference code.
- */
 const API_DOCS: BoardTemplate = {
   id: "apiDocs",
   name: "API documentation",
@@ -418,7 +377,6 @@ export function templateById(id: string | undefined): BoardTemplate | null {
   return id && id in CATALOG ? CATALOG[id as BoardTemplateId] : null;
 }
 
-/** Columns of a template, deep-copied so the board owns every object it holds. */
 export function instantiateColumns(template: BoardTemplate): readonly BoardColumn[] {
   return template.columns.map((source) => {
     const copy = { ...source } as BoardColumn;
@@ -426,8 +384,6 @@ export function instantiateColumns(template: BoardTemplate): readonly BoardColum
     if (copy.type === "select") {
       const { transitionRules, completedOptionIds } = copy.config;
 
-      // Every nested structure is copied too: a board must be able to rewrite
-      // its own rules without the template it came from ever changing.
       return {
         ...copy,
         config: {
@@ -457,7 +413,6 @@ export function instantiateColumns(template: BoardTemplate): readonly BoardColum
   });
 }
 
-/** Freeze the catalog so an accidental in-place write fails loudly in dev. */
 for (const template of BOARD_TEMPLATES) {
   Object.freeze(template);
   Object.freeze(template.columns);

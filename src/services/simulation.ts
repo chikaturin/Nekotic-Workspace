@@ -1,16 +1,10 @@
-/**
- * Mock-only failure switches. The real services would never ship this, but the
- * UI must prove it renders every state — so the states are triggerable.
- */
 export type ListFailureMode = "none" | "network" | "permission" | "empty";
 
 export type LatencyProfile = "fast" | "normal" | "slow";
 
 export interface SimulationConfig {
   readonly listFailure: ListFailureMode;
-  /** Force every upload to fail; individual files can also opt in by name. */
   readonly failUploads: boolean;
-  /** Force every document save to fail. */
   readonly failSaves: boolean;
   readonly latency: LatencyProfile;
 }
@@ -49,25 +43,16 @@ export function subscribeSimulation(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-/** Files whose name contains this marker always fail to upload. */
 export const UPLOAD_FAILURE_MARKER = "fail";
 
 export function shouldFailUpload(fileName: string): boolean {
   return config.failUploads || fileName.toLowerCase().includes(UPLOAD_FAILURE_MARKER);
 }
 
-/**
- * Documents whose title contains the marker always fail to save.
- *
- * Only ever call this with an *identifier* — a file name, a board name, a
- * document title. Applying it to free-form prose would make "the check is
- * failing" an unpostable sentence.
- */
 export function shouldFailSave(title: string): boolean {
   return config.failSaves || title.toLowerCase().includes(UPLOAD_FAILURE_MARKER);
 }
 
-/** Failure switch for writes that carry no identifier — comments, for one. */
 export function shouldFailWrite(): boolean {
   return config.failSaves;
 }

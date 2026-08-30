@@ -3,6 +3,7 @@
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BulkActionBar } from "@/components/board/bulk/bulk-action-bar";
+import { useBoardPeople } from "@/hooks/use-board-people";
 import { GridHeader, type SelectionState } from "@/components/board/table/grid-header";
 import { GridRow } from "@/components/board/table/grid-row";
 import { GroupHeader } from "@/components/board/table/group-header";
@@ -11,6 +12,7 @@ import { ConvertColumnDialog } from "@/components/board/table/convert-column-dia
 import { CellDetailDialog } from "@/components/board/cells/cell-detail-dialog";
 import { useBulkActions } from "@/hooks/use-bulk-actions";
 import { useGridClipboard } from "@/hooks/use-grid-clipboard";
+import { useGridFill } from "@/hooks/use-grid-fill";
 import { useGridKeyboard } from "@/hooks/use-grid-keyboard";
 import { useVirtualRows } from "@/hooks/use-virtual-rows";
 import type { BoardViewModel } from "@/hooks/use-board-view";
@@ -39,26 +41,15 @@ import type {
 
 interface TableGridProps {
   readonly model: BoardViewModel;
-  /** Folder that attachment uploads land in — the board's own folder. */
   readonly folderId: string | null;
-  /** Rows a board-level validation has flagged. */
   readonly warnedRowIds?: ReadonlySet<string>;
-  /** Bound permission resolver for this board (SY-RBC-42). */
   readonly can: PermissionResolver;
-  /** Opens the export dialog already scoped to the ticked records. */
   readonly onExportSelection: () => void;
 }
 
 const NO_WARNINGS: ReadonlySet<string> = new Set();
 const EMPTY_DISPLAY: Readonly<Record<string, CellDisplayMode>> = {};
 
-/**
- * The table view.
- *
- * Rows are virtualised (only the visible window is mounted), widths live in CSS
- * variables (a resize drag mutates the DOM, not React state) and every cell
- * subscribes to its own record, so editing one cell touches one row.
- */
 export function TableGrid({
   model,
   folderId,
@@ -75,7 +66,7 @@ export function TableGrid({
   const createOption = useBoardStore((state) => state.createOption);
   const addRow = useBoardStore((state) => state.addRow);
   const commitColumnWidth = useBoardStore((state) => state.commitColumnWidth);
-  const people = useBoardStore((state) => state.people);
+  const people = useBoardPeople();
   const rowsById = useBoardStore((state) => state.rowsById);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -84,10 +75,6 @@ export function TableGrid({
     type: ColumnType;
   } | null>(null);
 
-  /**
-   * The view's row order, for shift-click ranges. It lives in a ref because it
-   * changes on every edit and `shared` must not.
-   */
   const orderedRef = useRef<readonly string[]>([]);
 
   const collapsed = useGridStore(selectCollapsedGroups(view?.id ?? null));
@@ -99,17 +86,6 @@ export function TableGrid({
   const bulk = useBulkActions(model);
   const isReadOnly = !can("row.update");
 
-
-
-  /**
-   * Grouped and ungrouped take the same path: one flat, uniform-height list of
-   * group headers and records, which is what the window maths needs.
-   */
-  /**
-   * How a list of row ids becomes rows on screen. Under "nested" a parent
-   * brings its visible children with it, indented; the other two modes are
-   * plain filters the view model already applied, so they lay out flat.
-   */
   const expand = useMemo<RowExpander>(
     () => (ids) =>
       layoutHierarchy({
@@ -131,10 +107,6 @@ export function TableGrid({
 
   const displayModes = useMemo(() => view?.columnDisplay ?? EMPTY_DISPLAY, [view?.columnDisplay]);
 
-  /**
-   * The columns that can make a row taller than one line. Almost always none,
-   * and when it is none the grid takes the uniform path it always has.
-   */
   const flexible = useMemo(
     () =>
       columnsShown.filter(
@@ -143,14 +115,6 @@ export function TableGrid({
     [columnsShown, displayModes],
   );
 
-  /**
-   * A height per rendered line, computed from the text rather than measured.
-   *
-   * Group headers keep the view's own height; a record takes the tallest of its
-   * flexible columns. This runs when the rows, the columns or the modes change
-   * — not per frame, and not per render — and it touches no DOM at all, which
-   * is what lets the virtualiser place a row it has never mounted.
-   */
   const heights = useMemo(() => {
     if (flexible.length === 0) return null;
 
@@ -178,7 +142,6 @@ export function TableGrid({
     heights,
   });
 
-  /** Keyboard moves by record; the scroller works in flat positions. */
   const scrollToRecord = useCallback(
     (recordIndex: number) => scrollToIndex(flattened.flatIndexByRecord[recordIndex] ?? recordIndex),
     [scrollToIndex, flattened.flatIndexByRecord],
@@ -202,6 +165,90 @@ export function TableGrid({
     [createOption],
   );
 
+  const recordIndexAt = useCallback(
+    (offsetY: number): number | null => {
+      const flat = flattened.flat;
+
+      if (flat.length === 0) return null;
+
+      let flatIndex: number;
+
+      if (heights) {
+        let cursor = 0;
+        flatIndex = 0;
+
+        while (
+          flatIndex < flat.length - 1 &&
+          cursor + (heights[flatIndex] ?? rowHeight) <= offsetY
+        ) {
+          cursor += heights[flatIndex] ?? rowHeight;
+          flatIndex += 1;
+        }
+      } else {
+        flatIndex = Math.min(Math.max(Math.floor(offsetY / rowHeight), 0), flat.length - 1);
+      }
+
+      const entry = flat[flatIndex];
+
+      if (!entry || entry.kind === "group") return null;
+
+      const record = flattened.flatIndexByRecord.indexOf(flatIndex);
+
+      return record === -1 ? null : record;
+    },
+    [flattened.flat, flattened.flatIndexByRecord, heights, rowHeight],
+  );
+
+  const columnAt = useCallback(
+    (clientX: number): number | null => {
+      const scroller = scrollRef.current;
+
+      if (!scroller) return null;
+
+      const cells = scroller.querySelectorAll<HTMLElement>('[role="gridcell"]');
+      let rightmost: { index: number; right: number } | null = null;
+
+      for (const cell of cells) {
+        const raw = cell.getAttribute("aria-colindex");
+
+        if (raw === null) continue;
+
+        const index = Number(raw) - 1;
+        const rect = cell.getBoundingClientRect();
+
+        if (clientX >= rect.left && clientX < rect.right) return index;
+
+        if (!rightmost || rect.right > rightmost.right) {
+          rightmost = { index, right: rect.right };
+        }
+      }
+
+      return rightmost && clientX >= rightmost.right ? rightmost.index : null;
+    },
+    [scrollRef],
+  );
+
+  const slice = useMemo(
+    () => ({ rowIds, columns: columnsShown, rowsById, context }),
+    [rowIds, columnsShown, rowsById, context],
+  );
+
+  const { onCopy, onCut, onPaste, clearSelection } = useGridClipboard(slice, isReadOnly);
+
+  const bounds = useMemo(
+    () => ({ rowCount: rowIds.length, columnCount: columnsShown.length }),
+    [rowIds.length, columnsShown.length],
+  );
+
+  const { onHandlePointerDown } = useGridFill({
+    slice,
+    bounds,
+    recordIndexAt,
+    scrollRef,
+    columnAt,
+    isReadOnly,
+  });
+
   const shared = useMemo<GridShared>(
     () => ({
       boardId: board?.id ?? "",
@@ -210,6 +257,7 @@ export function TableGrid({
       people,
       context,
       columns: columnsShown,
+      bounds,
       rowHeight,
       displayModes,
       warnedRowIds,
@@ -218,6 +266,7 @@ export function TableGrid({
       onToggleRow,
       onCreateOption,
       onCommitCell,
+      onFillPointerDown: isReadOnly ? null : onHandlePointerDown,
     }),
     [
       board,
@@ -225,6 +274,7 @@ export function TableGrid({
       people,
       context,
       columnsShown,
+      bounds,
       rowHeight,
       displayModes,
       warnedRowIds,
@@ -233,14 +283,10 @@ export function TableGrid({
       onToggleRow,
       onCreateOption,
       onCommitCell,
+      onHandlePointerDown,
     ],
   );
 
-  /**
-   * How much of what is on screen is ticked. Derived from the view's own row
-   * ids, so "select all" means "all the records you can see", not every record
-   * a filter is hiding.
-   */
   const selectionState = useMemo<SelectionState>(() => {
     if (rowIds.length === 0) return "none";
 
@@ -249,15 +295,6 @@ export function TableGrid({
     return ticked === rowIds.length ? "all" : "some";
   }, [rowIds, selectedMap]);
 
-  /**
-   * The header is memoised, so its callbacks have to be stable too: an inline
-   * arrow here re-renders every column header on every keystroke in a cell.
-   */
-  /**
-   * Reads the row ids through the ref rather than the controller: the query
-   * returns a fresh array on every cell edit, and depending on it here would
-   * re-render every column header on every keystroke.
-   */
   const onToggleAll = useCallback(() => {
     const grid = useGridStore.getState();
     if (selectionState === "all") grid.clearRowSelection();
@@ -274,13 +311,6 @@ export function TableGrid({
     [setColumnDisplay],
   );
 
-  /**
-   * Fit a column to what is in it.
-   *
-   * Measured over the records the view is showing, not the whole board: the
-   * width that suits what you are looking at is the useful answer, and it keeps
-   * the pass bounded by the filter rather than by the record count.
-   */
   const onAutoFitWidth = useCallback(
     (columnId: string) => {
       const column = columnsShown.find((candidate) => candidate.id === columnId);
@@ -296,18 +326,6 @@ export function TableGrid({
     [columnsShown, rowsById, context, commitColumnWidth],
   );
 
-  const slice = useMemo(
-    () => ({ rowIds, columns: columnsShown, rowsById, context }),
-    [rowIds, columnsShown, rowsById, context],
-  );
-
-  const { onCopy, onCut, onPaste, clearSelection } = useGridClipboard(slice, isReadOnly);
-
-  const bounds = useMemo(
-    () => ({ rowCount: rowIds.length, columnCount: columnsShown.length }),
-    [rowIds.length, columnsShown.length],
-  );
-
   const onKeyDown = useGridKeyboard({
     bounds,
     rowIds,
@@ -321,7 +339,6 @@ export function TableGrid({
     orderedRef.current = rowIds;
   }, [rowIds]);
 
-  /** A drag selection ends wherever the pointer is released. */
   useEffect(() => {
     const stop = () => useGridStore.getState().endDragSelect();
     window.addEventListener("pointerup", stop);
@@ -343,7 +360,6 @@ export function TableGrid({
     [commitColumnWidth],
   );
 
-  // Only materialised while the conversion dialog is open — it walks every row.
   const conversionRows = useMemo(
     () =>
       conversion
@@ -356,7 +372,6 @@ export function TableGrid({
 
   const visible = flattened.flat.slice(range.start, range.end);
 
-  /** The height of one rendered line, by its position in the flat list. */
   const heightAt = (index: number) => heights?.[index] ?? rowHeight;
 
   return (
@@ -388,8 +403,6 @@ export function TableGrid({
             displayModes={displayModes}
             onSetDisplayMode={onSetDisplayMode}
             onAutoFitWidth={onAutoFitWidth}
-            // A partial selection extends to everything on screen; only a full
-            // one clears, because the bar already carries its own dismiss.
             onToggleAll={onToggleAll}
             onConvert={onConvert}
             onResizePreview={previewResize}
@@ -476,13 +489,6 @@ interface GridDetailReaderProps {
   readonly isReadOnly: boolean;
 }
 
-/**
- * The grid's one detail reader.
- *
- * A separate component purely so the subscription lives here: opening a reader
- * changes `detailCell`, and had `TableGrid` been the subscriber every mounted
- * row would have re-rendered to show a dialog none of them draw.
- */
 function GridDetailReader({ rowsById, columns, context, isReadOnly }: GridDetailReaderProps) {
   const detailCell = useGridStore((state) => state.detailCell);
   const closeDetail = useGridStore((state) => state.closeDetail);
@@ -492,20 +498,12 @@ function GridDetailReader({ rowsById, columns, context, isReadOnly }: GridDetail
     ? columns.find((candidate) => candidate.id === detailCell.columnId)
     : undefined;
 
-  /**
-   * A reader whose record or column has gone — deleted, filtered away, or on a
-   * board that has since been swapped — is closed rather than left pointing at
-   * nothing. Otherwise it renders shut while still "open", and reappears by
-   * itself the moment a filter brings the row back.
-   */
   const isOrphaned = detailCell !== null && (!row || !column);
 
   useEffect(() => {
     if (isOrphaned) closeDetail();
   }, [isOrphaned, closeDetail]);
 
-  // Archived records are read-only however writable the board is, so the
-  // hand-over to an editor is offered against the record, not the board.
   const canEdit = Boolean(row) && !isReadOnly && !isRowArchived(row!);
 
   return (

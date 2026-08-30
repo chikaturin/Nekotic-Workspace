@@ -8,15 +8,6 @@ interface GanttTimelineHeaderProps {
   readonly height: number;
 }
 
-/**
- * The time scale, in two rows.
- *
- * The upper row names the month; the lower one names the columns inside it. A
- * single row of "17 Aug · 24 Aug · 31 Aug" makes the reader carry the month in
- * their head and gives them nothing to hold on to when they scroll into the
- * next one — naming the span above the columns is what turns a row of dates
- * into a calendar.
- */
 export function GanttTimelineHeader({ scale, height }: GanttTimelineHeaderProps) {
   const { dayWidth, bands, ticks, todayOffset } = scale;
   const rowHeight = height / 2;
@@ -49,7 +40,6 @@ export function GanttTimelineHeader({ scale, height }: GanttTimelineHeaderProps)
           </div>
         ))}
 
-        {/* The line starts here, so the reader sees where "now" enters the chart. */}
         <div
           aria-hidden
           style={{ left: todayOffset * dayWidth }}

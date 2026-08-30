@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/ui/select-field";
 import type { AuditFilters as Filters } from "@/hooks/use-audit-log";
 import { AUDIT_MODULES, AUDIT_MODULE_LABELS, SEVERITIES, SEVERITY_LABELS } from "@/lib/audit";
-import { MEMBERS } from "@/mock/users";
+import { useDirectory } from "@/hooks/use-directory";
 import type { AuditModule, AuditSeverity } from "@/types";
 
 interface AuditFiltersProps {
@@ -16,8 +16,9 @@ interface AuditFiltersProps {
   readonly onClear: () => void;
 }
 
-/** Narrowing the trail. Filtering is the only thing anyone can do to it. */
 export function AuditFilters({ filters, isFiltered, onChange, onClear }: AuditFiltersProps) {
+  const directory = useDirectory();
+
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
       <div className="relative min-w-52 flex-1">
@@ -63,7 +64,7 @@ export function AuditFilters({ filters, isFiltered, onChange, onClear }: AuditFi
         onChange={(event) => onChange("actorId", event.target.value)}
       >
         <option value="all">Anyone</option>
-        {MEMBERS.map((member) => (
+        {directory.map((member) => (
           <option key={member.id} value={member.id}>
             {member.name}
           </option>

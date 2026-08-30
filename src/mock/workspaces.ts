@@ -5,9 +5,9 @@ const GIGABYTE = 1024 ** 3;
 
 export const WORKSPACES: readonly Workspace[] = [
   {
-    id: "ws_nexdrop",
+    id: "ws_nekotic",
     name: "Nekotic Workspace",
-    slug: "nexdrop",
+    slug: "nekotic",
     plan: "team",
     badge: "ND",
     color: "var(--accent)",
@@ -25,8 +25,6 @@ export const WORKSPACES: readonly Workspace[] = [
     storage: { usedBytes: 9 * GIGABYTE, totalBytes: 15 * GIGABYTE },
   },
   {
-    // Deliberately empty, so the dashboard's first-run state (SY-DSH-44) is a
-    // place you can actually stand rather than a branch nobody ever reaches.
     id: "ws_atlas",
     name: "Atlas",
     slug: "atlas",
@@ -40,4 +38,4 @@ export const WORKSPACES: readonly Workspace[] = [
   },
 ] as const;
 
-export const DEFAULT_WORKSPACE_ID = "ws_nexdrop";
+export const DEFAULT_WORKSPACE_ID = "ws_nekotic";

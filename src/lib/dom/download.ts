@@ -1,11 +1,4 @@
-/**
- * Handing bytes to the browser.
- *
- * One place owns the anchor dance so every download — a stored file, an
- * exported board — behaves the same and revokes what it allocates.
- */
 
-/** Point the browser at a URL it should save rather than navigate to. */
 export function triggerDownload(url: string, fileName: string): void {
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -17,10 +10,6 @@ export function triggerDownload(url: string, fileName: string): void {
   anchor.remove();
 }
 
-/**
- * Save bytes we generated ourselves. The object URL is released on the next
- * frame — immediately would race the click in Safari.
- */
 export function downloadBytes(bytes: Uint8Array, fileName: string, mimeType: string): void {
   const buffer = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(buffer).set(bytes);

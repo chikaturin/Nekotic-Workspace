@@ -10,7 +10,6 @@ import type { SelectOption } from "@/types";
 interface EnvironmentPickerProps {
   readonly optionId: string;
   readonly canEdit: boolean;
-  /** Only managers may point a document at Production (DV-ENV-21). */
   readonly canManage: boolean;
   readonly onChange: (optionId: string) => void;
 }
@@ -21,23 +20,6 @@ export function environmentOption(optionId: string): SelectOption {
   );
 }
 
-/**
- * Environment label, wearing the shared `Chip` rather than inventing a second
- * dropdown. Moving a document to Production is confirmed, and refused outright
- * for anyone without manage rights.
- *
- * The chip used to be the board's `SelectChip`, imported across two domains
- * because it was the only one of the six copies that happened to be exported.
- * `Chip` is that same shape at `md` — the size the select cell already drew —
- * so the label is unchanged and devtools no longer reaches into a board cell.
- *
- * The confirmation is `ConfirmDialog` rather than a dialog written out here.
- * The one it replaced asked the same question in a narrower card, with tighter
- * padding and a ghost Cancel — three differences that a reader can only read as
- * meaning something, and that meant nothing except that it was written on a
- * different day. This is the app's most consequential confirmation; it should
- * look like the ones guarding a delete, not like a variant of them.
- */
 export function EnvironmentPicker({
   optionId,
   canEdit,

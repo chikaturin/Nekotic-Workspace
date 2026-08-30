@@ -15,7 +15,6 @@ export interface RowActivity {
   readonly reload: () => void;
 }
 
-/** A record's history, grouped into days for the drawer timeline (SY-ACT-40). */
 export function useRowActivity(boardId: string, rowId: string): RowActivity {
   const loader = useCallback(
     (signal: AbortSignal) => boardService.listActivity(boardId, rowId, signal),

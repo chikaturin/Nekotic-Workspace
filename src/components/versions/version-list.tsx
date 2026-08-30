@@ -18,11 +18,6 @@ interface VersionListProps {
   readonly onRestore: (entry: VersionEntry) => void;
 }
 
-/**
- * The history itself: when, by whom, and what it did. Entries with no snapshot
- * — a rotated secret — offer neither compare nor restore, because the client
- * has no plaintext to compare or restore *from*.
- */
 export function VersionList({
   entries,
   currentVersion,

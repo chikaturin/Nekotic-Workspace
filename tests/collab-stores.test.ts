@@ -5,10 +5,11 @@ import { assigneeIds, dueOf, lensesFor, statusOf, titleOf } from "@/lib/my-work"
 import { createRealtimeClient } from "@/lib/realtime/client";
 import { createLocalTransport } from "@/lib/realtime/transport";
 import { CURRENT_USER, directoryAt } from "@/mock/users";
-import { boardIdFor, boardService } from "@/services/board-service";
+import { boardService } from "@/services/board-service";
+import { boardIdFor } from "./msw/fake/board.fake";
 import { commentService } from "@/services/comment-service";
 import { notificationService } from "@/services/notification-service";
-import { watchService } from "@/services/watch-service";
+import { collabFake } from "./msw/fake/collab.fake";
 import { resetSimulation, setSimulation } from "@/services/simulation";
 import { useNotificationStore } from "@/store/notification-store";
 import { useRecentStore } from "@/store/recent-store";
@@ -50,11 +51,6 @@ beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
 
-  boardService.reset();
-  commentService.reset();
-  notificationService.reset();
-  watchService.reset();
-
   useNotificationStore.setState({
     status: "idle",
     error: null,
@@ -81,7 +77,7 @@ afterEach(() => {
 
 describe("notification service", () => {
   test("an inbox only ever returns its owner's notifications", async () => {
-    notificationService.emit({
+    collabFake.emitForTest({
       reason: "mention",
       recipientId: directoryAt(1).id,
       actor: CURRENT_USER,
@@ -90,16 +86,20 @@ describe("notification service", () => {
       target: null,
     });
 
-    const mine = await notificationService.list(CURRENT_USER.id);
+    // `list()` KHÔNG nhận id: hộp thư luôn là của phiên đang đăng nhập, nên
+    // không có tham số nào để đọc trộm hộp thư người khác.
+    const mine = await notificationService.list();
+
     expect(mine.every((item) => item.recipientId === CURRENT_USER.id)).toBe(true);
     expect(mine.some((item) => item.title === "for Mai")).toBe(false);
 
-    const hers = await notificationService.list(directoryAt(1).id);
-    expect(hers.map((item) => item.title)).toEqual(["for Mai"]);
+    expect(
+      collabFake.notifications(directoryAt(1).id).map((item) => item.title),
+    ).toEqual(["for Mai"]);
   });
 
   test("marking read is scoped to the caller's own inbox", async () => {
-    const foreign = notificationService.emit({
+    const foreign = collabFake.emitForTest({
       reason: "mention",
       recipientId: directoryAt(1).id,
       actor: CURRENT_USER,
@@ -108,16 +108,14 @@ describe("notification service", () => {
       target: null,
     });
 
-    await notificationService.markRead([foreign.id], CURRENT_USER.id);
-    const hers = await notificationService.list(directoryAt(1).id);
-    expect(hers[0]?.isRead).toBe(false);
+    // Id ngoài hộp thư của người gọi bị BỎ QUA, không phải áp dụng.
+    await notificationService.markRead([foreign.id]);
 
-    await notificationService.markRead([foreign.id], directoryAt(1).id);
-    expect((await notificationService.list(directoryAt(1).id))[0]?.isRead).toBe(true);
+    expect(collabFake.notifications(directoryAt(1).id)[0]?.isRead).toBe(false);
   });
 
   test("mark all read clears one inbox and leaves the others alone", async () => {
-    notificationService.emit({
+    collabFake.emitForTest({
       reason: "mention",
       recipientId: directoryAt(1).id,
       actor: CURRENT_USER,
@@ -126,9 +124,12 @@ describe("notification service", () => {
       target: null,
     });
 
-    const mine = await notificationService.markAllRead(CURRENT_USER.id);
-    expect(mine.every((item) => item.isRead)).toBe(true);
-    expect((await notificationService.list(directoryAt(1).id))[0]?.isRead).toBe(false);
+    await notificationService.markAllRead();
+
+    expect((await notificationService.list()).every((item) => item.isRead)).toBe(
+      true,
+    );
+    expect(collabFake.notifications(directoryAt(1).id)[0]?.isRead).toBe(false);
   });
 });
 
@@ -258,7 +259,7 @@ describe("recent store persistence", () => {
     const storage = installStorage();
 
     useRecentStore.getState().visit({ kind: "document", nodeId: "nd_1", label: "Page" });
-    expect(storage.get("nexdrop-recent")).toContain("nd_1");
+    expect(storage.get("nekotic-recent")).toContain("nd_1");
 
     useRecentStore.setState({ entries: [], isHydrated: false });
     useRecentStore.getState().hydrate();
@@ -270,19 +271,19 @@ describe("recent store persistence", () => {
   });
 
   test("unreadable or malformed storage yields an empty history", () => {
-    installStorage({ "nexdrop-recent": "not json" });
+    installStorage({ "nekotic-recent": "not json" });
     useRecentStore.getState().hydrate();
     expect(useRecentStore.getState().entries).toEqual([]);
 
     useRecentStore.setState({ entries: [], isHydrated: false });
-    installStorage({ "nexdrop-recent": JSON.stringify({ nope: true }) });
+    installStorage({ "nekotic-recent": JSON.stringify({ nope: true }) });
     useRecentStore.getState().hydrate();
     expect(useRecentStore.getState().entries).toEqual([]);
   });
 
   test("entries that do not look like entries are dropped", () => {
     installStorage({
-      "nexdrop-recent": JSON.stringify([
+      "nekotic-recent": JSON.stringify([
         { ref: { kind: "document", nodeId: "nd_1", label: "Page" }, visitedAt: "2026-08-26" },
         { ref: null, visitedAt: "2026-08-26" },
         { ref: { kind: "document" }, visitedAt: "2026-08-26" },

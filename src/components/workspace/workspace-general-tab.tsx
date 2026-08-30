@@ -13,26 +13,11 @@ import {
 } from "@/lib/workspace-access";
 import { selectActiveWorkspace, useWorkspaceStore } from "@/store/workspace-store";
 
-/**
- * Name, description and tile.
- *
- * Read-only for anybody without `workspace.manage`: the fields still render,
- * because knowing what the workspace is called is not a privilege — only
- * changing it is.
- */
 export function WorkspaceGeneralTab({ canEdit }: { readonly canEdit: boolean }) {
   const workspace = useWorkspaceStore(selectActiveWorkspace);
   const updateWorkspace = useWorkspaceStore((state) => state.updateWorkspace);
   const pushFeedback = useWorkspaceStore((state) => state.pushFeedback);
 
-  /**
-   * The draft is keyed by what it was taken from.
-   *
-   * Switching workspaces behind an open dialog would otherwise leave the other
-   * workspace's name sitting in the form, one Save away from being applied to
-   * this one. Keying the draft rather than resetting it in an effect means the
-   * stale value is never rendered at all, not even for a frame.
-   */
   const stored = `${workspace.id}:${workspace.name}:${workspace.description ?? ""}`;
   const [draft, setDraft] = useState({ stored, name: workspace.name, description: workspace.description ?? "" });
   const [error, setError] = useState<string | null>(null);
@@ -67,10 +52,6 @@ export function WorkspaceGeneralTab({ canEdit }: { readonly canEdit: boolean }) 
         save();
       }}
     >
-      {/* `validateWorkspaceName` is the only thing that can refuse this form,
-          so its message hangs off the name field — which is also what marks
-          that field invalid rather than leaving a red sentence floating under
-          a control that still looks fine. */}
       <FormField label="Workspace name" error={error}>
         {(field) => (
           <Input

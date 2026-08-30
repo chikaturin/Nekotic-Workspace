@@ -15,21 +15,9 @@ import { collectNodes, findNodeById, pathLabel } from "@/lib/tree";
 import { selectTree, useWorkspaceStore } from "@/store/workspace-store";
 import type { DriveNode } from "@/types";
 
-/**
- * Archive (SY-ARC-37).
- *
- * Everything frozen out of the active workspace, whatever its kind. Items stay
- * openable — that is the point of archiving rather than deleting — and each
- * one can be restored from here without going to it first.
- */
 export function ArchivePage() {
   const tree = useWorkspaceStore(selectTree);
 
-  /**
-   * Only the outermost archived node is listed: everything below it is frozen
-   * by inheritance and cannot be restored on its own, so listing the children
-   * would offer a button that does nothing.
-   */
   const nodes = useMemo(() => collectNodes(tree, isArchivedNode), [tree]);
   const roots = useMemo(() => topmost(tree, nodes), [tree, nodes]);
 
@@ -72,11 +60,6 @@ export function ArchivePage() {
   );
 }
 
-/**
- * One archived item. It is its own component because Restore is permission-
- * gated and permissions are resolved per node — the answer for the project you
- * own is not the answer for the one you were added to.
- */
 function ArchiveRow({ node, path }: { node: DriveNode; path: string }) {
   const setNodeArchived = useWorkspaceStore((state) => state.setNodeArchived);
   const can = usePermissions(node);
@@ -111,7 +94,6 @@ function ArchiveRow({ node, path }: { node: DriveNode; path: string }) {
   );
 }
 
-/** Drop archived nodes that sit inside another archived node. */
 function topmost(tree: readonly DriveNode[], nodes: readonly DriveNode[]): readonly DriveNode[] {
   const archivedIds = new Set(nodes.map((node) => node.id));
 

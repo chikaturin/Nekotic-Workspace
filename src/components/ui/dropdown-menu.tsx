@@ -3,9 +3,38 @@
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Check } from "lucide-react";
 import type { ComponentProps } from "react";
+import { PopupAncestry, usePopupLayer } from "@/components/ui/popup-layer";
 import { cn } from "@/lib/utils";
 
-export const DropdownMenu = DropdownMenuPrimitive.Root;
+/**
+ * Menu thả xuống, có ghi tên vào sổ đăng ký popup.
+ *
+ * `modal` để `false` chứ không phải mặc định `true` của Radix. Menu modal đặt
+ * `pointer-events: none` lên `<body>`, nên cú bấm vào NÚT THỨ HAI bị chặn: menu
+ * thứ nhất đóng lại nhưng menu thứ hai không mở, người dùng phải bấm hai lần.
+ */
+export function DropdownMenu({
+  open,
+  defaultOpen,
+  onOpenChange,
+  modal = false,
+  children,
+  ...props
+}: ComponentProps<typeof DropdownMenuPrimitive.Root>) {
+  const layer = usePopupLayer({ open, defaultOpen, onOpenChange });
+
+  return (
+    <DropdownMenuPrimitive.Root
+      {...props}
+      modal={modal}
+      open={layer.isOpen}
+      onOpenChange={layer.setOpen}
+    >
+      <PopupAncestry ancestry={layer.ancestry}>{children}</PopupAncestry>
+    </DropdownMenuPrimitive.Root>
+  );
+}
+
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 export const DropdownMenuGroup = DropdownMenuPrimitive.Group;
 export const DropdownMenuSub = DropdownMenuPrimitive.Sub;

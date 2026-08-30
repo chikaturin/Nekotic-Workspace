@@ -11,11 +11,6 @@ import {
 } from "lucide-react";
 import type { SearchResultKind } from "@/types";
 
-/**
- * Icon and tint per result kind. Returned as an object rather than a bare
- * component so callers reach it through member access — creating a component
- * during render is what the static-components rule forbids.
- */
 export interface ResultVisual {
   readonly Icon: LucideIcon;
   readonly colorClass: string;

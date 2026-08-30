@@ -26,6 +26,11 @@ import type { AuditEvent, DriveNode } from "@/types";
  */
 
 import { testWorkspace } from "./helpers";
+import { devtoolsFake } from "./msw/fake/devtools.fake";
+import { auditFake } from "./msw/fake/audit.fake";
+
+/** Nhường một vòng microtask cho các lần ghi xuyên fire-and-forget. */
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const WORKSPACE_ID = "ws_audit";
 
@@ -71,8 +76,6 @@ let tree: readonly DriveNode[] = buildTree();
 beforeEach(() => {
   resetSimulation();
   setSimulation({ latency: "fast" });
-  auditService.reset();
-  devtoolsService.reset();
   usePermissionStore.getState().reset();
 
   tree = buildTree();
@@ -86,63 +89,68 @@ beforeEach(() => {
 });
 
 describe("the service surface", () => {
-  test("appends and reads, and offers nothing else", () => {
-    expect(Object.keys(auditService).sort()).toEqual(["list", "record", "reset"]);
+  test("reads and exports — and offers no way to write", () => {
+    // Khẳng định PHỦ ĐỊNH, và nó mạnh hơn hẳn bản cũ: trước đây service có
+    // `record`, nghĩa là client quyết định được chuyện gì vào nhật ký. Một nhật
+    // ký kiểm toán mà bên bị kiểm toán ghi được thì không kiểm toán được gì.
+    // Giờ mọi hàng do server viết, trong cùng transaction với hành động.
+    expect(Object.keys(auditService).sort()).toEqual(["exportCsv", "list"]);
+    expect(auditService).not.toHaveProperty("record");
   });
 
   test("a recorded event cannot be reached to be changed", async () => {
-    auditService.record({
+    auditFake.record({
       module: "board",
       action: "board.export",
       actor: CURRENT_USER,
       target: "Roadmap",
     });
 
-    const page = await auditService.list();
+    const page = await auditFake.list();
     const first = page.events[0] as AuditEvent;
 
     // The list is a copy of the store's array — mutating it changes nothing.
     (page.events as AuditEvent[]).length = 0;
-    expect((await auditService.list()).events[0]?.id).toBe(first.id);
+    expect((await auditFake.list()).events[0]?.id).toBe(first.id);
   });
 });
 
 describe("reading the trail", () => {
   test("the newest entry is first", async () => {
-    auditService.record({ module: "row", action: "row.update", actor: CURRENT_USER });
-    const page = await auditService.list();
+    auditFake.record({ module: "row", action: "row.update", actor: CURRENT_USER });
+    const page = await auditFake.list();
 
     expect(page.events[0]?.action).toBe("row.update");
     expect(Date.parse(page.events[0]!.at)).toBeGreaterThanOrEqual(Date.parse(page.events[1]!.at));
   });
 
   test("severity defaults to error on a refusal and info otherwise", () => {
-    const denied = auditService.record({
+    const denied = auditFake.record({
       module: "secret",
       action: "secret.reveal",
       actor: memberAt(1),
       outcome: "denied",
     });
-    const allowed = auditService.record({ module: "row", action: "row.create", actor: CURRENT_USER });
+    const allowed = auditFake.record({ module: "row", action: "row.create", actor: CURRENT_USER });
 
     expect(denied.severity).toBe("error");
     expect(allowed.severity).toBe("info");
   });
 
   test("filters narrow by module, severity and actor", async () => {
-    const byModule = await auditService.list({ module: "secret" });
+    const byModule = await auditFake.list({ module: "secret" });
     expect(byModule.events.every((event) => event.module === "secret")).toBe(true);
     expect(byModule.total).toBeGreaterThan(0);
 
-    const bySeverity = await auditService.list({ severity: "error" });
+    const bySeverity = await auditFake.list({ severity: "error" });
     expect(bySeverity.events.every((event) => event.severity === "error")).toBe(true);
 
-    const byActor = await auditService.list({ actorId: "usr_hai" });
+    const byActor = await auditFake.list({ actorId: "usr_hai" });
     expect(byActor.events.every((event) => event.actor.id === "usr_hai")).toBe(true);
   });
 
   test("the severity tally counts the matches, not the page", async () => {
-    const page = await auditService.list({ limit: 2 });
+    const page = await auditFake.list({ limit: 2 });
     const tallied = page.bySeverity.info + page.bySeverity.warn + page.bySeverity.error;
 
     expect(page.events).toHaveLength(2);
@@ -150,8 +158,8 @@ describe("reading the trail", () => {
   });
 
   test("search reaches every column the table shows", async () => {
-    const byTarget = await auditService.list({ search: "STRIPE_SECRET_KEY" });
-    const byAddress = await auditService.list({ search: "10.4.31" });
+    const byTarget = await auditFake.list({ search: "STRIPE_SECRET_KEY" });
+    const byAddress = await auditFake.list({ search: "10.4.31" });
 
     expect(byTarget.total).toBeGreaterThan(0);
     expect(byAddress.total).toBeGreaterThan(0);
@@ -159,7 +167,7 @@ describe("reading the trail", () => {
 
   test("an empty backend is an empty page, not an error", async () => {
     setSimulation({ listFailure: "empty" });
-    const page = await auditService.list();
+    const page = await auditFake.list();
 
     expect(page.events).toEqual([]);
     expect(page.total).toBe(0);
@@ -167,7 +175,7 @@ describe("reading the trail", () => {
 
   test("a failing backend rejects rather than returning half a trail", async () => {
     setSimulation({ listFailure: "network" });
-    await expect(auditService.list()).rejects.toThrow();
+    await expect(auditFake.list()).rejects.toThrow();
   });
 });
 
@@ -225,7 +233,7 @@ describe("what reaches the trail", () => {
     const entry = document.entries[0]!;
 
     await expect(
-      devtoolsService.revealSecret({
+      devtoolsFake.revealSecret({
         nodeId: ID.secret,
         secretId: entry.id,
         role: "member",
@@ -233,7 +241,7 @@ describe("what reaches the trail", () => {
       }),
     ).rejects.toThrow();
 
-    const page = await auditService.list({ module: "secret" });
+    const page = await auditFake.list({ module: "secret" });
     const recorded = page.events[0]!;
 
     expect(recorded.outcome).toBe("denied");
@@ -245,14 +253,14 @@ describe("what reaches the trail", () => {
     const document = await devtoolsService.getSecrets(ID.secret);
     const entry = document.entries[0]!;
 
-    await devtoolsService.revealSecret({
+    await devtoolsFake.revealSecret({
       nodeId: ID.secret,
       secretId: entry.id,
       role: "admin",
       action: "reveal",
     });
 
-    const page = await auditService.list({ module: "secret" });
+    const page = await auditFake.list({ module: "secret" });
 
     expect(page.events[0]?.outcome).toBe("allowed");
     expect(page.events[0]?.severity).toBe("warn");
@@ -262,10 +270,14 @@ describe("what reaches the trail", () => {
     const backend = nodeAt(ID.backend, tree);
     const store = usePermissionStore.getState();
 
-    store.setAccessRule(WORKSPACE_ID, backend, { kind: "user", userId: "usr_duc" }, "manager");
-    store.clearAccessRule(WORKSPACE_ID, backend, { kind: "user", userId: "usr_duc" });
+    // Tuần tự, và CHỜ: hai lần ghi này phải tới server đúng thứ tự thì hai
+    // hàng audit mới đọc được như một câu chuyện — cấp quyền rồi gỡ quyền.
+    await store.setAccessRule(WORKSPACE_ID, backend, { kind: "user", userId: "usr_duc" }, "manager");
+    await store.clearAccessRule(WORKSPACE_ID, backend, { kind: "user", userId: "usr_duc" });
 
-    const page = await auditService.list({ module: "workspace", search: "Backend" });
+    await flush();
+
+    const page = await auditFake.list({ module: "workspace", search: "Backend" });
 
     expect(page.total).toBeGreaterThanOrEqual(2);
     expect(page.events[0]?.detail).toContain("inherits");
@@ -274,12 +286,14 @@ describe("what reaches the trail", () => {
 
   test("clearing a rule that is not there records nothing", async () => {
     const backend = nodeAt(ID.backend, tree);
-    const before = (await auditService.list({ module: "workspace" })).total;
+    const before = (await auditFake.list({ module: "workspace" })).total;
 
-    usePermissionStore
+    await usePermissionStore
       .getState()
       .clearAccessRule(WORKSPACE_ID, backend, { kind: "user", userId: "usr_lan" });
 
-    expect((await auditService.list({ module: "workspace" })).total).toBe(before);
+    await flush();
+
+    expect((await auditFake.list({ module: "workspace" })).total).toBe(before);
   });
 });

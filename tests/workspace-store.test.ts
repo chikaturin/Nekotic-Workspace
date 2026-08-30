@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { childCount, findNodeById } from "@/lib/tree";
+import { childCount, findNodeById, flattenTree } from "@/lib/tree";
 import { CURRENT_USER } from "@/mock/users";
+import type { CompletedUpload } from "@/services/api/file.api";
 import {
   selectActiveWorkspace,
   selectTrash,
@@ -9,15 +10,24 @@ import {
 } from "@/store/workspace-store";
 import { childrenOf, isFile, type FileAsset } from "@/types";
 import { buildTestTree, ID, TEST_WORKSPACE, testWorkspace } from "./helpers";
+import { seedWorkspace } from "./msw/db";
 
 const WORKSPACE_ID = "ws_test";
 
-/** Point the store at the deterministic fixture tree before every test. */
+/**
+ * Cùng một cây ở HAI chỗ: store (cache phía client) và backend giả (nguồn sự
+ * thật). Chỉ nạp store thì mọi mutation đi qua API sẽ gặp một backend rỗng và
+ * fail bằng 404 — thứ trước đây không xảy ra vì store tự sinh node lấy.
+ */
 beforeEach(() => {
+  const tree = buildTestTree();
+
+  seedWorkspace({ workspace: TEST_WORKSPACE, nodes: tree });
+
   useWorkspaceStore.setState({
     workspaces: [TEST_WORKSPACE],
       activeWorkspaceId: WORKSPACE_ID,
-    treeByWorkspace: { [WORKSPACE_ID]: buildTestTree() },
+    treeByWorkspace: { [WORKSPACE_ID]: tree },
     trashByWorkspace: { [WORKSPACE_ID]: [] },
     expandedIds: [],
     selectedIds: [],
@@ -63,6 +73,40 @@ describe("moveNode", () => {
   });
 });
 
+describe("khi chưa có workspace nào", () => {
+  beforeEach(() => {
+    // Đúng trạng thái của một tài khoản vừa đăng ký: có phiên, chưa có workspace.
+    useWorkspaceStore.setState({
+      workspaces: [],
+      activeWorkspaceId: "",
+      treeByWorkspace: {},
+      feedback: null,
+    });
+  });
+
+  test("từ chối tạo thư mục bằng một câu người dùng hiểu được", async () => {
+    await actions().createFolder(null, "Untitled project folder");
+
+    const { feedback } = useWorkspaceStore.getState();
+
+    expect(feedback?.tone).toBe("error");
+    // KHÔNG được là "Cannot POST /api/v1/workspaces//nodes" — đó là câu về
+    // routing của server, cho một chuyện không phải lỗi của người dùng.
+    expect(feedback?.message).not.toContain("Cannot POST");
+    expect(feedback?.message).toContain("workspace");
+  });
+
+  test("không đụng tới cây, và không gửi request nào", async () => {
+    // MSW bật `onUnhandledRequest: "error"`, nhưng URL hỏng `/workspaces//nodes`
+    // vẫn khớp pattern `/workspaces/:id/nodes`. Nên khẳng định ở đây là: cây
+    // không đổi — tức là không có node nào được chèn từ một câu trả lời nào cả.
+    await actions().createFolder(null, "Untitled project folder");
+    await actions().createDocument(null, "Untitled", "📄");
+
+    expect(selectTree(useWorkspaceStore.getState())).toHaveLength(0);
+  });
+});
+
 describe("addUploadedAsset", () => {
   const asset = (name: string, id: string): FileAsset => ({
     id,
@@ -77,19 +121,62 @@ describe("addUploadedAsset", () => {
     folderId: ID.frontend,
   });
 
-  test("inserts a file node keyed by the asset id", () => {
-    actions().addUploadedAsset(ID.frontend, asset("report.txt", "asset_1"));
+  /** Câu trả lời của bước `complete`, đúng như backend gửi về. */
+  const completed = (
+    name: string,
+    id: string,
+    extra: Partial<CompletedUpload> = {},
+  ): CompletedUpload => ({
+    asset: { ...asset(name, id), previewUrl: null, thumbnailUrl: null },
+    node: { id: `nd_${id}`, name },
+    storage: { usedBytes: 1024, totalBytes: 5 * 1024 ** 3 },
+    ...extra,
+  });
+
+  test("keys the node by the SERVER's node id, not the asset id", () => {
+    actions().addUploadedAsset(ID.frontend, completed("report.txt", "asset_1"));
 
     const children = childrenOf(findNodeById(tree(), ID.frontend)!);
 
     expect(children).toHaveLength(1);
-    expect(children[0]?.id).toBe("asset_1");
+    // Asset và node là hai thứ khác nhau; mọi thao tác sau đó địa chỉ theo node.
+    expect(children[0]?.id).toBe("nd_asset_1");
     expect(children[0] && isFile(children[0]) && children[0].sizeBytes).toBe(1024);
   });
 
+  test("mang theo link webp để lưới vẽ được ngay, không đợi tải lại trang", () => {
+    actions().addUploadedAsset(ID.frontend, {
+      ...completed("photo.png", "asset_img"),
+      asset: {
+        ...asset("photo.png", "asset_img"),
+        thumbnailUrl: "https://api.test/images/a.thumb.webp",
+        previewUrl: "https://api.test/images/a.preview.webp",
+      },
+    });
+
+    const [node] = childrenOf(findNodeById(tree(), ID.frontend)!);
+
+    expect(node && isFile(node) && node.thumbnailUrl).toBe(
+      "https://api.test/images/a.thumb.webp",
+    );
+  });
+
+  test("cập nhật hạn mức lưu trữ từ con số server vừa tính", () => {
+    actions().addUploadedAsset(ID.frontend, {
+      ...completed("report.txt", "asset_1"),
+      storage: { usedBytes: 4096, totalBytes: 5 * 1024 ** 3 },
+    });
+
+    const active = useWorkspaceStore
+      .getState()
+      .workspaces.find((item) => item.id === useWorkspaceStore.getState().activeWorkspaceId);
+
+    expect(active?.storage.usedBytes).toBe(4096);
+  });
+
   test("de-duplicates slugs between two files with the same name", () => {
-    actions().addUploadedAsset(ID.frontend, asset("report.txt", "asset_1"));
-    actions().addUploadedAsset(ID.frontend, asset("report.txt", "asset_2"));
+    actions().addUploadedAsset(ID.frontend, completed("report.txt", "asset_1"));
+    actions().addUploadedAsset(ID.frontend, completed("report.txt", "asset_2"));
 
     const slugs = childrenOf(findNodeById(tree(), ID.frontend)!).map((node) => node.slug);
 
@@ -99,30 +186,30 @@ describe("addUploadedAsset", () => {
   test("uploads to the workspace root when no folder is given", () => {
     const before = tree().length;
 
-    actions().addUploadedAsset(null, asset("root.txt", "asset_root"));
+    actions().addUploadedAsset(null, completed("root.txt", "asset_root"));
 
     expect(tree()).toHaveLength(before + 1);
   });
 });
 
 describe("document nodes", () => {
-  test("createDocument inserts a page and returns it", () => {
-    const created = actions().createDocument(ID.frontend, "Release notes", "\u{1F4C4}");
+  test("createDocument inserts a page and returns it", async () => {
+    const created = await actions().createDocument(ID.frontend, "Release notes", "\u{1F4C4}");
 
     expect(created?.type).toBe("document");
     expect(created?.slug).toBe("release-notes");
     expect(childrenOf(findNodeById(tree(), ID.frontend)!)).toHaveLength(1);
   });
 
-  test("createDocument refuses a leaf destination", () => {
-    const created = actions().createDocument(ID.roadmap, "Nope", "\u{1F4C4}");
+  test("createDocument refuses a leaf destination", async () => {
+    const created = await actions().createDocument(ID.roadmap, "Nope", "\u{1F4C4}");
 
     expect(created).toBeNull();
     expect(actions().feedback?.tone).toBe("error");
   });
 
-  test("applyDocumentSummary mirrors content changes onto the tree", () => {
-    const created = actions().createDocument(ID.frontend, "Notes", "\u{1F4C4}");
+  test("applyDocumentSummary mirrors content changes onto the tree", async () => {
+    const created = await actions().createDocument(ID.frontend, "Notes", "\u{1F4C4}");
     if (!created) throw new Error("page not created");
 
     actions().applyDocumentSummary(created.id, {
@@ -159,8 +246,8 @@ describe("document nodes", () => {
 });
 
 describe("folder and item lifecycle", () => {
-  test("createFolder inserts an empty container", () => {
-    actions().createFolder(ID.frontend, "Design Tokens");
+  test("createFolder inserts an empty container", async () => {
+    await actions().createFolder(ID.frontend, "Design Tokens");
 
     const created = childrenOf(findNodeById(tree(), ID.frontend)!)[0];
 
@@ -169,8 +256,8 @@ describe("folder and item lifecycle", () => {
     expect(created?.slug).toBe("design-tokens");
   });
 
-  test("createFolder falls back to a default name", () => {
-    actions().createFolder(null, "   ");
+  test("createFolder falls back to a default name", async () => {
+    await actions().createFolder(null, "   ");
 
     expect(tree().some((node) => node.name === "Untitled folder")).toBe(true);
   });
@@ -196,9 +283,9 @@ describe("folder and item lifecycle", () => {
    * look like a clash — it looks like the second item having vanished, with
    * every link to it silently opening the first.
    */
-  test("renameNode gives the node a slug no sibling already holds", () => {
-    actions().createFolder(ID.backend, "Reports");
-    actions().createFolder(ID.backend, "Archive");
+  test("renameNode gives the node a slug no sibling already holds", async () => {
+    await actions().createFolder(ID.backend, "Reports");
+    await actions().createFolder(ID.backend, "Archive");
 
     const [reports, archive] = childrenOf(findNodeById(tree(), ID.backend)!).filter(
       (node) => node.name === "Reports" || node.name === "Archive",
@@ -359,5 +446,73 @@ describe("view state", () => {
 
     actions().dismissFeedback();
     expect(actions().feedback).toBeNull();
+  });
+});
+
+/**
+ * Thanh điều hướng vẽ từ bản sao cây trong máy, nên nó có thể nói dối: mục đã
+ * bị xoá hoặc bị khoá quyền ở nơi khác vẫn nằm đó, bấm vào thì ra "Item not
+ * found". Phát hiện ra thì phải gỡ ngay.
+ */
+describe("forgetMissingNode", () => {
+  test("gỡ mục mà server bảo không còn, kèm cả nhánh con", () => {
+    // Arrange
+    const before = flattenTree(tree()).length;
+    const folder = findNodeById(tree(), ID.frontend)!;
+    const inside = childrenOf(folder).length;
+
+    // Act
+    useWorkspaceStore.getState().forgetMissingNode(ID.frontend);
+
+    // Assert
+    expect(findNodeById(tree(), ID.frontend)).toBeNull();
+    expect(flattenTree(tree())).toHaveLength(before - inside - 1);
+  });
+
+  test("id lạ thì không đụng gì tới cây", () => {
+    const before = flattenTree(tree()).length;
+
+    useWorkspaceStore.getState().forgetMissingNode("khong-co-that");
+
+    expect(flattenTree(tree())).toHaveLength(before);
+  });
+});
+
+/**
+ * Ghim là trạng thái CHUNG của node, không phải của riêng loại "trang".
+ *
+ * Trước đây `isPinned` nằm trong thuộc tính của document, nên chuyển đổi
+ * thuộc tính → cột trả về `EMPTY_COLUMNS` cho mọi loại khác: ghim một board sẽ
+ * bị ghi đè thành `false` ngay lần lưu kế tiếp.
+ */
+describe("togglePinned", () => {
+  test("ghim được một thư mục", async () => {
+    // Arrange
+    const before = findNodeById(tree(), ID.frontend)!;
+    expect(before.isPinned).toBe(false);
+
+    // Act
+    useWorkspaceStore.getState().togglePinned(ID.frontend);
+    await Promise.resolve();
+
+    // Assert
+    expect(findNodeById(tree(), ID.frontend)!.isPinned).toBe(true);
+  });
+
+  test("bỏ ghim thì quay lại như cũ", async () => {
+    useWorkspaceStore.getState().togglePinned(ID.frontend);
+    await Promise.resolve();
+    useWorkspaceStore.getState().togglePinned(ID.frontend);
+    await Promise.resolve();
+
+    expect(findNodeById(tree(), ID.frontend)!.isPinned).toBe(false);
+  });
+
+  test("id lạ thì không đụng gì tới cây", () => {
+    const before = flattenTree(tree()).length;
+
+    useWorkspaceStore.getState().togglePinned("khong-co-that");
+
+    expect(flattenTree(tree())).toHaveLength(before);
   });
 });

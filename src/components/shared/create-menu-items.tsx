@@ -10,6 +10,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { PendingCreate } from "@/components/shared/create-name-dialog";
 import { useCreateBoard } from "@/hooks/use-create-board";
 import { useCreateDocument } from "@/hooks/use-create-document";
 import { BOARD_TEMPLATES } from "@/lib/board-templates";
@@ -17,33 +18,26 @@ import { CONFIG_FORMATS, CONFIG_FORMAT_LABELS } from "@/lib/syntax";
 import { useWorkspaceStore } from "@/store/workspace-store";
 
 interface CreateMenuItemsProps {
-  /** Container that receives the new item — the folder currently open. */
   readonly targetId: string | null;
   readonly targetName: string;
-  /** Omitted where the surface already has its own folder button beside it. */
   readonly includeFolder?: boolean;
-  /** Given only where the menu is the surface's only way to upload. */
   readonly onUpload?: () => void;
+  /**
+   * Hỏi tên trước khi tạo.
+   *
+   * Hộp thoại phải do THÀNH PHẦN CHA giữ: chọn một mục trong menu sẽ đóng menu,
+   * và mọi thứ bên trong `DropdownMenuContent` bị gỡ theo — kể cả hộp thoại vừa
+   * mở ra.
+   */
+  readonly onAskName: (pending: PendingCreate) => void;
 }
 
-/**
- * The create menu, once.
- *
- * Every surface that offers "new…" offers the same four content types —
- * Folder, Page, Board, and the two documents that need their own editor,
- * Config and Secret. Keeping the list here is what stops one entry point
- * quietly offering less than another, which is exactly how the Drive toolbar
- * ended up able to create nothing but a Page.
- *
- * There is still no "new .txt", "new .md", "new .csv" or "new .xlsx": a Page
- * already holds headings, checklists, code, tables, images, attachments and
- * embedded boards. Uploading files and attaching them to records are untouched.
- */
 export function CreateMenuItems({
   targetId,
   targetName,
   includeFolder = true,
   onUpload,
+  onAskName,
 }: CreateMenuItemsProps) {
   const createFolder = useWorkspaceStore((state) => state.createFolder);
   const { createDocument, isCreating } = useCreateDocument();
@@ -53,14 +47,33 @@ export function CreateMenuItems({
     <>
       <DropdownMenuLabel>Create in {targetName}</DropdownMenuLabel>
 
-      <DropdownMenuItem disabled={isCreating} onSelect={() => void createDocument(targetId)}>
+      <DropdownMenuItem
+        disabled={isCreating}
+        onSelect={() =>
+          onAskName({
+            title: "Trang mới",
+            label: "Tên trang",
+            suggestion: "Untitled",
+            run: (name) => void createDocument(targetId, name),
+          })
+        }
+      >
         <FilePlus2 />
         Page
         <DropdownMenuShortcut>P</DropdownMenuShortcut>
       </DropdownMenuItem>
 
       {includeFolder && (
-        <DropdownMenuItem onSelect={() => createFolder(targetId, "Untitled folder")}>
+        <DropdownMenuItem
+          onSelect={() =>
+            onAskName({
+              title: "Thư mục mới",
+              label: "Tên thư mục",
+              suggestion: "Untitled folder",
+              run: (name) => void createFolder(targetId, name),
+            })
+          }
+        >
           <FolderPlus />
           Folder
           <DropdownMenuShortcut>N</DropdownMenuShortcut>
@@ -78,7 +91,14 @@ export function CreateMenuItems({
             <DropdownMenuItem
               key={template.id}
               disabled={isCreatingBoard}
-              onSelect={() => createBoard(targetId, template)}
+              onSelect={() =>
+                onAskName({
+                  title: `Board mới · ${template.name}`,
+                  label: "Tên board",
+                  suggestion: template.name,
+                  run: (name) => void createBoard(targetId, template, name),
+                })
+              }
             >
               <div className="flex min-w-0 flex-col">
                 <span className="flex items-center gap-1.5">
@@ -94,10 +114,6 @@ export function CreateMenuItems({
         </DropdownMenuSubContent>
       </DropdownMenuSub>
 
-      {/* The language is chosen here rather than in a dialog, for the same
-          reason a board's template is: the app creates and then renames
-          inline, and one modal on the path to one document would be the only
-          one in the menu. The language is changeable in the header afterwards. */}
       <DropdownMenuSub>
         <DropdownMenuSubTrigger disabled={isCreating}>
           <SlidersHorizontal />
@@ -110,12 +126,12 @@ export function CreateMenuItems({
               key={format}
               disabled={isCreating}
               onSelect={() =>
-                void createDocument(
-                  targetId,
-                  `Untitled ${CONFIG_FORMAT_LABELS[format]} config`,
-                  "config",
-                  format,
-                )
+                onAskName({
+                  title: `Config ${CONFIG_FORMAT_LABELS[format]} mới`,
+                  label: "Tên tài liệu",
+                  suggestion: `Untitled ${CONFIG_FORMAT_LABELS[format]} config`,
+                  run: (name) => void createDocument(targetId, name, "config", format),
+                })
               }
             >
               {CONFIG_FORMAT_LABELS[format]}
@@ -126,7 +142,14 @@ export function CreateMenuItems({
 
       <DropdownMenuItem
         disabled={isCreating}
-        onSelect={() => void createDocument(targetId, "Untitled secrets", "secret")}
+        onSelect={() =>
+          onAskName({
+            title: "Tài liệu secret mới",
+            label: "Tên tài liệu",
+            suggestion: "Untitled secrets",
+            run: (name) => void createDocument(targetId, name, "secret"),
+          })
+        }
       >
         <KeyRound />
         Secret document

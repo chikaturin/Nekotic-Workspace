@@ -10,19 +10,11 @@ import { isFile, type AsyncState, type FileNode, type FilePreview } from "@/type
 export interface FilePreviewController {
   readonly state: AsyncState<FilePreview>;
   readonly reload: () => void;
-  /** Trigger a browser download of the file's real bytes. */
   readonly download: () => Promise<void>;
 }
 
 const NO_SELECTION: FilePreview = { kind: "unsupported", reason: "No file selected" };
 
-/**
- * Resolve the preview for a file.
- *
- * The request is keyed by node id, not by the node object: the workspace tree
- * hands out a new object on every mutation, and re-keying on identity made the
- * preview flash back to a skeleton whenever anything in the workspace changed.
- */
 export function useFilePreview(nodeId: string | null): FilePreviewController {
   const loader = useCallback(
     (signal: AbortSignal) => {
@@ -45,7 +37,6 @@ export function useFilePreview(nodeId: string | null): FilePreviewController {
   return { state: resource.state, reload: resource.reload, download };
 }
 
-/** Download any file without opening a preview first. */
 export function useFileDownload(): (node: FileNode) => Promise<void> {
   return useCallback(async (node: FileNode) => {
     const url = await fileService.getDownloadUrl(node);

@@ -11,11 +11,6 @@ import { cellOf } from "@/lib/cell-values";
 import type { RowMap } from "@/lib/board-records";
 import type { BoardColumn } from "@/types";
 
-/**
- * Month view over the shared records. A day cell holds row ids, never copies of
- * records, so a cell edited anywhere is the same object the calendar renders.
- */
-
 const WEEKS_IN_GRID = 6;
 const DAYS_IN_WEEK = 7;
 
@@ -32,12 +27,10 @@ export interface CalendarMonth {
   readonly monthIso: string;
   readonly label: string;
   readonly weeks: readonly (readonly CalendarDay[])[];
-  /** Records whose date cell is empty — the PRD's "Unscheduled" list. */
   readonly unscheduled: readonly string[];
   readonly scheduledCount: number;
 }
 
-/** Bucket rows by calendar day; rows with no date land in `unscheduled`. */
 export function bucketByDay(
   rowIds: readonly string[],
   rows: RowMap,
@@ -66,7 +59,6 @@ export function bucketByDay(
   return { byDay, unscheduled };
 }
 
-/** A six-week Monday-first grid covering `monthIso`. */
 export function buildMonth(
   monthIso: string,
   rowIds: readonly string[],
@@ -117,10 +109,6 @@ export function shiftMonth(monthIso: string, delta: number): string {
   return addMonths(monthIso, delta);
 }
 
-/**
- * Dropping a record on a day keeps its time of day, so a due date with a
- * meeting time does not silently reset to midnight.
- */
 export function moveToDay(currentIso: string | null, dayIso: string): string {
   if (!currentIso) return dayIso;
 

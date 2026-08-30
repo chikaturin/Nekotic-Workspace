@@ -27,15 +27,10 @@ import { documentKindOf, isBoard, isContainer, isDocument } from "@/types";
 import { routableHref } from "@/lib/exported-routes";
 
 interface DriveViewProps {
-  /** URL path segments below `/drive`, already decoded — what was prerendered. */
   readonly segments: readonly string[];
 }
 
-/** Drive Mode: folder contents as grid or list, with drop targets everywhere. */
 export function DriveView({ segments: prerendered }: DriveViewProps) {
-  // The live URL wins over the params the page was built with, so this one
-  // prerendered route can also serve `/drive/?p=…` — the address a node made
-  // after the build has to use.
   const segments = useRouteSegments(prerendered);
   const location = useDriveLocation(segments);
   const workspace = useWorkspaceStore(selectActiveWorkspace);
@@ -51,18 +46,12 @@ export function DriveView({ segments: prerendered }: DriveViewProps) {
   const { node, visibleChildren, isNotFound, isDenied } = location;
   const capabilities = useCapabilities(node);
 
-  /**
-   * Only containers are recorded here. Documents, boards and files record
-   * themselves, because reaching this component is not the same as opening
-   * them — a page renders its own surface below.
-   */
   const recentTarget = useMemo(
     () => (node && isContainer(node) && capabilities.view ? nodeRef(node) : null),
     [node, capabilities.view],
   );
   useTrackRecent(recentTarget);
 
-  /** Keep the sidebar tree opened to whatever the URL points at. */
   useEffect(() => {
     if (node) expandToNode(node.id);
   }, [node, expandToNode]);
@@ -79,11 +68,6 @@ export function DriveView({ segments: prerendered }: DriveViewProps) {
     [segments],
   );
 
-  /**
-   * Refused before "not found", and refused *without naming anything*. The
-   * page never loaded the node's metadata, its children or its content — the
-   * tree it resolved against does not contain them.
-   */
   if (isDenied) {
     return (
       <PermissionDeniedState
@@ -157,7 +141,7 @@ export function DriveView({ segments: prerendered }: DriveViewProps) {
                 description="Drag files here to upload, or create a folder to start organising this space."
                 action={{
                   label: "New folder",
-                  onClick: () => createFolder(location.dropTargetId, "Untitled folder"),
+                  onClick: () => void createFolder(location.dropTargetId, "Untitled folder"),
                 }}
               />
             ) : viewMode === "grid" ? (

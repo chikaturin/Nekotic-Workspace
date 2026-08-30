@@ -3,6 +3,7 @@
 import { ListTree, Workflow, X } from "lucide-react";
 import { useState } from "react";
 import { DateMenu } from "@/components/board/config/date-menu";
+import { useBoardPeople } from "@/hooks/use-board-people";
 import { FilterMenu } from "@/components/board/config/filter-menu";
 import { GroupMenu } from "@/components/board/config/group-menu";
 import { SelectColumnDialog } from "@/components/board/config/select-column-dialog";
@@ -18,22 +19,8 @@ import type { PermissionResolver, RowHeight, SubtaskDisplay } from "@/types";
 const ROW_HEIGHTS: readonly RowHeight[] = ["short", "medium", "tall"];
 const SUBTASK_DISPLAYS: readonly SubtaskDisplay[] = ["nested", "flat", "hidden"];
 
-/**
- * The bar's own step, shared with the menus it opens. Both selects here are
- * fixed lists of plain words, so they stay native — there is no icon, colour
- * or avatar for an option to carry, and the platform's keyboard is free.
- */
 const CONTROL_SIZE = "sm" as const;
 
-/**
- * One configuration bar for every view type. Filter, sort and group are shared
- * by all four; the date anchors only appear where they mean something.
- *
- * Filter, sort, group and row height are how anybody *reads* a board, so they
- * are open to everybody. Transition rules are not: they decide what every card
- * on the board is allowed to do, and the button that opens them is gated on the
- * same key the column header's own menu checks.
- */
 export function ViewConfigBar({
   model,
   can,
@@ -46,32 +33,16 @@ export function ViewConfigBar({
   const setRowHeight = useBoardStore((state) => state.setRowHeight);
   const setSubtaskDisplay = useBoardStore((state) => state.setSubtaskDisplay);
   const updateColumnConfig = useBoardStore((state) => state.updateColumnConfig);
-  const people = useBoardStore((state) => state.people);
+  const people = useBoardPeople();
 
-  /**
-   * The column the rules dialog was opened *on*, held by id.
-   *
-   * Not a boolean beside `kanbanStatusColumn`: that is derived from the view's
-   * current grouping, so a boolean would let a draft edited against one column
-   * be saved onto whichever column the view was grouping by at the moment the
-   * user pressed Save. Naming the column at open time makes the two the same
-   * column by construction.
-   */
   const [rulesColumnId, setRulesColumnId] = useState<string | null>(null);
 
   const needsDates = view?.type === "calendar" || view?.type === "gantt";
   const filters = view?.filters ?? [];
 
-  /**
-   * Kanban writes the group column on every drop, so its transition rules are
-   * worth reaching from the board itself — the same dialog the column header
-   * opens, and the same stored config.
-   */
   const kanbanStatusColumn =
     view?.type === "kanban" && groupColumn?.type === "select" ? groupColumn : null;
 
-  // Reading the workflow is how you understand a refused drag, so the button
-  // stays for everyone; what it opens is read-only below Manager.
   const canEditRules = can("board.column.update");
 
   const opened = columns.find((column) => column.id === rulesColumnId);
@@ -97,8 +68,6 @@ export function ViewConfigBar({
         </Button>
       )}
 
-      {/* Hierarchy is presentation, so it lives on the view like row height —
-          one saved view can nest subtasks while another lists them flat. */}
       <label className="ml-1 flex items-center gap-1">
         <ListTree className="size-3.5 shrink-0 text-faint-foreground" />
         <span className="sr-only">Subtasks</span>
@@ -143,11 +112,6 @@ export function ViewConfigBar({
               className="group flex max-w-56 items-center gap-1 rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-body text-accent"
             >
               <span className="truncate">{describeFilter(filter, columns)}</span>
-              {/* A faded glyph is how the system spells a state — disabled,
-                  pending, frozen — and this one is in none of them. It is
-                  simply quieter than the label beside it, which is a colour,
-                  and it brightens with the pill rather than only under its
-                  own two pixels. */}
               <X
                 aria-hidden="true"
                 className="size-2.5 shrink-0 text-faint-foreground transition-colors group-hover:text-foreground"

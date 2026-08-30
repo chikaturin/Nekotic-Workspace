@@ -1,22 +1,11 @@
 import { ROW_REFERENCE_SOURCE } from "@/lib/row-id";
 import type { BodySegment, DirectoryUser, MentionQuery } from "@/types";
 
-/**
- * Mentions inside a comment body.
- *
- * A mention is stored as `@[Mai Tran](usr_mai)`: the id is what the
- * notification fan-out reads, the label is what renders. Everything in this
- * module is pure, so the composer, the renderer and the service all agree on
- * one encoding.
- */
-
 const MENTION_SOURCE = "@\\[([^\\]]{1,64})\\]\\(([A-Za-z0-9_-]{1,64})\\)";
 
-/** Mention token, then record reference — matched in one pass, in order. */
 const SEGMENT_PATTERN = new RegExp(`${MENTION_SOURCE}|${ROW_REFERENCE_SOURCE}`, "g");
 const MENTION_PATTERN = new RegExp(MENTION_SOURCE, "g");
 
-/** Longest run of characters after `@` still treated as an open mention. */
 const MAX_QUERY_LENGTH = 40;
 const MENTION_LIMIT = 6;
 
@@ -24,13 +13,6 @@ export function mentionToken(user: Pick<DirectoryUser, "id" | "name">): string {
   return `@[${user.name}](${user.id})`;
 }
 
-/**
- * The open `@` token at the caret, or null.
- *
- * A mention only starts at the beginning of the text or after whitespace, so
- * an email address never opens the picker, and a finished token is skipped
- * because its query would start with `[`.
- */
 export function findMentionQuery(text: string, caret: number): MentionQuery | null {
   const end = Math.max(0, Math.min(caret, text.length));
 
@@ -54,23 +36,99 @@ export function findMentionQuery(text: string, caret: number): MentionQuery | nu
   return { query, start: index, end };
 }
 
-/** Replace the open token with a finished mention and report the new caret. */
+/**
+ * Chèn tên người được nhắc vào ô soạn thảo — dạng NGƯỜI ĐỌC ĐƯỢC.
+ *
+ * Trước đây chỗ này chèn thẳng `@[Tên](uuid)`. Đó là dạng lưu trữ, và nó đúng
+ * cho server: id không đổi khi người ta đổi tên. Nhưng người đang gõ thì thấy
+ * một chuỗi 45 ký tự đầy dấu ngoặc chen ngang câu của mình.
+ *
+ * Nên ô soạn thảo giữ `@Tên`, và `resolveMentions` dịch ngược lại thành dạng
+ * lưu trữ ngay trước khi gửi.
+ */
 export function applyMention(
   text: string,
   range: MentionQuery,
   user: Pick<DirectoryUser, "id" | "name">,
 ): { readonly text: string; readonly caret: number } {
-  const token = `${mentionToken(user)} `;
+  const label = `@${user.name} `;
   return {
-    text: `${text.slice(0, range.start)}${token}${text.slice(range.end)}`,
-    caret: range.start + token.length,
+    text: `${text.slice(0, range.start)}${label}${text.slice(range.end)}`,
+    caret: range.start + label.length,
   };
 }
 
+/** Ký tự đứng trước `@` thì mới tính là một lần nhắc tên. */
+const MENTION_START = /[\s([]/;
+
+function isMentionStart(text: string, at: number): boolean {
+  if (at === 0) return true;
+
+  const before = text[at - 1] ?? "";
+  return MENTION_START.test(before);
+}
+
 /**
- * People a query can mention. Members who left the workspace are resolvable
- * but not mentionable — notifying an inbox nobody reads is worse than nothing.
+ * Đổi `@Tên` trong ô soạn thảo thành `@[Tên](id)` để gửi đi.
+ *
+ * Khớp theo tên DÀI NHẤT trước, vì tên có dấu cách ("Trần Văn A") sẽ bị tên
+ * ngắn hơn ăn mất phần đầu nếu duyệt ngược lại.
+ *
+ * Hai người trùng tên thì KHÔNG đổi: gửi nhầm thông báo cho người lạ tệ hơn là
+ * để nguyên chữ thường. Chuỗi đã ở dạng lưu trữ thì giữ nguyên, không đụng vào.
  */
+export function resolveMentions(
+  text: string,
+  people: readonly DirectoryUser[],
+): string {
+  const active = people.filter((person) => person.isActive);
+  const names = [...new Set(active.map((person) => person.name))].sort(
+    (a, b) => b.length - a.length,
+  );
+
+  let result = "";
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const at = text.indexOf("@", cursor);
+
+    if (at === -1) break;
+
+    // Đã là dạng lưu trữ rồi: nhảy qua trọn vẹn, đừng dịch hai lần.
+    const token = new RegExp(`^${MENTION_SOURCE}`).exec(text.slice(at));
+
+    if (token) {
+      result += text.slice(cursor, at) + token[0];
+      cursor = at + token[0].length;
+      continue;
+    }
+
+    const name = isMentionStart(text, at)
+      ? names.find(
+          (candidate) =>
+            text.slice(at + 1, at + 1 + candidate.length).toLowerCase() ===
+            candidate.toLowerCase(),
+        )
+      : undefined;
+
+    const matches =
+      name === undefined
+        ? []
+        : active.filter((person) => person.name === name);
+
+    if (matches.length !== 1 || name === undefined) {
+      result += text.slice(cursor, at + 1);
+      cursor = at + 1;
+      continue;
+    }
+
+    result += text.slice(cursor, at) + mentionToken(matches[0]!);
+    cursor = at + 1 + name.length;
+  }
+
+  return result + text.slice(cursor);
+}
+
 export function mentionCandidates(
   people: readonly DirectoryUser[],
   query: string,
@@ -90,7 +148,6 @@ export function mentionCandidates(
     .slice(0, limit);
 }
 
-/** Ids a body mentions, de-duplicated, in the order they appear. */
 export function extractMentionIds(body: string): readonly string[] {
   const ids = new Set<string>();
 
@@ -102,10 +159,6 @@ export function extractMentionIds(body: string): readonly string[] {
   return [...ids];
 }
 
-/**
- * Split a body into text, mention and record segments. The renderer maps this
- * straight onto elements — it never re-parses the raw string itself.
- */
 export function parseBody(body: string): readonly BodySegment[] {
   const segments: BodySegment[] = [];
   let cursor = 0;
@@ -129,7 +182,6 @@ export function parseBody(body: string): readonly BodySegment[] {
   return segments;
 }
 
-/** Body with mention tokens flattened to `@Name` — for previews and search. */
 export function plainBody(body: string): string {
   return body.replace(MENTION_PATTERN, (_match, label: string) => `@${label}`);
 }

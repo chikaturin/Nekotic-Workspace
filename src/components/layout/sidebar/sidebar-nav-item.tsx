@@ -13,7 +13,6 @@ interface SidebarNavItemProps {
   readonly icon: LucideIcon;
   readonly isCollapsed: boolean;
   readonly badgeCount?: number;
-  /** Match nested routes, not just the exact path. */
   readonly matchNested?: boolean;
 }
 

@@ -6,20 +6,10 @@ import { refKey } from "@/lib/entity-ref";
 import { dropEntry, touchEntry } from "@/lib/lru";
 import type { EntityRef, RecentEntry } from "@/types";
 
-/**
- * Recent (CO-REC-33).
- *
- * A least-recently-used list of the last {@link RECENT_LIMIT} places visited,
- * kept in this browser only. It is a navigation convenience, so best-effort
- * storage is the right trade: a blocked storage API costs the history, nothing
- * else.
- */
-
-const STORAGE_KEY = "nexdrop-recent";
+const STORAGE_KEY = "nekotic-recent";
 
 interface RecentState {
   readonly entries: readonly RecentEntry[];
-  /** False until local storage has been read, so SSR and hydration agree. */
   readonly isHydrated: boolean;
 }
 
@@ -42,7 +32,6 @@ function read(): readonly RecentEntry[] {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
 
-    // Anything that does not look like an entry is dropped rather than trusted.
     return parsed.filter(isRecentEntry).slice(0, RECENT_LIMIT);
   } catch {
     return [];
@@ -56,7 +45,11 @@ function isRecentEntry(value: unknown): value is RecentEntry {
   if (typeof candidate.visitedAt !== "string") return false;
   if (typeof candidate.ref !== "object" || candidate.ref === null) return false;
 
-  const ref = candidate.ref as { nodeId?: unknown; kind?: unknown; label?: unknown };
+  const ref = candidate.ref as {
+    nodeId?: unknown;
+    kind?: unknown;
+    label?: unknown;
+  };
   return (
     typeof ref.nodeId === "string" &&
     typeof ref.kind === "string" &&
@@ -68,7 +61,6 @@ function write(entries: readonly RecentEntry[]): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   } catch {
-    /* storage unavailable — the list still works for this session */
   }
 }
 
@@ -103,4 +95,5 @@ export const useRecentStore = create<RecentStore>()((set, get) => ({
   },
 }));
 
-export const selectRecent = (state: RecentStore): readonly RecentEntry[] => state.entries;
+export const selectRecent = (state: RecentStore): readonly RecentEntry[] =>
+  state.entries;

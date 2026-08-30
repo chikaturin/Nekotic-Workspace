@@ -27,7 +27,8 @@ export function AttachmentBlock({ block, onChange, isEditable, folderId }: Attac
   async function handleFile(file: File) {
     setIsUploading(true);
     try {
-      const asset = await uploadOne(file, folderId);
+      // Tệp đính kèm của khối, không phải một mục trong Drive.
+      const asset = await uploadOne(file, folderId, { kind: "block" });
       if (!asset) return;
 
       onChange({
@@ -42,15 +43,18 @@ export function AttachmentBlock({ block, onChange, isEditable, folderId }: Attac
     }
   }
 
-  function download() {
+  async function download() {
     if (!block.assetId) {
-      pushFeedback("This attachment has no stored file in the mock dataset", "info");
+      pushFeedback("This attachment has no stored file", "info");
       return;
     }
 
-    const url = fileService.getAssetUrl(block.assetId);
-    if (!url) {
-      pushFeedback("The file is no longer available in this session", "error");
+    let url: string;
+
+    try {
+      url = await fileService.getAssetUrl(block.assetId);
+    } catch {
+      pushFeedback("The file could not be reached", "error");
       return;
     }
 

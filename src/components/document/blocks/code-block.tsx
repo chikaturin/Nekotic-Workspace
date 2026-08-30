@@ -28,10 +28,6 @@ interface CodeBlockProps {
   readonly isEditable: boolean;
 }
 
-/**
- * Plain monospaced editor. Tab inserts spaces instead of leaving the block, and
- * ⌘↑/⌘↓ hop out to the neighbouring blocks so the keyboard is never trapped.
- */
 export function CodeBlock({
   block,
   onChange,
@@ -51,8 +47,6 @@ export function CodeBlock({
   }, [block.code]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    // Shift+Tab always leaves the block, and a read-only block never swallows
-    // Tab — otherwise a locked page becomes a keyboard trap.
     if (event.key === "Tab" && isEditable && !event.shiftKey) {
       event.preventDefault();
 
@@ -90,11 +84,6 @@ export function CodeBlock({
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-surface">
       <div className="flex items-center gap-2 border-b border-hairline px-2 py-1.5">
-        {/* Ghost, because the code block already draws its own frame and a
-            second bordered box inside the chrome bar reads as a field where
-            there is only a label. The `metric` face is the block's, not the
-            control's — a language name belongs in the same face as the code
-            underneath it. */}
         <SelectField
           variant="ghost"
           size="xs"

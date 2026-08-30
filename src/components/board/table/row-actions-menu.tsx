@@ -18,16 +18,10 @@ import type { PermissionResolver } from "@/types";
 interface RowActionsMenuProps {
   readonly rowId: string;
   readonly displayId: string;
-  /**
-   * Bound resolver. Duplicating a record is adding one; archiving and deleting
-   * are not — three different keys behind three items that used to share one.
-   */
   readonly can: PermissionResolver;
-  /** True when the record already sits under a parent. */
   readonly isSubtask: boolean;
 }
 
-/** Row-level operations: duplicate, archive and delete, all optimistic. */
 export function RowActionsMenu({ rowId, displayId, can, isSubtask }: RowActionsMenuProps) {
   const duplicateRow = useBoardStore((state) => state.duplicateRow);
   const deleteRow = useBoardStore((state) => state.deleteRow);
@@ -59,8 +53,6 @@ export function RowActionsMenu({ rowId, displayId, can, isSubtask }: RowActionsM
           <DropdownMenuItem
             disabled={!can("row.create")}
             onSelect={() => {
-              // The child is a record of its own, so its drawer is where the
-              // rest of it gets filled in.
               void createSubtask(rowId).then((id) => {
                 if (id) openDrawer(id);
               });
@@ -105,8 +97,6 @@ export function RowActionsMenu({ rowId, displayId, can, isSubtask }: RowActionsM
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Records have no bin — deleting one here is exactly as final as the
-          bulk delete, so it asks in exactly the same way. */}
       <ConfirmDialog
         isOpen={isConfirmingDelete}
         title={`Delete ${displayId}?`}
